@@ -13,48 +13,68 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare remote directory
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          script: mkdir -p /root/apps/dashboardvivera
+      - name: Install sshpass
+        run: sudo apt-get update -y -q && sudo apt-get install -y -q sshpass
 
-      - name: Copy app files
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          source: "server.js,package.json,package-lock.json,dashboard-api.html"
-          target: "/root/apps/dashboardvivera"
-          strip_components: 0
-
-      - name: Install deps and (re)start app
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          envs: PIPEDRIVE_TOKEN,FB_ACCESS_TOKEN,FB_AD_ACCOUNT_IDS
-          script: |
-            set -e
-            cd /root/apps/dashboardvivera
-            cat > .env <<EOF
-            PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN
-            FB_ACCESS_TOKEN=$FB_ACCESS_TOKEN
-            FB_AD_ACCOUNT_IDS=$FB_AD_ACCOUNT_IDS
-            PORT=3000
-            EOF
-            npm install --omit=dev
-            command -v pm2 >/dev/null 2>&1 || npm install -g pm2
-            pm2 describe dashboardvivera >/dev/null 2>&1 && pm2 restart dashboardvivera || pm2 start server.js --name dashboardvivera
-            pm2 save
+      - name: Build remote .env file
         env:
           PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
           FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
           FB_AD_ACCOUNT_IDS: ${{ secrets.FB_AD_ACCOUNT_IDS }}
+        run: |
+          cat > /tmp/app.env <<EOF
+          PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN
+          FB_ACCESS_TOKEN=$FB_ACCESS_TOKEN
+          FB_AD_ACCOUNT_IDS=$FB_AD_ACCOUNT_IDS
+          PORT=3000
+          EOF
+
+      - name: Build remote deploy script
+        run: |
+          cat > /tmp/deploy_remote.sh <<'EOF'
+          set -e
+          mkdir -p /root/apps/dashboardvivera
+          mv /tmp/app.env /root/apps/dashboardvivera/.env
+          cd /root/apps/dashboardvivera
+          npm install --omit=dev
+          command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+          pm2 delete dashboardvivera >/dev/null 2>&1 || true
+          pm2 start server.js --name dashboardvivera
+          pm2 save
+          sleep 3
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || echo "000")
+          echo "HTTP status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "App nao respondeu OK, ultimos logs:"
+            pm2 logs dashboardvivera --lines 40 --nostream || true
+            exit 1
+          fi
+          echo "Deploy verificado com sucesso (HTTP 200)."
+          EOF
+
+      - name: Deploy over SSH (com retry automatico)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+        run: |
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -p 22"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -P 22"
+          MAX_ATTEMPTS=6
+          attempt=1
+          until [ $attempt -gt $MAX_ATTEMPTS ]; do
+            echo "=== Tentativa $attempt de $MAX_ATTEMPTS ==="
+            if sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "mkdir -p /root/apps/dashboardvivera" \
+              && sshpass -e scp $SCP_OPTS server.js package.json package-lock.json dashboard-api.html "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/" \
+              && sshpass -e scp $SCP_OPTS /tmp/app.env /tmp/deploy_remote.sh "$REMOTE_USER@$REMOTE_HOST:/tmp/" \
+              && sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "bash /tmp/deploy_remote.sh"
+            then
+              echo "Deploy concluido com sucesso na tentativa $attempt."
+              exit 0
+            fi
+            echo "Falhou na tentativa $attempt. Aguardando antes de tentar de novo..."
+            attempt=$((attempt + 1))
+            sleep 20
+          done
+          echo "Todas as $MAX_ATTEMPTS tentativas falharam."
+          exit 1
