@@ -2,11 +2,6 @@ name: Cleanup old dashboard-audit process
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - claude/meta-pipe-api-integration-xsxna2
-    paths:
-      - .github/workflows/cleanup-dashboard-audit.yml
 
 jobs:
   cleanup:
