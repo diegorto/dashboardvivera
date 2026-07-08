@@ -1,0 +1,60 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - claude/meta-pipe-api-integration-xsxna2
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare remote directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script: mkdir -p /root/apps/dashboardvivera
+
+      - name: Copy app files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          source: "server.js,package.json,package-lock.json,dashboard-api.html"
+          target: "/root/apps/dashboardvivera"
+          strip_components: 0
+
+      - name: Install deps and (re)start app
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          envs: PIPEDRIVE_TOKEN,FB_ACCESS_TOKEN,FB_AD_ACCOUNT_IDS
+          script: |
+            set -e
+            cd /root/apps/dashboardvivera
+            cat > .env <<EOF
+            PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN
+            FB_ACCESS_TOKEN=$FB_ACCESS_TOKEN
+            FB_AD_ACCOUNT_IDS=$FB_AD_ACCOUNT_IDS
+            PORT=3000
+            EOF
+            npm install --omit=dev
+            command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+            pm2 describe dashboardvivera >/dev/null 2>&1 && pm2 restart dashboardvivera || pm2 start server.js --name dashboardvivera
+            pm2 save
+        env:
+          PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
+          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+          FB_AD_ACCOUNT_IDS: ${{ secrets.FB_AD_ACCOUNT_IDS }}
