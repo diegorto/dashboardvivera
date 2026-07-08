@@ -10,10 +10,14 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Credenciais (carregadas do .env, nao ficam hardcoded no codigo)
-const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
-const FB_ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN;
-const FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
+// Credenciais: em producao (Vercel) vem de config.json (incluido so no deploy,
+// nunca commitado no git); em dev local vem do .env
+let deployConfig = {};
+try { deployConfig = require('./config.json'); } catch (e) { /* nao existe em dev local, tudo bem */ }
+
+const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN || deployConfig.PIPEDRIVE_TOKEN;
+const FB_ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN || deployConfig.FB_ACCESS_TOKEN;
+const FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || deployConfig.FB_AD_ACCOUNT_IDS || '')
   .split(',')
   .map(id => id.trim())
   .filter(Boolean);
@@ -295,9 +299,12 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  const range = defaultDateRange();
-  console.log(`
+
+// Em producao na Vercel o modulo e importado pelo runtime serverless, nao roda diretamente
+if (require.main === module) {
+  app.listen(PORT, () => {
+    const range = defaultDateRange();
+    console.log(`
 Servidor rodando em http://localhost:${PORT}
 Acesse http://localhost:${PORT} no navegador
 API: http://localhost:${PORT}/api/audit?since=${range.since}&until=${range.until}
@@ -310,5 +317,8 @@ Configuracoes:
 
 Clique em Atualizar no dashboard para carregar dados
 Veja os logs aqui para diagnosticar problemas
-  `);
-});
+    `);
+  });
+}
+
+module.exports = app;
