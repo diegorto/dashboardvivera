@@ -294,6 +294,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
 });
 
+// Modulo "Antes e Depois" - Google Photos + reconhecimento facial + timeline por paciente
+app.use('/auth', require('./src/auth/routes'));
+app.use('/api/patients', require('./src/patients/routes'));
+app.use('/api', require('./src/timeline/routes'));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   const range = defaultDateRange();
