@@ -150,9 +150,17 @@ async function getMetaAds(since, until) {
           if (spend <= 0) return;
 
           let leads = 0;
+          let mensagens = 0;
           if (insight.actions) {
-            const leadAction = insight.actions.find(a => a.action_type === 'lead');
-            leads = leadAction ? parseInt(leadAction.value) : 0;
+            insight.actions.forEach(a => {
+              if (a.action_type === 'lead') leads += parseInt(a.value) || 0;
+              // "Conversas por mensagem iniciadas" (anuncios Clique-para-WhatsApp/Messenger).
+              // O nome da action varia por janela de atribuicao (_1d/_7d/_28d); pega o maior valor
+              // encontrado entre as variantes, ja que representam o mesmo evento, nao somam.
+              if (a.action_type && a.action_type.startsWith('onsite_conversion.messaging_conversation_started')) {
+                mensagens = Math.max(mensagens, parseInt(a.value) || 0);
+              }
+            });
           }
 
           const impressions = parseInt(insight.impressions || 0);
@@ -167,7 +175,7 @@ async function getMetaAds(since, until) {
             adId: ad.id,
             adName: ad.name,
             status: ad.effective_status || ad.status,
-            spend, leads, impressions, clicks,
+            spend, leads, mensagens, impressions, clicks,
             thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
             // Deep link pro Ads Manager (funciona pra qualquer anuncio de quem tem acesso a conta).
             // A Ads Library publica (facebook.com/ads/library) so indexa de forma confiavel anuncios
@@ -341,7 +349,7 @@ function buildCreatives(ads, deals) {
     if (!map[key]) {
       map[key] = {
         campanha: ad.campaignName, conjunto: ad.adsetName, anuncio: ad.adName,
-        investimento: 0, impressoes: 0, cliques: 0,
+        investimento: 0, impressoes: 0, cliques: 0, mensagensMeta: 0,
         leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
         receita: 0, thumbnailUrl: ad.thumbnailUrl, adUrl: ad.adUrl, adStatus: ad.status,
         adId: ad.adId, dealDates: []
@@ -350,6 +358,7 @@ function buildCreatives(ads, deals) {
     map[key].investimento += ad.spend;
     map[key].impressoes += ad.impressions;
     map[key].cliques += ad.clicks;
+    map[key].mensagensMeta += ad.mensagens;
     if (!map[key].thumbnailUrl && ad.thumbnailUrl) map[key].thumbnailUrl = ad.thumbnailUrl;
   });
 
@@ -361,7 +370,7 @@ function buildCreatives(ads, deals) {
     if (!map[key]) {
       map[key] = {
         campanha, conjunto, anuncio,
-        investimento: 0, impressoes: 0, cliques: 0,
+        investimento: 0, impressoes: 0, cliques: 0, mensagensMeta: 0,
         leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
         receita: 0, thumbnailUrl: null, adUrl: null, adStatus: null, adId: null, dealDates: []
       };
@@ -395,7 +404,7 @@ function buildCreatives(ads, deals) {
 
     return {
       campanha: r.campanha, conjunto: r.conjunto, anuncio: r.anuncio,
-      investimento: round2(r.investimento), leads: r.leads,
+      investimento: round2(r.investimento), leads: r.leads, mensagensMeta: r.mensagensMeta,
       qualificados: r.qualificados, agendados: r.agendados, compareceram: r.compareceram, compras: r.compras,
       receita: round2(r.receita), roas: round2(roas),
       receitaPorLead: round2(receitaPorLead), receitaPorAgendamento: round2(receitaPorAgendamento),

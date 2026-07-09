@@ -21,6 +21,7 @@ export interface Creative {
   anuncio: string
   investimento: number
   leads: number
+  mensagensMeta: number
   qualificados: number
   agendados: number
   compareceram: number
