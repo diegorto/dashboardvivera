@@ -54,10 +54,15 @@ export function FunilPage() {
           <CardContent>
             {!selectedStage && <p className="text-xs text-muted-foreground">Clique numa etapa do funil pra ver os criativos que mais contribuem para ela.</p>}
             {selectedStage && topCreatives.length === 0 && <p className="text-xs text-muted-foreground">Sem dados nesta etapa no período.</p>}
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2.5">
               {topCreatives.map(c => (
-                <li key={c.anuncio} className="flex items-center justify-between text-sm">
-                  <span className="truncate">{c.anuncio}</span>
+                <li key={c.anuncio} className="flex items-start justify-between gap-2 text-sm">
+                  <span>
+                    {c.anuncio}
+                    {(c.campanha || c.conjunto) && (
+                      <span className="text-xs text-muted-foreground"> ({c.campanha} / {c.conjunto})</span>
+                    )}
+                  </span>
                   <span className="shrink-0 tabular-nums text-muted-foreground">{formatPercent(c.pct, 0)} · {c.count}</span>
                 </li>
               ))}

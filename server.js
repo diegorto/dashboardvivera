@@ -503,11 +503,18 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
 function buildFunnel(deals) {
   const counts = { leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compraram: 0 };
   const topCreativesByStage = { leads: {}, qualificados: {}, agendados: {}, compareceram: {}, compraram: {} };
+  // Pra cada anuncio, conta qual combinacao campanha/conjunto aparece mais - usado so pra
+  // exibir a origem ao lado do nome do criativo no drill-down do funil.
+  const anuncioOriginCounts = {};
 
   deals.forEach(deal => {
     const rank = rankOf(deal);
     const anuncio = deal.palavraChave || 'sem_palavra_chave';
     const bump = (stageKey) => { topCreativesByStage[stageKey][anuncio] = (topCreativesByStage[stageKey][anuncio] || 0) + 1; };
+
+    const originKey = joinKey(deal.campanha || 'sem_campanha', deal.conjunto || 'sem_conjunto', '');
+    if (!anuncioOriginCounts[anuncio]) anuncioOriginCounts[anuncio] = {};
+    anuncioOriginCounts[anuncio][originKey] = (anuncioOriginCounts[anuncio][originKey] || 0) + 1;
 
     counts.leads++; bump('leads');
     if (rank >= 2 || deal.status === 'won') { counts.qualificados++; bump('qualificados'); }
@@ -515,6 +522,14 @@ function buildFunnel(deals) {
     if (rank >= 4 || deal.status === 'won') { counts.compareceram++; bump('compareceram'); }
     if (deal.status === 'won') { counts.compraram++; bump('compraram'); }
   });
+
+  function originOf(anuncio) {
+    const counts = anuncioOriginCounts[anuncio];
+    if (!counts) return { campanha: '', conjunto: '' };
+    const [bestKey] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    const [campanha, conjunto] = bestKey.split('|||');
+    return { campanha, conjunto };
+  }
 
   const stageOrder = ['leads', 'qualificados', 'agendados', 'compareceram', 'compraram'];
   const labels = { leads: 'Leads', qualificados: 'Qualificados', agendados: 'Agendados', compareceram: 'Compareceram', compraram: 'Compraram' };
@@ -529,7 +544,7 @@ function buildFunnel(deals) {
   const top5 = {};
   stageOrder.forEach(key => {
     top5[key] = Object.entries(topCreativesByStage[key])
-      .map(([anuncio, count]) => ({ anuncio, count, pct: counts[key] > 0 ? round2((count / counts[key]) * 100) : 0 }))
+      .map(([anuncio, count]) => ({ anuncio, count, pct: counts[key] > 0 ? round2((count / counts[key]) * 100) : 0, ...originOf(anuncio) }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
   });

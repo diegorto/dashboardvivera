@@ -56,6 +56,8 @@ export interface FunnelTopCreative {
   anuncio: string
   count: number
   pct: number
+  campanha: string
+  conjunto: string
 }
 
 export interface Funnel {
