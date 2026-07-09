@@ -13,6 +13,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend (Vivera Insights)
+        run: |
+          cd web
+          npm install
+          npm run build
+
       - name: Install sshpass
         run: sudo apt-get update -y -q && sudo apt-get install -y -q sshpass
 
@@ -51,14 +62,28 @@ jobs:
           fi
           UNTIL=$(date +%F)
           SINCE=$(date -d "30 days ago" +%F 2>/dev/null || date -v-30d +%F)
-          echo "--- Verificando /api/audit ($SINCE a $UNTIL) ---"
-          AUDIT=$(curl -sS -m 60 "http://127.0.0.1:3000/api/audit?since=$SINCE&until=$UNTIL")
-          echo "$AUDIT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log('success:',j.success);console.log('meta_ads rows:',(j.meta_ads||[]).length);console.log('data rows:',(j.data||[]).length);console.log('daily rows:',(j.daily||[]).length);console.log('funnel:',JSON.stringify(j.funnel));console.log('summary:',JSON.stringify(j.summary));if(j.meta_ads&&j.meta_ads[0])console.log('sample meta_ad:',JSON.stringify(j.meta_ads[0]));}catch(e){console.log('resposta nao e JSON valido:',d.slice(0,300));process.exit(1)}})" || (echo "api/audit falhou ao processar" && exit 1)
-          if [ "$(echo "$AUDIT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log((j.meta_ads||[]).length)}catch(e){console.log(0)}})")" = "0" ]; then
+          echo "--- Verificando /api/dashboard ($SINCE a $UNTIL) ---"
+          RESP=$(curl -sS -m 60 "http://127.0.0.1:3000/api/dashboard?since=$SINCE&until=$UNTIL")
+          echo "$RESP" | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              try{
+                const j=JSON.parse(d);
+                console.log('success:', j.success);
+                console.log('creatives:', (j.creatives||[]).length);
+                console.log('patients:', (j.patients||[]).length);
+                console.log('funnel leads:', j.funnel && j.funnel.stages && j.funnel.stages[0] ? j.funnel.stages[0].count : 'n/a');
+                console.log('governance sem responsavel:', JSON.stringify(j.governance && j.governance.semResponsavel));
+                console.log('kpis:', JSON.stringify(j.kpis));
+                console.log('totalAdsComGasto:', j.meta && j.meta.totalAdsComGasto);
+              }catch(e){ console.log('resposta nao e JSON valido:', d.slice(0,300)); process.exit(1); }
+            })
+          " || (echo "api/dashboard falhou ao processar" && exit 1)
+          ADS_COUNT=$(echo "$RESP" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log(j.meta.totalAdsComGasto||0)}catch(e){console.log(0)}})")
+          if [ "$ADS_COUNT" = "0" ]; then
             echo "AVISO: 0 ads retornados do Meta nos ultimos 30 dias, verificando logs para erro de API:"
             pm2 logs dashboardvivera --lines 60 --nostream --err || true
           fi
-          echo "Deploy verificado com sucesso (HTTP 200 + /api/audit OK)."
+          echo "Deploy verificado com sucesso (HTTP 200 + /api/dashboard OK)."
           EOF
 
       - name: Deploy over SSH (com retry automatico)
@@ -73,8 +98,9 @@ jobs:
           attempt=1
           until [ $attempt -gt $MAX_ATTEMPTS ]; do
             echo "=== Tentativa $attempt de $MAX_ATTEMPTS ==="
-            if sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "mkdir -p /root/apps/dashboardvivera" \
-              && sshpass -e scp $SCP_OPTS server.js package.json package-lock.json dashboard-api.html "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/" \
+            if sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "mkdir -p /root/apps/dashboardvivera/web" \
+              && sshpass -e scp $SCP_OPTS server.js package.json package-lock.json "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/" \
+              && sshpass -e scp $SCP_OPTS -r web/dist "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/web/" \
               && sshpass -e scp $SCP_OPTS /tmp/app.env /tmp/deploy_remote.sh "$REMOTE_USER@$REMOTE_HOST:/tmp/" \
               && sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "bash /tmp/deploy_remote.sh"
             then

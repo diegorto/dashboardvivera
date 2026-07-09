@@ -4,13 +4,13 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
-// Credenciais: em producao (Vercel) vem de config.json (incluido so no deploy,
+// Credenciais: em producao vem de config.json (incluido so no deploy,
 // nunca commitado no git); em dev local vem do .env
 let deployConfig = {};
 try { deployConfig = require('./config.json'); } catch (e) { /* nao existe em dev local, tudo bem */ }
@@ -22,40 +22,103 @@ const FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || deployConfig.FB_AD_A
   .map(id => id.trim())
   .filter(Boolean);
 
-// IDs reais dos campos customizados "Trafego Pago" no Deal do Pipedrive
+// IDs reais dos campos customizados no Deal do Pipedrive (confirmados via API)
 const FIELD_CAMPANHA = 'b70cf4c34cd06cb3917b79f3ebe1e64d28666f4b';
 const FIELD_CONJUNTO = '182132e7acfbec43315140ab18362f0e16ada0c4';
-// Convencao do usuario: "Palavra Chave" = nome do anuncio (pra funcionar tambem com Google Ads no futuro)
-const FIELD_PALAVRA_CHAVE = 'c9ee045e6537eb296d268102e99829b0dbda1b5b';
+const FIELD_PALAVRA_CHAVE = 'c9ee045e6537eb296d268102e99829b0dbda1b5b'; // = "criativo"
 const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a';
 const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
+const FIELD_PROCEDIMENTO = 'f7a27fd84e08c5d880f1534646eb07307eb20944';
+const FIELD_TELEFONE = '82a1694b1017b48cf7ed15e0085843b4f3f97d5d';
 
 // Pipeline "Inbound" = id 1 (onde entram os leads de trafego pago)
 const INBOUND_PIPELINE_ID = 1;
+
+// Etiquetas (label) que identificam a medica responsavel (Closer) - confirmado via API
+const DOCTOR_LABELS = { '65': 'Dra Kissya', '67': 'Dra Jéssica', '98': 'Dr. Diego' };
+
+// Opcoes do campo "Procedimento" (set) - confirmado via API
+const PROCEDIMENTO_OPTIONS = {
+  '37': 'Método Evolution', '38': 'Toxina botulínica', '39': 'Ácido Hialurônico',
+  '40': 'Bioestimuladores de colágeno', '41': 'Fios APTOS', '42': 'Ultraformer MPT',
+  '43': 'Exojet', '44': 'Protocolo Evolution Full Face',
+  '45': 'Implantes Dentários Sem Cortes (Cirurgia Guiada)',
+  '46': 'Lentes de Contato Dental Biomiméticas', '47': 'Invisalign - Alinhadores Transparentes',
+  '68': 'Não identificado'
+};
+
+// Ordem das etapas do funil no Pipedrive (stage_id -> posicao). Deals "ganhos" (won)
+// sao tratados como tendo alcancado no minimo a etapa de Comparecimento (rank 4),
+// mesmo que o stage_id atual nao reflita isso.
+const STAGE_RANK = {
+  1: 0,                          // Entrada
+  2: 1, 25: 1, 20: 1, 21: 1, 22: 1, 23: 1, 24: 1, // Contato Realizado + D+1..D+5
+  3: 2,                          // Qualificado
+  4: 3, 13: 3,                   // Agendamento Realizado / Nao Compareceu-reagendar
+  5: 4, 6: 4, 7: 4                // Comparecimento + Follow Up 1/2
+};
+
+const FUNNEL_STAGES = [
+  { key: 'leads', label: 'Leads', rank: 0 },
+  { key: 'qualificados', label: 'Qualificados', rank: 2 },
+  { key: 'agendados', label: 'Agendados', rank: 3 },
+  { key: 'compareceram', label: 'Compareceram', rank: 4 },
+  { key: 'compraram', label: 'Compraram', rank: 5 } // tratado a parte (status === won)
+];
+
+function fmtDate(d) { return d.toISOString().slice(0, 10); }
 
 function defaultDateRange() {
   const until = new Date();
   const since = new Date();
   since.setDate(since.getDate() - 30);
-  const fmt = d => d.toISOString().slice(0, 10);
-  return { since: fmt(since), until: fmt(until) };
+  return { since: fmtDate(since), until: fmtDate(until) };
+}
+
+// Periodo anterior de mesma duracao, imediatamente anterior a "since".
+function previousRange(since, until) {
+  const s = new Date(since + 'T00:00:00');
+  const u = new Date(until + 'T00:00:00');
+  const days = Math.max(1, Math.round((u - s) / 86400000) + 1);
+  const prevUntil = new Date(s);
+  prevUntil.setDate(prevUntil.getDate() - 1);
+  const prevSince = new Date(prevUntil);
+  prevSince.setDate(prevSince.getDate() - (days - 1));
+  return { since: fmtDate(prevSince), until: fmtDate(prevUntil) };
 }
 
 function joinKey(campanha, conjunto, anuncio) {
   return `${campanha}|||${conjunto}|||${anuncio}`;
 }
 
-// Busca ads (nivel anuncio individual) da Meta, com spend/leads no periodo escolhido.
-// "leads" aqui = o que o proprio Meta Ads Manager reporta como acao do tipo "lead"
-// (o "leads_meta" da tabela de audit) - o que o gerenciador diz que aconteceu.
-// Depois comparamos com o Pipedrive, que confirma se realmente aconteceu.
+function deltaPct(current, previous) {
+  if (previous === 0) return current === 0 ? 0 : null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function rankOf(deal) {
+  const r = STAGE_RANK[deal.stageId];
+  return r === undefined ? 0 : r;
+}
+
+function closerNames(deal) {
+  const ids = (deal.labelRaw || '').split(',').filter(Boolean);
+  return ids.map(id => DOCTOR_LABELS[id]).filter(Boolean);
+}
+
+function procedimentoNames(deal) {
+  const ids = (deal.procedimentoRaw || '').split(',').filter(Boolean);
+  return ids.map(id => PROCEDIMENTO_OPTIONS[id]).filter(Boolean);
+}
+
+// Busca ads (nivel anuncio individual) da Meta, com spend/leads/impressoes/cliques no periodo.
 async function getMetaAds(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
-  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
+  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},` +
+    `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
-    console.log(`\nBuscando ads Meta - Account: ${accountId} (${since} a ${until})`);
     let url = `https://graph.facebook.com/v18.0/act_${accountId}/ads`;
     let params = { access_token: FB_ACCESS_TOKEN, fields, limit: 200 };
     let page = 0;
@@ -65,12 +128,10 @@ async function getMetaAds(since, until) {
       while (url && page < MAX_PAGES) {
         const response = await axios.get(url, { params });
         const data = response.data.data || [];
-        let comAtividade = 0;
 
         data.forEach(ad => {
           const insight = ad.insights && ad.insights.data && ad.insights.data[0];
-          if (!insight) return; // sem atividade no periodo
-
+          if (!insight) return;
           const spend = parseFloat(insight.spend || 0);
           if (spend <= 0) return;
 
@@ -82,9 +143,6 @@ async function getMetaAds(since, until) {
 
           const impressions = parseInt(insight.impressions || 0);
           const clicks = parseInt(insight.clicks || 0);
-          const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
-          const cpc = clicks > 0 ? (spend / clicks) : 0;
-          const cpm = impressions > 0 ? (spend / impressions * 1000) : 0;
 
           ads.push({
             accountId,
@@ -95,22 +153,15 @@ async function getMetaAds(since, until) {
             adId: ad.id,
             adName: ad.name,
             status: ad.effective_status || ad.status,
-            spend,
-            leads,
-            impressions,
-            clicks,
-            ctr,
-            cpc,
-            cpm
+            spend, leads, impressions, clicks,
+            thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
+            adUrl: `https://www.facebook.com/ads/library/?id=${ad.id}`
           });
-          comAtividade++;
         });
-
-        console.log(`  pagina ${page + 1}: ${data.length} ads retornados, ${comAtividade} com gasto > 0 no periodo`);
 
         if (response.data.paging && response.data.paging.next) {
           url = response.data.paging.next;
-          params = undefined; // a URL "next" ja vem com todos os params necessarios
+          params = undefined;
         } else {
           url = null;
         }
@@ -121,142 +172,25 @@ async function getMetaAds(since, until) {
     }
   }
 
-  console.log(`\nTotal de ads com atividade no periodo: ${ads.length}\n`);
   return ads;
 }
 
-// Agrupa os ads em Campanha + Conjunto + Anuncio (nome do anuncio = "palavra chave"
-// por convencao do usuario, pra bater com o Pipedrive e futuramente com Google Ads).
-function aggregateMetaAds(ads) {
-  const map = {};
-  ads.forEach(ad => {
-    const key = joinKey(ad.campaignName, ad.adsetName, ad.adName);
-    if (!map[key]) {
-      map[key] = {
-        campanha: ad.campaignName,
-        conjunto: ad.adsetName,
-        anuncio: ad.adName,
-        gasto_meta: 0,
-        leads_meta: 0,
-        impressoes_meta: 0,
-        cliques_meta: 0
-      };
-    }
-    map[key].gasto_meta += ad.spend;
-    map[key].leads_meta += ad.leads;
-    map[key].impressoes_meta += ad.impressions;
-    map[key].cliques_meta += ad.clicks;
-  });
-  return Object.values(map);
-}
+// Todos os deals do pipeline Inbound, SEM filtro de data (usado como base; filtros de
+// periodo sao aplicados em memoria depois, e o Pipeline usa o conjunto sem filtro).
+async function fetchAllInboundDeals() {
+  const deals = [];
+  let start = 0;
+  let hasMore = true;
 
-// Serie diaria de gasto/leads no nivel de conta (nao por anuncio), pra montar o
-// grafico de tendencia sem multiplicar o numero de chamadas por anuncio x dia.
-async function getMetaDailySeries(since, until) {
-  const daily = {};
-  const timeRangeParam = JSON.stringify({ since, until });
-
-  for (const accountId of FB_AD_ACCOUNT_IDS) {
-    try {
-      let url = `https://graph.facebook.com/v18.0/act_${accountId}/insights`;
-      let params = {
-        access_token: FB_ACCESS_TOKEN,
-        time_range: timeRangeParam,
-        time_increment: 1,
-        fields: 'spend,actions',
-        limit: 500
-      };
-
-      while (url) {
-        const response = await axios.get(url, { params });
-        const data = response.data.data || [];
-
-        data.forEach(row => {
-          const date = row.date_start;
-          if (!daily[date]) daily[date] = { date, gasto_meta: 0, leads_meta: 0 };
-          daily[date].gasto_meta += parseFloat(row.spend || 0);
-          const leadAction = (row.actions || []).find(a => a.action_type === 'lead');
-          daily[date].leads_meta += leadAction ? parseInt(leadAction.value) : 0;
-        });
-
-        if (response.data.paging && response.data.paging.next) {
-          url = response.data.paging.next;
-          params = undefined;
-        } else {
-          url = null;
-        }
-      }
-    } catch (error) {
-      console.error(`Erro ao buscar serie diaria da conta ${accountId}:`, JSON.stringify(error.response?.data?.error || error.message));
-    }
-  }
-
-  return daily;
-}
-
-// Preenche todos os dias do intervalo (mesmo sem atividade) pra grafico continuo.
-function buildDailySeries(since, until, metaDaily, deals) {
-  const pipedriveDaily = {};
-  deals.forEach(deal => {
-    if (!deal.addDate) return;
-    if (!pipedriveDaily[deal.addDate]) pipedriveDaily[deal.addDate] = { leads_pipedrive: 0, revenue_total: 0 };
-    pipedriveDaily[deal.addDate].leads_pipedrive++;
-    pipedriveDaily[deal.addDate].revenue_total += deal.value;
-  });
-
-  const series = [];
-  const cursor = new Date(since + 'T00:00:00');
-  const end = new Date(until + 'T00:00:00');
-  while (cursor <= end) {
-    const date = cursor.toISOString().slice(0, 10);
-    const meta = metaDaily[date] || { gasto_meta: 0, leads_meta: 0 };
-    const pd = pipedriveDaily[date] || { leads_pipedrive: 0, revenue_total: 0 };
-    series.push({
-      date,
-      gasto_meta: meta.gasto_meta,
-      leads_meta: meta.leads_meta,
-      leads_pipedrive: pd.leads_pipedrive,
-      revenue_total: pd.revenue_total
-    });
-    cursor.setDate(cursor.getDate() + 1);
-  }
-  return series;
-}
-
-// Funil de status dos deals no Pipedrive (open/won/lost) + taxa de conversao.
-function buildFunnel(deals) {
-  const counts = { open: 0, won: 0, lost: 0 };
-  deals.forEach(deal => {
-    const status = deal.status || 'open';
-    counts[status] = (counts[status] || 0) + 1;
-  });
-  const total = deals.length;
-  const conversion = total > 0 ? ((counts.won || 0) / total * 100).toFixed(1) : '0.0';
-  return { counts, total, conversion };
-}
-
-// Pipedrive: busca Deals (negocios) do funil Inbound dentro do periodo (filtra por add_time).
-// Campanha/Conjunto/Palavra-chave vivem no proprio Deal (campos "Trafego Pago").
-async function getPipedriveDeals(since, until) {
   try {
-    const deals = [];
-    let start = 0;
-    let hasMore = true;
-
     while (hasMore) {
-      const url = 'https://api.pipedrive.com/v1/deals';
-
-      const response = await axios.get(url, {
+      const response = await axios.get('https://api.pipedrive.com/v1/deals', {
         params: { api_token: PIPEDRIVE_TOKEN, limit: 500, start }
       });
 
       if (response.data.success && response.data.data) {
         response.data.data.forEach(deal => {
-          if (INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
-
-          const addDate = (deal.add_time || '').slice(0, 10);
-          if (since && addDate && addDate < since) return;
-          if (until && addDate && addDate > until) return;
+          if (deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
 
           let email = '';
           if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.email)) {
@@ -268,13 +202,19 @@ async function getPipedriveDeals(since, until) {
             id: deal.id,
             title: deal.title,
             status: deal.status,
-            addDate,
-            value: deal.status === 'won' ? (deal.value || 0) : 0,
+            stageId: deal.stage_id,
+            addDate: (deal.add_time || '').slice(0, 10),
+            wonDate: deal.won_time ? deal.won_time.slice(0, 10) : null,
+            value: deal.value || 0,
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
             palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
             plataforma: deal[FIELD_PLATAFORMA] || '',
             origem: deal[FIELD_ORIGEM] || '',
+            labelRaw: deal.label || '',
+            procedimentoRaw: deal[FIELD_PROCEDIMENTO] || '',
+            telefone: deal[FIELD_TELEFONE] || '',
+            ownerName: deal.user_id ? deal.user_id.name : '',
             personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
             email
           });
@@ -286,152 +226,409 @@ async function getPipedriveDeals(since, until) {
         hasMore = false;
       }
     }
-
-    console.log(`Total de deals no funil Inbound dentro do periodo: ${deals.length}`);
-    return deals;
   } catch (error) {
     console.error('Erro ao buscar deals Pipedrive:', error.response?.data?.error || error.message);
-    return [];
   }
+
+  return deals;
 }
 
-// Endpoint: Audit completo (aceita ?since=YYYY-MM-DD&until=YYYY-MM-DD)
-app.get('/api/audit', async (req, res) => {
+function inRange(deal, since, until) {
+  if (!deal.addDate) return false;
+  if (since && deal.addDate < since) return false;
+  if (until && deal.addDate > until) return false;
+  return true;
+}
+
+// Meta-atribuido = deal com Campanha preenchida (veio de trafego pago rastreado).
+function isMetaAttributed(deal) {
+  return !!deal.campanha;
+}
+
+function buildCreatives(ads, deals) {
+  const map = {};
+
+  ads.forEach(ad => {
+    const key = joinKey(ad.campaignName, ad.adsetName, ad.adName);
+    if (!map[key]) {
+      map[key] = {
+        campanha: ad.campaignName, conjunto: ad.adsetName, anuncio: ad.adName,
+        investimento: 0, impressoes: 0, cliques: 0,
+        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
+        receita: 0, thumbnailUrl: ad.thumbnailUrl, adUrl: ad.adUrl, adStatus: ad.status,
+        adId: ad.adId, dealDates: []
+      };
+    }
+    map[key].investimento += ad.spend;
+    map[key].impressoes += ad.impressions;
+    map[key].cliques += ad.clicks;
+    if (!map[key].thumbnailUrl && ad.thumbnailUrl) map[key].thumbnailUrl = ad.thumbnailUrl;
+  });
+
+  deals.forEach(deal => {
+    const campanha = deal.campanha || 'sem_campanha';
+    const conjunto = deal.conjunto || 'sem_conjunto';
+    const anuncio = deal.palavraChave || 'sem_palavra_chave';
+    const key = joinKey(campanha, conjunto, anuncio);
+    if (!map[key]) {
+      map[key] = {
+        campanha, conjunto, anuncio,
+        investimento: 0, impressoes: 0, cliques: 0,
+        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
+        receita: 0, thumbnailUrl: null, adUrl: null, adStatus: null, adId: null, dealDates: []
+      };
+    }
+    const r = map[key];
+    const rank = rankOf(deal);
+    r.leads++;
+    if (rank >= 2 || deal.status === 'won') r.qualificados++;
+    if (rank >= 3 || deal.status === 'won') r.agendados++;
+    if (rank >= 4 || deal.status === 'won') r.compareceram++;
+    if (deal.status === 'won') { r.compras++; r.receita += deal.value; r.dealDates.push({ date: deal.wonDate || deal.addDate, value: deal.value }); }
+  });
+
+  return Object.values(map).map(r => {
+    const roas = r.investimento > 0 ? r.receita / r.investimento : 0;
+    const receitaPorLead = r.leads > 0 ? r.receita / r.leads : 0;
+    const receitaPorAgendamento = r.agendados > 0 ? r.receita / r.agendados : 0;
+    const ctr = r.impressoes > 0 ? (r.cliques / r.impressoes) * 100 : 0;
+    const cpc = r.cliques > 0 ? r.investimento / r.cliques : 0;
+
+    // tendencia: divide as vendas em 2 metades cronologicas e compara receita
+    const sortedDates = r.dealDates.map(d => d.date).filter(Boolean).sort();
+    const trend = buildTrendBuckets(r.dealDates);
+    const firstHalf = trend.slice(0, 2).reduce((s, v) => s + v, 0);
+    const secondHalf = trend.slice(2).reduce((s, v) => s + v, 0);
+    const trendDirection = secondHalf > firstHalf ? 'up' : secondHalf < firstHalf ? 'down' : 'flat';
+
+    let status = 'observar';
+    if (r.receita >= 1 && roas < 1.0 && r.investimento >= 500) status = 'desligar';
+    else if (roas >= 2.0 && r.compras >= 3 && trendDirection !== 'down') status = 'escalar';
+
+    return {
+      campanha: r.campanha, conjunto: r.conjunto, anuncio: r.anuncio,
+      investimento: round2(r.investimento), leads: r.leads,
+      qualificados: r.qualificados, agendados: r.agendados, compareceram: r.compareceram, compras: r.compras,
+      receita: round2(r.receita), roas: round2(roas),
+      receitaPorLead: round2(receitaPorLead), receitaPorAgendamento: round2(receitaPorAgendamento),
+      ctr: round2(ctr), cpc: round2(cpc), impressoes: r.impressoes, cliques: r.cliques,
+      trend, trendDirection, status,
+      thumbnailUrl: r.thumbnailUrl, adUrl: r.adUrl, adStatus: r.adStatus, adId: r.adId
+    };
+  }).sort((a, b) => b.receita - a.receita);
+}
+
+function buildTrendBuckets(dealDates) {
+  const withDates = dealDates.filter(d => d.date).sort((a, b) => a.date.localeCompare(b.date));
+  if (withDates.length === 0) return [0, 0, 0, 0];
+  const bucketSize = Math.ceil(withDates.length / 4) || 1;
+  const buckets = [0, 0, 0, 0];
+  withDates.forEach((d, i) => {
+    const b = Math.min(3, Math.floor(i / bucketSize));
+    buckets[b] += d.value;
+  });
+  return buckets.map(round2);
+}
+
+function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+
+function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
+  function totals(ads, deals) {
+    const attributed = deals.filter(isMetaAttributed);
+    const won = attributed.filter(d => d.status === 'won');
+    const receita = won.reduce((s, d) => s + d.value, 0);
+    const compras = won.length;
+    const investimento = ads.reduce((s, a) => s + a.spend, 0);
+    return { receita, compras, investimento };
+  }
+  const cur = totals(currentAds, currentDeals);
+  const prev = totals(previousAds, previousDeals);
+
+  function metric(curVal, prevVal) {
+    return { current: round2(curVal), previous: round2(prevVal), deltaPct: deltaPct(curVal, prevVal) === null ? null : round2(deltaPct(curVal, prevVal)) };
+  }
+
+  const curTicket = cur.compras > 0 ? cur.receita / cur.compras : 0;
+  const prevTicket = prev.compras > 0 ? prev.receita / prev.compras : 0;
+  const curRoas = cur.investimento > 0 ? cur.receita / cur.investimento : 0;
+  const prevRoas = prev.investimento > 0 ? prev.receita / prev.investimento : 0;
+  const curCac = cur.compras > 0 ? cur.investimento / cur.compras : 0;
+  const prevCac = prev.compras > 0 ? prev.investimento / prev.compras : 0;
+
+  return {
+    receita: metric(cur.receita, prev.receita),
+    compras: metric(cur.compras, prev.compras),
+    ticketMedio: metric(curTicket, prevTicket),
+    investimento: metric(cur.investimento, prev.investimento),
+    roas: metric(curRoas, prevRoas),
+    cac: metric(curCac, prevCac)
+  };
+}
+
+function buildFunnel(deals) {
+  const counts = { leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compraram: 0 };
+  const topCreativesByStage = { leads: {}, qualificados: {}, agendados: {}, compareceram: {}, compraram: {} };
+
+  deals.forEach(deal => {
+    const rank = rankOf(deal);
+    const anuncio = deal.palavraChave || 'sem_palavra_chave';
+    const bump = (stageKey) => { topCreativesByStage[stageKey][anuncio] = (topCreativesByStage[stageKey][anuncio] || 0) + 1; };
+
+    counts.leads++; bump('leads');
+    if (rank >= 2 || deal.status === 'won') { counts.qualificados++; bump('qualificados'); }
+    if (rank >= 3 || deal.status === 'won') { counts.agendados++; bump('agendados'); }
+    if (rank >= 4 || deal.status === 'won') { counts.compareceram++; bump('compareceram'); }
+    if (deal.status === 'won') { counts.compraram++; bump('compraram'); }
+  });
+
+  const stageOrder = ['leads', 'qualificados', 'agendados', 'compareceram', 'compraram'];
+  const labels = { leads: 'Leads', qualificados: 'Qualificados', agendados: 'Agendados', compareceram: 'Compareceram', compraram: 'Compraram' };
+  const stages = stageOrder.map((key, i) => {
+    const count = counts[key];
+    const pctFromStart = counts.leads > 0 ? (count / counts.leads) * 100 : 0;
+    const prevKey = i > 0 ? stageOrder[i - 1] : null;
+    const pctLossFromPrev = prevKey && counts[prevKey] > 0 ? ((counts[prevKey] - count) / counts[prevKey]) * -100 : null;
+    return { key, label: labels[key], count, pctFromStart: round2(pctFromStart), pctLossFromPrev: pctLossFromPrev === null ? null : round2(pctLossFromPrev) };
+  });
+
+  const top5 = {};
+  stageOrder.forEach(key => {
+    top5[key] = Object.entries(topCreativesByStage[key])
+      .map(([anuncio, count]) => ({ anuncio, count, pct: counts[key] > 0 ? round2((count / counts[key]) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  });
+
+  return { stages, topCreativesByStage: top5 };
+}
+
+function buildPipelineAging(allOpenDeals) {
+  const buckets = [
+    { label: '0-3 dias', min: 0, max: 3 },
+    { label: '4-7 dias', min: 4, max: 7 },
+    { label: '8-14 dias', min: 8, max: 14 },
+    { label: '15-21 dias', min: 15, max: 21 },
+    { label: '22-30 dias', min: 22, max: 30 },
+    { label: '30+ dias', min: 31, max: Infinity }
+  ].map(b => ({ ...b, count: 0, potentialValue: 0, deals: [] }));
+
+  const today = new Date();
+  const stuckByCreative = {};
+  const campaignDays = {};
+
+  allOpenDeals.forEach(deal => {
+    if (!deal.addDate) return;
+    const added = new Date(deal.addDate + 'T00:00:00');
+    const days = Math.floor((today - added) / 86400000);
+    const bucket = buckets.find(b => days >= b.min && days <= b.max) || buckets[buckets.length - 1];
+    bucket.count++;
+    bucket.potentialValue += deal.value || 0;
+    if (bucket.deals.length < 200) bucket.deals.push({ id: deal.id, title: deal.title || deal.personName, days, anuncio: deal.palavraChave, campanha: deal.campanha });
+
+    const anuncio = deal.palavraChave || 'sem_palavra_chave';
+    stuckByCreative[anuncio] = (stuckByCreative[anuncio] || 0) + (days >= 15 ? 1 : 0);
+
+    const campanha = deal.campanha || 'sem_campanha';
+    if (!campaignDays[campanha]) campaignDays[campanha] = { total: 0, count: 0 };
+    campaignDays[campanha].total += days;
+    campaignDays[campanha].count++;
+  });
+
+  const stuckCreatives = Object.entries(stuckByCreative)
+    .filter(([, c]) => c > 0)
+    .map(([anuncio, count]) => ({ anuncio, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  const slowestCampaigns = Object.entries(campaignDays)
+    .map(([campanha, v]) => ({ campanha, avgDays: round2(v.total / v.count), count: v.count }))
+    .sort((a, b) => b.avgDays - a.avgDays)
+    .slice(0, 8);
+
+  return {
+    buckets: buckets.map(b => ({ label: b.label, count: b.count, potentialValue: round2(b.potentialValue), deals: b.deals })),
+    stuckCreatives, slowestCampaigns
+  };
+}
+
+function buildPatients(deals) {
+  return deals.filter(d => d.status === 'won').map(deal => {
+    let tempoAteFechar = null;
+    if (deal.wonDate && deal.addDate) {
+      tempoAteFechar = Math.round((new Date(deal.wonDate) - new Date(deal.addDate)) / 86400000);
+    }
+    const closers = closerNames(deal);
+    return {
+      id: deal.id,
+      nome: deal.personName || deal.title || 'Sem nome',
+      telefone: deal.telefone || '',
+      criativo: deal.palavraChave || 'sem_palavra_chave',
+      campanha: deal.campanha || 'sem_campanha',
+      conjunto: deal.conjunto || 'sem_conjunto',
+      closer: closers.length > 0 ? closers.join(', ') : null,
+      sdr: deal.ownerName || '',
+      procedimento: procedimentoNames(deal).join(', ') || '—',
+      valor: round2(deal.value),
+      dataLead: deal.addDate,
+      dataVenda: deal.wonDate,
+      status: deal.status,
+      tempoAteFechar
+    };
+  }).sort((a, b) => (b.dataVenda || '').localeCompare(a.dataVenda || ''));
+}
+
+function buildGovernance(deals) {
+  const won = deals.filter(d => d.status === 'won');
+  const semResponsavel = won.filter(d => closerNames(d).length === 0);
+  return {
+    totalVendas: won.length,
+    comResponsavel: won.length - semResponsavel.length,
+    semResponsavel: {
+      count: semResponsavel.length,
+      value: round2(semResponsavel.reduce((s, d) => s + d.value, 0)),
+      deals: semResponsavel.slice(0, 100).map(d => ({ id: d.id, title: d.personName || d.title, value: round2(d.value), data: d.wonDate }))
+    }
+  };
+}
+
+// "Valor potencial" de um deal aberto: usa o campo value do proprio negocio quando
+// preenchido; cai pro ticket medio realizado no periodo quando o negocio ainda nao
+// tem valor definido (comum em estagios iniciais do funil).
+function buildRevenueAtRisk(deals, avgTicket) {
+  const potential = d => d.value > 0 ? d.value : avgTicket;
+
+  function group(filtered) {
+    const items = filtered.map(d => ({ id: d.id, title: d.personName || d.title, status: d.status, value: round2(potential(d)) }));
+    return { count: items.length, value: round2(items.reduce((s, d) => s + d.value, 0)), deals: items.slice(0, 100) };
+  }
+
+  const qualificadosSemAgendamento = group(deals.filter(d => d.status === 'open' && rankOf(d) === 2));
+  const agendadosFaltaram = group(deals.filter(d => d.stageId === 13)); // "Nao Compareceu - reagendar"
+  const propostasSemFechamento = group(deals.filter(d => d.status === 'open' && rankOf(d) >= 4));
+
+  const total = round2(qualificadosSemAgendamento.value + agendadosFaltaram.value + propostasSemFechamento.value);
+  return { qualificadosSemAgendamento, agendadosFaltaram, propostasSemFechamento, total };
+}
+
+function buildInsights(creatives, funnel, governance, pipeline) {
+  const insights = [];
+
+  if (governance.semResponsavel.count > 0) {
+    insights.push({
+      id: 'gov-sem-responsavel',
+      severity: 'critical',
+      text: `⚠ ${governance.semResponsavel.count} vendas (${formatBRL(governance.semResponsavel.value)}) sem etiqueta de responsável — corrija antes da próxima reunião.`
+    });
+  }
+
+  const withSales = creatives.filter(c => c.compras >= 3);
+  if (withSales.length > 0) {
+    const best = [...withSales].sort((a, b) => b.receitaPorLead - a.receitaPorLead)[0];
+    insights.push({ id: 'melhor-receita-lead', severity: 'good', text: `"${best.anuncio}" gera ${formatBRL(best.receitaPorLead)} por lead — o melhor da conta no período.` });
+
+    const bestRoas = [...withSales].sort((a, b) => b.roas - a.roas)[0];
+    insights.push({ id: 'melhor-roas', severity: 'good', text: `"${bestRoas.conjunto}" tem o maior ROAS do período: ${bestRoas.roas.toFixed(2)}x.` });
+  }
+
+  const manyLeadsFewSales = creatives.filter(c => c.leads >= 10 && c.compras === 0);
+  if (manyLeadsFewSales.length > 0) {
+    const worst = [...manyLeadsFewSales].sort((a, b) => b.leads - a.leads)[0];
+    insights.push({ id: 'muitos-leads-poucas-vendas', severity: 'critical', text: `"${worst.anuncio}" gerou ${worst.leads} leads e nenhuma venda no período — considerar pausar.` });
+  }
+
+  const bottleneck = funnel.stages.slice(1).reduce((worst, s) => (s.pctLossFromPrev !== null && s.pctLossFromPrev < (worst?.pctLossFromPrev ?? 1)) ? s : worst, null);
+  if (bottleneck) {
+    const idx = funnel.stages.findIndex(s => s.key === bottleneck.key);
+    const prevLabel = funnel.stages[idx - 1]?.label;
+    insights.push({ id: 'gargalo', severity: 'neutral', text: `Gargalo atual: ${prevLabel} → ${bottleneck.label} (perda de ${Math.abs(bottleneck.pctLossFromPrev).toFixed(0)}%).` });
+  }
+
+  const stuck = pipeline.buckets.filter(b => b.label === '22-30 dias' || b.label === '30+ dias').reduce((s, b) => s + b.count, 0);
+  const stuckValue = pipeline.buckets.filter(b => b.label === '22-30 dias' || b.label === '30+ dias').reduce((s, b) => s + b.potentialValue, 0);
+  if (stuck > 0) {
+    insights.push({ id: 'pipeline-parado', severity: 'critical', text: `${stuck} leads parados há mais de 21 dias no pipeline.` });
+  }
+
+  const toDisable = creatives.filter(c => c.status === 'desligar');
+  toDisable.slice(0, 3).forEach(c => {
+    insights.push({ id: `desligar-${c.anuncio}`, severity: 'critical', text: `"${c.anuncio}" está com ROAS ${c.roas.toFixed(2)}x e investimento de ${formatBRL(c.investimento)} — candidato a pausa.` });
+  });
+
+  return insights;
+}
+
+function formatBRL(v) {
+  return 'R$ ' + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Endpoint principal do Vivera Insights: um unico payload com tudo que as 6 paginas precisam.
+app.get('/api/dashboard', async (req, res) => {
   try {
     const defaults = defaultDateRange();
-    const range = {
-      since: req.query.since || defaults.since,
-      until: req.query.until || defaults.until
-    };
+    const range = { since: req.query.since || defaults.since, until: req.query.until || defaults.until };
+    const prevRange = previousRange(range.since, range.until);
 
-    const [ads, dealsLeads, metaDaily] = await Promise.all([
+    const [currentAds, previousAds, allDeals] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until),
-      getMetaDailySeries(range.since, range.until)
+      getMetaAds(prevRange.since, prevRange.until),
+      fetchAllInboundDeals()
     ]);
 
-    const metaAgg = aggregateMetaAds(ads);
+    const deals = allDeals.filter(d => inRange(d, range.since, range.until));
+    const previousDeals = allDeals.filter(d => inRange(d, prevRange.since, prevRange.until));
+    const openDealsAllTime = allDeals.filter(d => d.status === 'open');
 
-    // auditByKey = tabela de cruzamento, agrupada por Campanha + Conjunto + Anuncio/Palavra-chave
-    const auditByKey = {};
-    metaAgg.forEach(c => {
-      const key = joinKey(c.campanha, c.conjunto, c.anuncio);
-      auditByKey[key] = {
-        campanha: c.campanha,
-        conjunto: c.conjunto,
-        anuncio: c.anuncio,
-        gasto_meta: c.gasto_meta,
-        leads_meta: c.leads_meta,
-        impressoes_meta: c.impressoes_meta,
-        cliques_meta: c.cliques_meta,
-        leads_pipedrive: 0,
-        revenue_total: 0,
-        leads_details: []
-      };
-    });
-
-    dealsLeads.forEach(deal => {
-      const campanha = deal.campanha || 'sem_campanha';
-      const conjunto = deal.conjunto || 'sem_conjunto';
-      const anuncio = deal.palavraChave || 'sem_palavra_chave';
-      const key = joinKey(campanha, conjunto, anuncio);
-      if (!auditByKey[key]) {
-        auditByKey[key] = {
-          campanha,
-          conjunto,
-          anuncio,
-          gasto_meta: 0,
-          leads_meta: 0,
-          impressoes_meta: 0,
-          cliques_meta: 0,
-          leads_pipedrive: 0,
-          revenue_total: 0,
-          leads_details: []
-        };
-      }
-      auditByKey[key].leads_pipedrive++;
-      auditByKey[key].revenue_total += deal.value;
-      auditByKey[key].leads_details.push({
-        nome: deal.personName,
-        email: deal.email,
-        anuncio,
-        conjunto,
-        status: deal.status,
-        data: deal.addDate,
-        revenue: deal.value
-      });
-    });
-
-    const result = Object.values(auditByKey).map(c => {
-      const roas = c.gasto_meta > 0 ? (c.revenue_total / c.gasto_meta).toFixed(2) : 0;
-      const discrepancia = c.leads_meta - c.leads_pipedrive;
-      const discrepancia_percent = c.leads_meta > 0
-        ? ((discrepancia / c.leads_meta) * 100).toFixed(1)
-        : 0;
-      const custo_por_lead = c.leads_pipedrive > 0
-        ? (c.gasto_meta / c.leads_pipedrive).toFixed(2)
-        : 0;
-      const ctr_meta = c.impressoes_meta > 0 ? (c.cliques_meta / c.impressoes_meta * 100).toFixed(2) : '0.00';
-      const cpc_meta = c.cliques_meta > 0 ? (c.gasto_meta / c.cliques_meta).toFixed(2) : '0.00';
-      const cpm_meta = c.impressoes_meta > 0 ? (c.gasto_meta / c.impressoes_meta * 1000).toFixed(2) : '0.00';
-
-      return { ...c, roas, discrepancia, discrepancia_percent, custo_por_lead, ctr_meta, cpc_meta, cpm_meta };
-    });
-
-    result.sort((a, b) => b.gasto_meta - a.gasto_meta);
-
-    const daily = buildDailySeries(range.since, range.until, metaDaily, dealsLeads);
-    const funnel = buildFunnel(dealsLeads);
+    const kpis = buildKpis(currentAds, deals, previousAds, previousDeals);
+    const creatives = buildCreatives(currentAds, deals);
+    const funnel = buildFunnel(deals);
+    const pipeline = buildPipelineAging(openDealsAllTime);
+    const patients = buildPatients(deals);
+    const governance = buildGovernance(deals);
+    const revenueAtRisk = buildRevenueAtRisk(deals, kpis.ticketMedio.current);
+    const insights = buildInsights(creatives, funnel, governance, pipeline);
 
     res.json({
       success: true,
-      range,
-      data: result,
-      meta_ads: ads.sort((a, b) => b.spend - a.spend),
-      daily,
-      funnel,
-      summary: {
-        total_linhas: result.length,
-        gasto_total: result.reduce((sum, r) => sum + r.gasto_meta, 0).toFixed(2),
-        revenue_total: result.reduce((sum, r) => sum + r.revenue_total, 0).toFixed(2),
-        leads_meta_total: result.reduce((sum, r) => sum + r.leads_meta, 0),
-        leads_total: result.reduce((sum, r) => sum + r.leads_pipedrive, 0),
-        impressoes_total: result.reduce((sum, r) => sum + r.impressoes_meta, 0),
-        cliques_total: result.reduce((sum, r) => sum + r.cliques_meta, 0),
-        roas_medio: result.length > 0
-          ? (result.reduce((sum, r) => sum + parseFloat(r.roas), 0) / result.length).toFixed(2)
-          : 0
+      range, previousRange: prevRange,
+      kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights,
+      meta: {
+        adsAccounts: FB_AD_ACCOUNT_IDS.length,
+        totalAdsComGasto: currentAds.length,
+        totalDealsNoPeriodo: deals.length
       }
     });
   } catch (error) {
+    console.error('Erro no /api/dashboard:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Servir o dashboard HTML
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard-api.html'));
-});
+// Servir o frontend React buildado (web/dist). Fallback pra SPA em qualquer rota nao-API.
+const WEB_DIST = path.join(__dirname, 'web', 'dist');
+if (fs.existsSync(WEB_DIST)) {
+  app.use(express.static(WEB_DIST));
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(WEB_DIST, 'index.html'));
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.send('Build do frontend nao encontrado (web/dist). Rode "npm run build" em web/.');
+  });
+}
 
 const PORT = process.env.PORT || 3000;
 
-// Em producao na Vercel o modulo e importado pelo runtime serverless, nao roda diretamente
 if (require.main === module) {
   app.listen(PORT, () => {
-    const range = defaultDateRange();
     console.log(`
 Servidor rodando em http://localhost:${PORT}
-Acesse http://localhost:${PORT} no navegador
-API: http://localhost:${PORT}/api/audit?since=${range.since}&until=${range.until}
+API: http://localhost:${PORT}/api/dashboard
 
 Configuracoes:
    - Meta Accounts: ${FB_AD_ACCOUNT_IDS.length}
    - Pipedrive Token: ${PIPEDRIVE_TOKEN ? PIPEDRIVE_TOKEN.substring(0, 10) + '...' : 'NAO CONFIGURADO'}
    - Pipeline Inbound ID: ${INBOUND_PIPELINE_ID}
-   - Periodo padrao: ${range.since} a ${range.until}
-
-Clique em Atualizar no dashboard para carregar dados
-Veja os logs aqui para diagnosticar problemas
+   - Frontend buildado: ${fs.existsSync(WEB_DIST) ? 'sim' : 'NAO - rode npm run build em web/'}
     `);
   });
 }
