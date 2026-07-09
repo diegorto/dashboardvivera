@@ -13,6 +13,7 @@ export interface Kpis {
   investimento: Metric
   roas: Metric
   cac: Metric
+  tempoMedioFechamento: Metric
 }
 
 export interface Creative {

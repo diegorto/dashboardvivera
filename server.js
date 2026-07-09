@@ -471,7 +471,13 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     const receita = won.reduce((s, d) => s + d.value, 0);
     const compras = won.length;
     const investimento = ads.reduce((s, a) => s + a.spend, 0);
-    return { receita, compras, investimento };
+    const temposFechamento = won
+      .filter(d => d.wonDate && d.addDate)
+      .map(d => (new Date(d.wonDate) - new Date(d.addDate)) / 86400000);
+    const tempoMedioFechamento = temposFechamento.length > 0
+      ? temposFechamento.reduce((s, t) => s + t, 0) / temposFechamento.length
+      : 0;
+    return { receita, compras, investimento, tempoMedioFechamento };
   }
   const cur = totals(currentAds, currentDeals);
   const prev = totals(previousAds, previousDeals);
@@ -489,7 +495,8 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     ticketMedio: metric(curTicket, prevTicket),
     investimento: metric(cur.investimento, prev.investimento),
     roas: metric(curRoas, prevRoas),
-    cac: metric(curCac, prevCac)
+    cac: metric(curCac, prevCac),
+    tempoMedioFechamento: metric(cur.tempoMedioFechamento, prev.tempoMedioFechamento)
   };
 }
 
