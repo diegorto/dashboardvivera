@@ -319,9 +319,12 @@ app.get('/vivera', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  const range = defaultDateRange();
-  console.log(`
+
+// Na Vercel o server nao deve fazer listen: cada request vira uma serverless function.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    const range = defaultDateRange();
+    console.log(`
 Servidor rodando em http://localhost:${PORT}
 Acesse http://localhost:${PORT} no navegador
 API: http://localhost:${PORT}/api/audit?since=${range.since}&until=${range.until}
@@ -334,5 +337,8 @@ Configuracoes:
 
 Clique em Atualizar no dashboard para carregar dados
 Veja os logs aqui para diagnosticar problemas
-  `);
-});
+    `);
+  });
+}
+
+module.exports = app;
