@@ -69,7 +69,7 @@ jobs:
         run: |
           SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -p 22"
           SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -P 22"
-          MAX_ATTEMPTS=6
+          MAX_ATTEMPTS=15
           attempt=1
           until [ $attempt -gt $MAX_ATTEMPTS ]; do
             echo "=== Tentativa $attempt de $MAX_ATTEMPTS ==="
