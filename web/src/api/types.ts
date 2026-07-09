@@ -135,6 +135,17 @@ export interface RevenueAtRisk {
   total: number
 }
 
+export interface LeadSemOrigem {
+  id: number
+  nome: string
+  campanha: string | null
+  conjunto: string | null
+  etapa: string
+  responsavel: string
+  dataEntrada: string
+  status: string
+}
+
 export interface DashboardResponse {
   success: boolean
   range: { since: string; until: string }
@@ -147,6 +158,7 @@ export interface DashboardResponse {
   governance: Governance
   revenueAtRisk: RevenueAtRisk
   insights: Insight[]
+  leadsSemOrigem: LeadSemOrigem[]
   meta: { adsAccounts: number; totalAdsComGasto: number; totalDealsNoPeriodo: number }
   error?: string
 }

@@ -7,6 +7,7 @@ import { FunilPage } from '@/pages/FunilPage'
 import { PipelinePage } from '@/pages/PipelinePage'
 import { PacientesPage } from '@/pages/PacientesPage'
 import { InsightsPage } from '@/pages/InsightsPage'
+import { SemOrigemPage } from '@/pages/SemOrigemPage'
 import { ReuniaoPage } from '@/pages/ReuniaoPage'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
             <Route path="/pipeline" element={<PipelinePage />} />
             <Route path="/pacientes" element={<PacientesPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/sem-origem" element={<SemOrigemPage />} />
           </Route>
           <Route path="/reuniao" element={<ReuniaoPage />} />
         </Routes>

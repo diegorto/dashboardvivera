@@ -66,6 +66,18 @@ const FUNNEL_STAGES = [
   { key: 'compraram', label: 'Compraram', rank: 5 } // tratado a parte (status === won)
 ];
 
+// Nomes reais das etapas no Pipedrive (stage_id -> nome), confirmado via API.
+const STAGE_NAMES = {
+  1: 'Entrada', 2: 'Contato Realizado', 25: 'Dia seguinte',
+  20: 'D+1', 21: 'D+2', 22: 'D+3', 23: 'D+4', 24: 'D+5',
+  3: 'Qualificado', 4: 'Agendamento Realizado', 13: 'Não Compareceu - reagendar',
+  5: 'Comparecimento', 6: 'Follow Up 1', 7: 'Follow Up 2'
+};
+
+function stageName(deal) {
+  return STAGE_NAMES[deal.stageId] || (deal.status === 'won' ? 'Ganho' : `Etapa ${deal.stageId}`);
+}
+
 function fmtDate(d) { return d.toISOString().slice(0, 10); }
 
 function defaultDateRange() {
@@ -477,6 +489,22 @@ function buildPatients(deals) {
   }).sort((a, b) => (b.dataVenda || '').localeCompare(a.dataVenda || ''));
 }
 
+// Leads sem Palavra-chave (criativo) preenchida no Pipedrive - sem isso e impossivel
+// saber qual anuncio do Meta gerou o lead, entao ele fica de fora de toda a atribuicao
+// (Campanhas, Funil por criativo, etc). Independente de status (aberto/ganho/perdido).
+function buildLeadsSemOrigem(deals) {
+  return deals.filter(d => !d.palavraChave).map(deal => ({
+    id: deal.id,
+    nome: deal.personName || deal.title || 'Sem nome',
+    campanha: deal.campanha || null,
+    conjunto: deal.conjunto || null,
+    etapa: stageName(deal),
+    responsavel: deal.ownerName || 'Sem responsável',
+    dataEntrada: deal.addDate,
+    status: deal.status
+  })).sort((a, b) => (b.dataEntrada || '').localeCompare(a.dataEntrada || ''));
+}
+
 function buildGovernance(deals) {
   const won = deals.filter(d => d.status === 'won');
   const semResponsavel = won.filter(d => closerNames(d).length === 0);
@@ -586,11 +614,12 @@ app.get('/api/dashboard', async (req, res) => {
     const governance = buildGovernance(deals);
     const revenueAtRisk = buildRevenueAtRisk(deals, kpis.ticketMedio.current);
     const insights = buildInsights(creatives, funnel, governance, pipeline);
+    const leadsSemOrigem = buildLeadsSemOrigem(deals);
 
     res.json({
       success: true,
       range, previousRange: prevRange,
-      kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights,
+      kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
       meta: {
         adsAccounts: FB_AD_ACCOUNT_IDS.length,
         totalAdsComGasto: currentAds.length,
