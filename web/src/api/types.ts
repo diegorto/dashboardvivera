@@ -44,12 +44,19 @@ export interface Creative {
   adId: string | null
 }
 
+export interface FunnelObjection {
+  tag: string
+  count: number
+}
+
 export interface FunnelStage {
   key: string
   label: string
   count: number
   pctFromStart: number
   pctLossFromPrev: number | null
+  perdidos: number
+  objecoes: FunnelObjection[]
 }
 
 export interface FunnelTopCreative {
@@ -63,6 +70,7 @@ export interface FunnelTopCreative {
 export interface Funnel {
   stages: FunnelStage[]
   topCreativesByStage: Record<string, FunnelTopCreative[]>
+  insights: Insight[]
 }
 
 export interface PipelineDealRef {

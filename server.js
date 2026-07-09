@@ -49,6 +49,13 @@ const RECEPCAO_PIPELINE_ID = 2;
 // Etiquetas (label) que identificam a medica responsavel (Closer) - confirmado via API
 const DOCTOR_LABELS = { '65': 'Dra Kissya', '67': 'Dra Jéssica', '98': 'Dr. Diego' };
 
+// Etiquetas (label) que indicam motivo de perda/objecao - confirmado via API (dealFields).
+const OBJECTION_LABELS = {
+  '80': 'Não Responde', '94': 'Nunca Respondeu', '106': 'Não qualificado',
+  '107': 'Objeção financeira', '108': 'Objeção de distância', '109': 'Parou de responder (valor consulta)',
+  '112': 'Desqualificada', '115': 'Não tem interesse no momento'
+};
+
 // Opcoes do campo "Procedimento" (set) - confirmado via API
 const PROCEDIMENTO_OPTIONS = {
   '37': 'Método Evolution', '38': 'Toxina botulínica', '39': 'Ácido Hialurônico',
@@ -145,12 +152,18 @@ function procedimentoNames(deal) {
   return ids.map(id => PROCEDIMENTO_OPTIONS[id]).filter(Boolean);
 }
 
+function objectionNames(deal) {
+  const ids = (deal.labelRaw || '').split(',').filter(Boolean);
+  return ids.map(id => OBJECTION_LABELS[id]).filter(Boolean);
+}
+
 // Busca ads (nivel anuncio individual) da Meta, com spend/leads/impressoes/cliques no periodo.
 async function getMetaAds(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
   const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},` +
-    `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
+    `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks},` +
+    `previewshareablelink{share_link}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
     let url = `https://graph.facebook.com/v18.0/act_${accountId}/ads`;
@@ -186,6 +199,15 @@ async function getMetaAds(since, until) {
           const impressions = parseInt(insight.impressions || 0);
           const clicks = parseInt(insight.clicks || 0);
 
+          // Link de previa compartilhavel do proprio anuncio (endpoint oficial da Graph API,
+          // o mesmo que a opcao "Compartilhar um link" usa no Ads Manager) - abre a previa do
+          // criativo sem exigir login. Cai pro deep link do Ads Manager se a Meta nao devolver
+          // (comum em anuncios pausados/removidos ha muito tempo).
+          const shareLink = ad.previewshareablelink && (
+            (Array.isArray(ad.previewshareablelink.data) && ad.previewshareablelink.data[0] && ad.previewshareablelink.data[0].share_link) ||
+            ad.previewshareablelink.share_link
+          );
+
           ads.push({
             accountId,
             campaignId: ad.campaign_id,
@@ -197,10 +219,7 @@ async function getMetaAds(since, until) {
             status: ad.effective_status || ad.status,
             spend, leads, mensagens, impressions, clicks,
             thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
-            // Deep link pro Ads Manager (funciona pra qualquer anuncio de quem tem acesso a conta).
-            // A Ads Library publica (facebook.com/ads/library) so indexa de forma confiavel anuncios
-            // politicos/de interesse social - anuncios comerciais normais costumam nao aparecer la.
-            adUrl: `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
+            adUrl: shareLink || `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
           });
         });
 
@@ -531,6 +550,22 @@ function buildFunnel(deals) {
     return { campanha, conjunto };
   }
 
+  // Perdidos "considerados nesta etapa" = negocios com status lost que ja tinham alcancado
+  // no minimo o rank dessa etapa antes de morrer - mesmo criterio cumulativo usado pros
+  // contadores principais (rank >= X), entao a barra de perdidos sempre cabe dentro da
+  // barra total da etapa.
+  const stageMinRank = { leads: 0, qualificados: 2, agendados: 3, compareceram: 4, compraram: null };
+  const lostDeals = deals.filter(d => d.status === 'lost');
+
+  function perdidosNaEtapa(minRank) {
+    if (minRank === null) return { count: 0, objecoes: [] };
+    const lostHere = lostDeals.filter(d => rankOf(d) >= minRank);
+    const tagCounts = {};
+    lostHere.forEach(d => { objectionNames(d).forEach(tag => { tagCounts[tag] = (tagCounts[tag] || 0) + 1; }); });
+    const objecoes = Object.entries(tagCounts).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+    return { count: lostHere.length, objecoes };
+  }
+
   const stageOrder = ['leads', 'qualificados', 'agendados', 'compareceram', 'compraram'];
   const labels = { leads: 'Leads', qualificados: 'Qualificados', agendados: 'Agendados', compareceram: 'Compareceram', compraram: 'Compraram' };
   const stages = stageOrder.map((key, i) => {
@@ -538,7 +573,12 @@ function buildFunnel(deals) {
     const pctFromStart = counts.leads > 0 ? (count / counts.leads) * 100 : 0;
     const prevKey = i > 0 ? stageOrder[i - 1] : null;
     const pctLossFromPrev = prevKey && counts[prevKey] > 0 ? ((counts[prevKey] - count) / counts[prevKey]) * -100 : null;
-    return { key, label: labels[key], count, pctFromStart: round2(pctFromStart), pctLossFromPrev: pctLossFromPrev === null ? null : round2(pctLossFromPrev) };
+    const perdidos = perdidosNaEtapa(stageMinRank[key]);
+    return {
+      key, label: labels[key], count, pctFromStart: round2(pctFromStart),
+      pctLossFromPrev: pctLossFromPrev === null ? null : round2(pctLossFromPrev),
+      perdidos: perdidos.count, objecoes: perdidos.objecoes
+    };
   });
 
   const top5 = {};
@@ -549,7 +589,41 @@ function buildFunnel(deals) {
       .slice(0, 5);
   });
 
-  return { stages, topCreativesByStage: top5 };
+  return { stages, topCreativesByStage: top5, insights: buildFunnelInsights(stages) };
+}
+
+// Conclusoes automaticas sobre a evolucao do funil no periodo - gargalo, etapa com mais
+// perda, principal motivo de perda e taxa de conversao geral.
+function buildFunnelInsights(stages) {
+  const insights = [];
+  const leadsStage = stages.find(s => s.key === 'leads');
+  const compraramStage = stages.find(s => s.key === 'compraram');
+
+  const bottleneck = stages.slice(1).reduce((worst, s) => (s.pctLossFromPrev !== null && s.pctLossFromPrev < (worst?.pctLossFromPrev ?? 1)) ? s : worst, null);
+  if (bottleneck) {
+    const idx = stages.findIndex(s => s.key === bottleneck.key);
+    const prevLabel = stages[idx - 1]?.label;
+    insights.push({ id: 'funil-gargalo', severity: 'critical', text: `Maior gargalo do funil: ${prevLabel} → ${bottleneck.label} (perda de ${Math.abs(bottleneck.pctLossFromPrev).toFixed(0)}%).` });
+  }
+
+  const stagesWithLoss = stages.filter(s => s.key !== 'compraram' && s.perdidos > 0);
+  if (stagesWithLoss.length > 0) {
+    const worstLoss = [...stagesWithLoss].sort((a, b) => b.perdidos - a.perdidos)[0];
+    const pctOfStage = worstLoss.count > 0 ? (worstLoss.perdidos / worstLoss.count) * 100 : 0;
+    insights.push({ id: 'funil-mais-perdidos', severity: 'critical', text: `"${worstLoss.label}" é a etapa com mais negócios perdidos: ${worstLoss.perdidos} de ${worstLoss.count} que chegaram lá (${pctOfStage.toFixed(0)}%).` });
+  }
+
+  if (leadsStage && leadsStage.objecoes.length > 0) {
+    const top = leadsStage.objecoes[0];
+    insights.push({ id: 'funil-motivo-perda', severity: 'neutral', text: `Principal motivo de perda registrado: "${top.tag}" (${top.count} casos).` });
+  }
+
+  if (leadsStage && leadsStage.count > 0 && compraramStage) {
+    const convPct = (compraramStage.count / leadsStage.count) * 100;
+    insights.push({ id: 'funil-conversao', severity: convPct >= 5 ? 'good' : 'neutral', text: `${convPct.toFixed(1)}% dos leads do período viraram venda (${compraramStage.count} de ${leadsStage.count}).` });
+  }
+
+  return insights;
 }
 
 function buildPipelineAging(allOpenDeals) {
