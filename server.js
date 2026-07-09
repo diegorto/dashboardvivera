@@ -298,10 +298,21 @@ async function fetchAllDeals() {
       if (response.data.success && response.data.data) {
         response.data.data.forEach(deal => {
           let email = '';
-          if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.email)) {
-            const primaryEmail = deal.person_id.email.find(e => e.primary) || deal.person_id.email[0];
-            email = primaryEmail ? primaryEmail.value : '';
+          let personPhone = '';
+          if (deal.person_id && typeof deal.person_id === 'object') {
+            if (Array.isArray(deal.person_id.email)) {
+              const primaryEmail = deal.person_id.email.find(e => e.primary) || deal.person_id.email[0];
+              email = primaryEmail ? primaryEmail.value : '';
+            }
+            if (Array.isArray(deal.person_id.phone)) {
+              const primaryPhone = deal.person_id.phone.find(p => p.primary) || deal.person_id.phone[0];
+              personPhone = primaryPhone ? primaryPhone.value : '';
+            }
           }
+          // O campo customizado "Telefone" do negocio costuma ficar vazio (ninguem preenche
+          // manualmente); usa o telefone cadastrado na Pessoa vinculada como alternativa.
+          // Remove aspa simples que o Pipedrive as vezes prefixa pra forcar texto.
+          const telefone = (deal[FIELD_TELEFONE] || personPhone || '').replace(/^'/, '');
 
           deals.push({
             id: deal.id,
@@ -319,7 +330,7 @@ async function fetchAllDeals() {
             origem: deal[FIELD_ORIGEM] || '',
             labelRaw: deal.label || '',
             procedimentoRaw: deal[FIELD_PROCEDIMENTO] || '',
-            telefone: deal[FIELD_TELEFONE] || '',
+            telefone,
             ownerName: deal.user_id ? deal.user_id.name : '',
             personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
             email
