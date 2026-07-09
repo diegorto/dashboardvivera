@@ -35,6 +35,9 @@ const FIELD_TELEFONE = '82a1694b1017b48cf7ed15e0085843b4f3f97d5d';
 
 // Pipeline "Inbound" = id 1 (onde entram os leads de trafego pago)
 const INBOUND_PIPELINE_ID = 1;
+// Pipeline "Recepção" = id 2 (fechamentos feitos pela recepção/clinica, sem atribuicao de
+// marketing - pacientes que ja conhecem a clinica, indicacao, retorno etc.)
+const RECEPCAO_PIPELINE_ID = 2;
 
 // Etiquetas (label) que identificam a medica responsavel (Closer) - confirmado via API
 const DOCTOR_LABELS = { '65': 'Dra Kissya', '67': 'Dra Jéssica', '98': 'Dr. Diego' };
@@ -271,9 +274,10 @@ function tintimToSuggestion(tintimLead) {
   };
 }
 
-// Todos os deals do pipeline Inbound, SEM filtro de data (usado como base; filtros de
-// periodo sao aplicados em memoria depois, e o Pipeline usa o conjunto sem filtro).
-async function fetchAllInboundDeals() {
+// Todos os deals de TODOS os pipelines, SEM filtro de data (usado como base; filtros de
+// periodo/pipeline sao aplicados em memoria depois). Uma unica passada pela API do Pipedrive,
+// reaproveitada tanto pro pipeline Inbound (marketing) quanto pro Recepcao (fechamentos locais).
+async function fetchAllDeals() {
   const deals = [];
   let start = 0;
   let hasMore = true;
@@ -286,8 +290,6 @@ async function fetchAllInboundDeals() {
 
       if (response.data.success && response.data.data) {
         response.data.data.forEach(deal => {
-          if (deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
-
           let email = '';
           if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.email)) {
             const primaryEmail = deal.person_id.email.find(e => e.primary) || deal.person_id.email[0];
@@ -296,6 +298,7 @@ async function fetchAllInboundDeals() {
 
           deals.push({
             id: deal.id,
+            pipelineId: deal.pipeline_id,
             title: deal.title,
             status: deal.status,
             stageId: deal.stage_id,
@@ -429,6 +432,10 @@ function buildTrendBuckets(dealDates) {
 
 function round2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
 
+function metric(curVal, prevVal) {
+  return { current: round2(curVal), previous: round2(prevVal), deltaPct: deltaPct(curVal, prevVal) === null ? null : round2(deltaPct(curVal, prevVal)) };
+}
+
 function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
   function totals(ads, deals) {
     const attributed = deals.filter(isMetaAttributed);
@@ -440,10 +447,6 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
   }
   const cur = totals(currentAds, currentDeals);
   const prev = totals(previousAds, previousDeals);
-
-  function metric(curVal, prevVal) {
-    return { current: round2(curVal), previous: round2(prevVal), deltaPct: deltaPct(curVal, prevVal) === null ? null : round2(deltaPct(curVal, prevVal)) };
-  }
 
   const curTicket = cur.compras > 0 ? cur.receita / cur.compras : 0;
   const prevTicket = prev.compras > 0 ? prev.receita / prev.compras : 0;
@@ -585,6 +588,41 @@ function buildPatients(deals) {
   }).sort((a, b) => (b.dataVenda || '').localeCompare(a.dataVenda || ''));
 }
 
+// Fechamentos do pipeline Recepcao (pacientes fechados pela clinica sem atribuicao de
+// marketing - indicacao, retorno, ja e paciente etc). Mostrado numa aba separada, nunca
+// misturado com os criativos/funil/campanhas do marketing.
+function buildFechamentosRecepcao(deals) {
+  return deals.filter(d => d.status === 'won').map(deal => {
+    const closers = closerNames(deal);
+    return {
+      id: deal.id,
+      nome: deal.personName || deal.title || 'Sem nome',
+      telefone: deal.telefone || '',
+      procedimento: procedimentoNames(deal).join(', ') || '—',
+      closer: closers.length > 0 ? closers.join(', ') : null,
+      responsavel: deal.ownerName || '',
+      valor: round2(deal.value),
+      dataFechamento: deal.wonDate
+    };
+  }).sort((a, b) => (b.dataFechamento || '').localeCompare(a.dataFechamento || ''));
+}
+
+function buildRecepcaoKpis(currentDeals, previousDeals) {
+  function totals(deals) {
+    const won = deals.filter(d => d.status === 'won');
+    return { receita: won.reduce((s, d) => s + d.value, 0), compras: won.length };
+  }
+  const cur = totals(currentDeals);
+  const prev = totals(previousDeals);
+  const curTicket = cur.compras > 0 ? cur.receita / cur.compras : 0;
+  const prevTicket = prev.compras > 0 ? prev.receita / prev.compras : 0;
+  return {
+    receita: metric(cur.receita, prev.receita),
+    compras: metric(cur.compras, prev.compras),
+    ticketMedio: metric(curTicket, prevTicket)
+  };
+}
+
 // Leads sem Palavra-chave (criativo) preenchida no Pipedrive - sem isso e impossivel
 // saber qual anuncio do Meta gerou o lead, entao ele fica de fora de toda a atribuicao
 // (Campanhas, Funil por criativo, etc). Independente de status (aberto/ganho/perdido).
@@ -695,12 +733,18 @@ app.get('/api/dashboard', async (req, res) => {
     const [currentAds, previousAds, allDeals] = await Promise.all([
       getMetaAds(range.since, range.until),
       getMetaAds(prevRange.since, prevRange.until),
-      fetchAllInboundDeals()
+      fetchAllDeals()
     ]);
 
-    const deals = allDeals.filter(d => inRange(d, range.since, range.until));
-    const previousDeals = allDeals.filter(d => inRange(d, prevRange.since, prevRange.until));
-    const openDealsAllTime = allDeals.filter(d => d.status === 'open');
+    const inboundDealsAll = allDeals.filter(d => d.pipelineId === INBOUND_PIPELINE_ID);
+    const recepcaoDealsAll = allDeals.filter(d => d.pipelineId === RECEPCAO_PIPELINE_ID);
+
+    const deals = inboundDealsAll.filter(d => inRange(d, range.since, range.until));
+    const previousDeals = inboundDealsAll.filter(d => inRange(d, prevRange.since, prevRange.until));
+    const openDealsAllTime = inboundDealsAll.filter(d => d.status === 'open');
+
+    const recepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, range.since, range.until));
+    const previousRecepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, prevRange.since, prevRange.until));
 
     const kpis = buildKpis(currentAds, deals, previousAds, previousDeals);
     const creatives = buildCreatives(currentAds, deals);
@@ -712,10 +756,22 @@ app.get('/api/dashboard', async (req, res) => {
     const insights = buildInsights(creatives, funnel, governance, pipeline);
     const leadsSemOrigem = buildLeadsSemOrigem(deals);
 
+    const recepcaoKpis = buildRecepcaoKpis(recepcaoDeals, previousRecepcaoDeals);
+    const fechamentosRecepcao = buildFechamentosRecepcao(recepcaoDeals);
+    // Faturamento total da empresa = marketing (Inbound, atribuido a Meta Ads) + Recepcao.
+    // So esse numero soma os dois "motores" - todo o resto do dashboard fica separado
+    // de proposito, pra nao diluir o que e especificamente resultado do marketing.
+    const faturamentoTotal = metric(
+      kpis.receita.current + recepcaoKpis.receita.current,
+      kpis.receita.previous + recepcaoKpis.receita.previous
+    );
+
     res.json({
       success: true,
       range, previousRange: prevRange,
       kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
+      recepcao: { kpis: recepcaoKpis, fechamentos: fechamentosRecepcao },
+      faturamentoTotal,
       meta: {
         adsAccounts: FB_AD_ACCOUNT_IDS.length,
         totalAdsComGasto: currentAds.length,
@@ -737,8 +793,9 @@ app.get('/api/tintim-audit', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Tintim nao configurado (faltam TINTIM_ACCOUNT_CODE / TINTIM_ACCOUNT_TOKEN nas variaveis de ambiente).' });
     }
 
-    const allDeals = await fetchAllInboundDeals();
-    const semOrigem = allDeals.filter(d => !d.palavraChave);
+    const allDeals = await fetchAllDeals();
+    const inboundDeals = allDeals.filter(d => d.pipelineId === INBOUND_PIPELINE_ID);
+    const semOrigem = inboundDeals.filter(d => !d.palavraChave);
     const comTelefone = semOrigem.filter(d => normalizePhoneForTintim(d.telefone));
 
     const uniquePhones = [...new Set(comTelefone.map(d => normalizePhoneForTintim(d.telefone)))];

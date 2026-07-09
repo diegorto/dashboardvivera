@@ -1,8 +1,9 @@
-import { AlertTriangle, UserX } from 'lucide-react'
+import { AlertTriangle, UserX, Landmark } from 'lucide-react'
 import { useFilters } from '@/lib/FilterContext'
 import { KpiCard } from '@/components/KpiCard'
 import { CreativesTable } from '@/components/CreativesTable'
 import { MiniFunnel } from '@/components/MiniFunnel'
+import { DeltaIndicator } from '@/components/DeltaIndicator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatBRL, formatNumber } from '@/lib/utils'
 
@@ -20,6 +21,23 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-5">
+      <Card className="border-accent/30 bg-accent-soft/30">
+        <CardHeader className="flex-row items-center gap-2 space-y-0">
+          <Landmark className="h-4 w-4 text-accent" />
+          <CardTitle className="text-accent">Faturamento Total da Empresa</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-end gap-3">
+            <span className="text-3xl font-bold tabular-nums">{formatBRL(data.faturamentoTotal.current)}</span>
+            <DeltaIndicator deltaPct={data.faturamentoTotal.deltaPct} />
+          </div>
+          <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">
+            <span>Marketing (Meta Ads): <span className="font-semibold text-foreground">{formatBRL(data.kpis.receita.current)}</span></span>
+            <span>Recepção: <span className="font-semibold text-foreground">{formatBRL(data.recepcao.kpis.receita.current)}</span></span>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[2fr_1fr]">
         <Card className="border-critical/30 bg-critical-soft/40">
           <CardHeader className="flex-row items-center gap-2 space-y-0">

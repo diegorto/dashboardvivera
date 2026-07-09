@@ -86,6 +86,28 @@ export interface Pipeline {
   slowestCampaigns: { campanha: string; avgDays: number; count: number }[]
 }
 
+export interface FechamentoRecepcao {
+  id: number
+  nome: string
+  telefone: string
+  procedimento: string
+  closer: string | null
+  responsavel: string
+  valor: number
+  dataFechamento: string | null
+}
+
+export interface RecepcaoKpis {
+  receita: Metric
+  compras: Metric
+  ticketMedio: Metric
+}
+
+export interface Recepcao {
+  kpis: RecepcaoKpis
+  fechamentos: FechamentoRecepcao[]
+}
+
 export interface Patient {
   id: number
   nome: string
@@ -195,6 +217,8 @@ export interface DashboardResponse {
   revenueAtRisk: RevenueAtRisk
   insights: Insight[]
   leadsSemOrigem: LeadSemOrigem[]
+  recepcao: Recepcao
+  faturamentoTotal: Metric
   meta: { adsAccounts: number; totalAdsComGasto: number; totalDealsNoPeriodo: number }
   error?: string
 }
