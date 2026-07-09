@@ -1,0 +1,19 @@
+services:
+  dashboardvivera:
+    build: .
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - n8n_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vivera.rule=Host(`vivera.srv1522176.hstgr.cloud`)
+      - traefik.http.routers.vivera.tls=true
+      - traefik.http.routers.vivera.entrypoints=web,websecure
+      - traefik.http.routers.vivera.tls.certresolver=mytlschallenge
+      - traefik.http.services.vivera.loadbalancer.server.port=3000
+
+networks:
+  n8n_default:
+    external: true
