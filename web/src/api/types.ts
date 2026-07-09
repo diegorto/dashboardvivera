@@ -67,6 +67,9 @@ export interface PipelineDealRef {
   days: number
   anuncio: string
   campanha: string
+  etapa: string
+  responsavel: string
+  dataEntrada: string
 }
 
 export interface PipelineBucket {

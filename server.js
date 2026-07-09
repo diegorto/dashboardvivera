@@ -435,7 +435,18 @@ function buildPipelineAging(allOpenDeals) {
     const bucket = buckets.find(b => days >= b.min && days <= b.max) || buckets[buckets.length - 1];
     bucket.count++;
     bucket.potentialValue += deal.value || 0;
-    if (bucket.deals.length < 200) bucket.deals.push({ id: deal.id, title: deal.title || deal.personName, days, anuncio: deal.palavraChave, campanha: deal.campanha });
+    if (bucket.deals.length < 500) {
+      bucket.deals.push({
+        id: deal.id,
+        title: deal.personName || deal.title || 'Sem nome',
+        days,
+        anuncio: deal.palavraChave || 'sem_palavra_chave',
+        campanha: deal.campanha || 'sem_campanha',
+        etapa: stageName(deal),
+        responsavel: deal.ownerName || 'Sem responsável',
+        dataEntrada: deal.addDate
+      });
+    }
 
     const anuncio = deal.palavraChave || 'sem_palavra_chave';
     stuckByCreative[anuncio] = (stuckByCreative[anuncio] || 0) + (days >= 15 ? 1 : 0);
