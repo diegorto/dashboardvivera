@@ -219,6 +219,8 @@ export interface DashboardResponse {
   patients: Patient[]
   governance: Governance
   revenueAtRisk: RevenueAtRisk
+  revenueAtRiskRange: { since: string; until: string }
+  revenueAtRiskAvgTicket: number
   insights: Insight[]
   leadsSemOrigem: LeadSemOrigem[]
   recepcao: Recepcao

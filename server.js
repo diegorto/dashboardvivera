@@ -99,6 +99,16 @@ function defaultDateRange() {
   return { since: fmtDate(since), until: fmtDate(until) };
 }
 
+// Janela fixa dos ultimos N meses a partir de hoje - usada em coisas como "Oportunidades
+// Paradas" que devem ficar sempre visiveis, independente de qual periodo o usuario tem
+// selecionado no filtro geral do dashboard.
+function lastNMonthsRange(n) {
+  const until = new Date();
+  const since = new Date();
+  since.setMonth(since.getMonth() - n);
+  return { since: fmtDate(since), until: fmtDate(until) };
+}
+
 // Periodo anterior de mesma duracao, imediatamente anterior a "since".
 function previousRange(since, until) {
   const s = new Date(since + 'T00:00:00');
@@ -779,9 +789,18 @@ app.get('/api/dashboard', async (req, res) => {
     const pipeline = buildPipelineAging(openDealsAllTime);
     const patients = buildPatients(deals);
     const governance = buildGovernance(deals);
-    const revenueAtRisk = buildRevenueAtRisk(deals, kpis.ticketMedio.current);
     const insights = buildInsights(creatives, funnel, governance, pipeline);
     const leadsSemOrigem = buildLeadsSemOrigem(deals);
+
+    // "Oportunidades Paradas" usa uma janela fixa de 3 meses, independente do filtro de
+    // data selecionado - negocio parado importa mesmo que o usuario esteja olhando "Mes atual".
+    const revenueAtRiskRange = lastNMonthsRange(3);
+    const dealsForRisk = inboundDealsAll.filter(d => inRange(d, revenueAtRiskRange.since, revenueAtRiskRange.until));
+    const wonForRiskTicket = dealsForRisk.filter(d => isMetaAttributed(d) && d.status === 'won');
+    const avgTicketForRisk = wonForRiskTicket.length > 0
+      ? wonForRiskTicket.reduce((s, d) => s + d.value, 0) / wonForRiskTicket.length
+      : kpis.ticketMedio.current;
+    const revenueAtRisk = buildRevenueAtRisk(dealsForRisk, avgTicketForRisk);
 
     const recepcaoKpis = buildRecepcaoKpis(recepcaoDeals, previousRecepcaoDeals);
     const fechamentosRecepcao = buildFechamentosRecepcao(recepcaoDeals);
@@ -797,6 +816,7 @@ app.get('/api/dashboard', async (req, res) => {
       success: true,
       range, previousRange: prevRange,
       kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
+      revenueAtRiskRange, revenueAtRiskAvgTicket: round2(avgTicketForRisk),
       recepcao: { kpis: recepcaoKpis, fechamentos: fechamentosRecepcao },
       faturamentoTotal,
       meta: {

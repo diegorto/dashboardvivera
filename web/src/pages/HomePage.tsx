@@ -50,7 +50,7 @@ export function HomePage() {
             <div>
               <div className="text-2xl font-bold tabular-nums text-critical">{formatBRL(risk.total)}</div>
               <div className="text-xs text-muted-foreground">
-                {stuckCount} negócios parados que poderiam gerar a receita estimada pelo ticket médio das vendas de Marketing (Meta Ads) fechadas no período selecionado, {formatDate(data.range.since)} a {formatDate(data.range.until)} (tkm médio do período: {formatBRL(data.kpis.ticketMedio.current)})
+                {stuckCount} negócios parados nos últimos 3 meses ({formatDate(data.revenueAtRiskRange.since)} a {formatDate(data.revenueAtRiskRange.until)}) que poderiam gerar a receita estimada pelo ticket médio das vendas de Marketing (Meta Ads) fechadas nessa mesma janela (tkm médio: {formatBRL(data.revenueAtRiskAvgTicket)}) — independente do filtro de período selecionado acima
               </div>
             </div>
             <div className="flex flex-col gap-3 text-xs sm:flex-row sm:flex-wrap sm:gap-8">
