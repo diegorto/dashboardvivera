@@ -18,6 +18,7 @@ export function HomePage() {
     .slice(0, 10)
 
   const risk = data.revenueAtRisk
+  const stuckCount = risk.qualificadosSemAgendamento.count + risk.agendadosFaltaram.count + risk.propostasSemFechamento.count
 
   return (
     <div className="flex flex-col gap-5">
@@ -42,12 +43,14 @@ export function HomePage() {
         <Card className="border-critical/30 bg-critical-soft/40">
           <CardHeader className="flex-row items-center gap-2 space-y-0">
             <AlertTriangle className="h-4 w-4 text-critical" />
-            <CardTitle className="text-critical">Receita em Risco</CardTitle>
+            <CardTitle className="text-critical">Oportunidades Paradas</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-6">
             <div>
               <div className="text-2xl font-bold tabular-nums text-critical">{formatBRL(risk.total)}</div>
-              <div className="text-xs text-muted-foreground">valor do negócio quando definido, senão ticket médio do período</div>
+              <div className="text-xs text-muted-foreground">
+                {stuckCount} negócios parados que poderiam gerar a receita estimada pelo ticket médio dos últimos fechamentos (tkm médio do período: {formatBRL(data.kpis.ticketMedio.current)})
+              </div>
             </div>
             <div className="flex flex-wrap gap-4 text-xs">
               <RiskLine label="Qualificados sem agendamento" count={risk.qualificadosSemAgendamento.count} value={risk.qualificadosSemAgendamento.value} />
