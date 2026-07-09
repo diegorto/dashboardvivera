@@ -32,11 +32,15 @@ jobs:
           PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
           FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
           FB_AD_ACCOUNT_IDS: ${{ secrets.FB_AD_ACCOUNT_IDS }}
+          TINTIM_ACCOUNT_CODE: ${{ secrets.TINTIM_ACCOUNT_CODE }}
+          TINTIM_ACCOUNT_TOKEN: ${{ secrets.TINTIM_ACCOUNT_TOKEN }}
         run: |
           cat > /tmp/app.env <<EOF
           PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN
           FB_ACCESS_TOKEN=$FB_ACCESS_TOKEN
           FB_AD_ACCOUNT_IDS=$FB_AD_ACCOUNT_IDS
+          TINTIM_ACCOUNT_CODE=$TINTIM_ACCOUNT_CODE
+          TINTIM_ACCOUNT_TOKEN=$TINTIM_ACCOUNT_TOKEN
           PORT=3000
           EOF
 
@@ -84,6 +88,20 @@ jobs:
             pm2 logs dashboardvivera --lines 60 --nostream --err || true
           fi
           echo "Deploy verificado com sucesso (HTTP 200 + /api/dashboard OK)."
+
+          echo "--- Verificando /api/tintim-audit (nao bloqueia o deploy se falhar) ---"
+          TINTIM_RESP=$(curl -sS -m 120 "http://127.0.0.1:3000/api/tintim-audit" || echo '{"success":false,"error":"curl falhou"}')
+          echo "$TINTIM_RESP" | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              try{
+                const j=JSON.parse(d);
+                if(!j.success){ console.log('AVISO tintim-audit:', j.error); process.exit(0); }
+                const rec = (j.items||[]).filter(i=>i.tintim && i.tintim.hasAdData).length;
+                const semRastreio = (j.items||[]).filter(i=>i.tintim && i.tintim.found && !i.tintim.hasAdData).length;
+                console.log('tintim-audit ok. leads sem origem:', (j.items||[]).length, '| telefones checados:', j.checked, '| recuperaveis:', rec, '| tintim tambem sem rastreio:', semRastreio);
+              }catch(e){ console.log('AVISO: resposta do tintim-audit nao e JSON valido:', d.slice(0,300)); }
+            })
+          " || true
           EOF
 
       - name: Deploy over SSH (com retry automatico)

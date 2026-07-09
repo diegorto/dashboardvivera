@@ -149,6 +149,38 @@ export interface LeadSemOrigem {
   status: string
 }
 
+export interface TintimSuggestion {
+  found: boolean
+  hasAdData?: boolean
+  noPhone?: boolean
+  plataforma?: string | null
+  campanha?: string | null
+  conjunto?: string | null
+  palavraChave?: string | null
+  origemSugerida?: string | null
+  adAccountName?: string | null
+  statusName?: string | null
+  source?: string | null
+}
+
+export interface TintimAuditItem {
+  dealId: number
+  nome: string
+  telefone: string
+  etapa: string
+  responsavel: string
+  dataEntrada: string
+  status: string
+  tintim: TintimSuggestion
+}
+
+export interface TintimAuditResponse {
+  success: boolean
+  items: TintimAuditItem[]
+  checked: number
+  error?: string
+}
+
 export interface DashboardResponse {
   success: boolean
   range: { since: string; until: string }

@@ -21,6 +21,8 @@ const FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || deployConfig.FB_AD_A
   .split(',')
   .map(id => id.trim())
   .filter(Boolean);
+const TINTIM_ACCOUNT_CODE = process.env.TINTIM_ACCOUNT_CODE || deployConfig.TINTIM_ACCOUNT_CODE;
+const TINTIM_ACCOUNT_TOKEN = process.env.TINTIM_ACCOUNT_TOKEN || deployConfig.TINTIM_ACCOUNT_TOKEN;
 
 // IDs reais dos campos customizados no Deal do Pipedrive (confirmados via API)
 const FIELD_CAMPANHA = 'b70cf4c34cd06cb3917b79f3ebe1e64d28666f4b';
@@ -185,6 +187,77 @@ async function getMetaAds(since, until) {
   }
 
   return ads;
+}
+
+// Telefone do Pipedrive -> formato que o Tintim espera (DDI+DDD+numero, so digitos).
+// Numeros brasileiros de 10-11 digitos (sem DDI) recebem o prefixo 55.
+function normalizePhoneForTintim(raw) {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 10 || digits.length === 11) return '55' + digits;
+  return digits;
+}
+
+// Busca um lead no Tintim pelo telefone. Retorna null se nao encontrado/erro/nao configurado.
+async function fetchTintimLead(phoneRaw) {
+  const phone = normalizePhoneForTintim(phoneRaw);
+  if (!phone || !TINTIM_ACCOUNT_CODE || !TINTIM_ACCOUNT_TOKEN) return null;
+  try {
+    const url = `https://s.tintim.app/api/v1/${TINTIM_ACCOUNT_CODE}/lead/${phone}`;
+    const response = await axios.get(url, { params: { token: TINTIM_ACCOUNT_TOKEN }, timeout: 10000 });
+    return response.data || null;
+  } catch (error) {
+    if (error.response && error.response.status === 404) return null;
+    console.error(`Erro ao buscar lead ${phone} no Tintim:`, error.response?.data || error.message);
+    return null;
+  }
+}
+
+// Busca varios telefones no Tintim em paralelo limitado (evita sobrecarregar a API deles
+// nem travar a requisicao por muito tempo quando ha muitos leads sem origem).
+async function fetchTintimLeadsBatch(phones, concurrency = 5) {
+  const results = new Map();
+  let index = 0;
+  async function worker() {
+    while (index < phones.length) {
+      const i = index++;
+      const phone = phones[i];
+      results.set(phone, await fetchTintimLead(phone));
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, phones.length) }, worker));
+  return results;
+}
+
+// Tenta inferir a Origem (Instagram/Facebook) a partir da convencao de nomenclatura
+// da propria conta ("[IG]"/"[FB]" no nome da campanha/conjunto) - o Tintim nao expoe
+// essa informacao diretamente. E so uma sugestao, sempre exibida antes de confirmar.
+function inferOrigemFromNaming(...strings) {
+  const joined = strings.filter(Boolean).join(' ').toLowerCase();
+  if (joined.includes('[ig]') || joined.includes('instagram')) return 'Instagram';
+  if (joined.includes('[fb]') || joined.includes('facebook')) return 'Facebook';
+  return null;
+}
+
+// Converte o objeto retornado pelo Tintim numa sugestao de preenchimento pros campos
+// do Pipedrive (Campanha/Conjunto/Palavra-chave/Plataforma batem 1:1 com o payload do
+// Tintim, confirmado com dado real; Origem e so uma sugestao heuristica).
+function tintimToSuggestion(tintimLead) {
+  if (!tintimLead) return { found: false };
+  const ad = tintimLead.ad || {};
+  const hasAdData = !!(ad.campaign_name || ad.adset_name || ad.ad_name);
+  if (!hasAdData) return { found: true, hasAdData: false, source: tintimLead.source || null };
+  return {
+    found: true,
+    hasAdData: true,
+    plataforma: tintimLead.source || null,
+    campanha: ad.campaign_name || null,
+    conjunto: ad.adset_name || null,
+    palavraChave: ad.ad_name || null,
+    origemSugerida: inferOrigemFromNaming(ad.campaign_name, ad.adset_name),
+    adAccountName: ad.ad_account_name || null,
+    statusName: (tintimLead.status && tintimLead.status.name) || null
+  };
 }
 
 // Todos os deals do pipeline Inbound, SEM filtro de data (usado como base; filtros de
@@ -640,6 +713,71 @@ app.get('/api/dashboard', async (req, res) => {
   } catch (error) {
     console.error('Erro no /api/dashboard:', error);
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Auditoria: cruza os leads sem Palavra-chave (sem origem) com o Tintim, pra ver se o
+// tracker deles capturou a origem que o Pipedrive perdeu. So roda sob demanda (o usuario
+// clica pra abrir a pagina), nao em todo carregamento do dashboard.
+app.get('/api/tintim-audit', async (req, res) => {
+  try {
+    if (!TINTIM_ACCOUNT_CODE || !TINTIM_ACCOUNT_TOKEN) {
+      return res.status(400).json({ success: false, error: 'Tintim nao configurado (faltam TINTIM_ACCOUNT_CODE / TINTIM_ACCOUNT_TOKEN nas variaveis de ambiente).' });
+    }
+
+    const allDeals = await fetchAllInboundDeals();
+    const semOrigem = allDeals.filter(d => !d.palavraChave);
+    const comTelefone = semOrigem.filter(d => normalizePhoneForTintim(d.telefone));
+
+    const uniquePhones = [...new Set(comTelefone.map(d => normalizePhoneForTintim(d.telefone)))];
+    const tintimResults = await fetchTintimLeadsBatch(uniquePhones, 5);
+
+    const items = semOrigem.map(deal => {
+      const phone = normalizePhoneForTintim(deal.telefone);
+      const suggestion = phone ? tintimToSuggestion(tintimResults.get(phone)) : { found: false, noPhone: true };
+      return {
+        dealId: deal.id,
+        nome: deal.personName || deal.title || 'Sem nome',
+        telefone: deal.telefone || '',
+        etapa: stageName(deal),
+        responsavel: deal.ownerName || 'Sem responsável',
+        dataEntrada: deal.addDate,
+        status: deal.status,
+        tintim: suggestion
+      };
+    }).sort((a, b) => (b.dataEntrada || '').localeCompare(a.dataEntrada || ''));
+
+    res.json({ success: true, items, checked: uniquePhones.length });
+  } catch (error) {
+    console.error('Erro no /api/tintim-audit:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Escreve de volta no Pipedrive os campos de origem sugeridos pelo Tintim - so executa
+// quando o usuario confirma explicitamente na tela (nunca automatico).
+app.post('/api/tintim-audit/apply', async (req, res) => {
+  try {
+    const { dealId, campanha, conjunto, palavraChave, plataforma, origem } = req.body || {};
+    if (!dealId || !palavraChave) {
+      return res.status(400).json({ success: false, error: 'dealId e palavraChave sao obrigatorios.' });
+    }
+
+    const fields = {};
+    if (campanha) fields[FIELD_CAMPANHA] = campanha;
+    if (conjunto) fields[FIELD_CONJUNTO] = conjunto;
+    if (palavraChave) fields[FIELD_PALAVRA_CHAVE] = palavraChave;
+    if (plataforma) fields[FIELD_PLATAFORMA] = plataforma;
+    if (origem) fields[FIELD_ORIGEM] = origem;
+
+    await axios.put(`https://api.pipedrive.com/v1/deals/${dealId}`, fields, {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao atualizar deal no Pipedrive via Tintim:', error.response?.data || error.message);
+    res.status(500).json({ success: false, error: (error.response && error.response.data && error.response.data.error) || error.message });
   }
 });
 

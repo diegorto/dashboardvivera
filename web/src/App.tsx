@@ -9,6 +9,7 @@ import { PacientesPage } from '@/pages/PacientesPage'
 import { InsightsPage } from '@/pages/InsightsPage'
 import { SemOrigemPage } from '@/pages/SemOrigemPage'
 import { LeadsParadosPage } from '@/pages/LeadsParadosPage'
+import { TintimAuditoriaPage } from '@/pages/TintimAuditoriaPage'
 import { ReuniaoPage } from '@/pages/ReuniaoPage'
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/sem-origem" element={<SemOrigemPage />} />
             <Route path="/pipeline/parados" element={<LeadsParadosPage />} />
+            <Route path="/auditoria-tintim" element={<TintimAuditoriaPage />} />
           </Route>
           <Route path="/reuniao" element={<ReuniaoPage />} />
         </Routes>
