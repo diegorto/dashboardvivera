@@ -34,7 +34,7 @@ export function HomePage() {
             <DeltaIndicator deltaPct={data.faturamentoTotal.deltaPct} />
           </div>
           <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">
-            <span>Marketing (Meta Ads): <span className="font-semibold text-foreground">{formatBRL(data.kpis.receita.current)}</span></span>
+            <span>Receita vindo do MKT: <span className="font-semibold text-foreground">{formatBRL(data.kpis.receita.current)}</span></span>
             <span>Recepção: <span className="font-semibold text-foreground">{formatBRL(data.recepcao.kpis.receita.current)}</span></span>
           </div>
         </CardContent>
