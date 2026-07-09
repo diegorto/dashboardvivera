@@ -1,17 +1,7 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Megaphone, Filter as FunnelIcon, GitBranch, Users, Lightbulb, SearchX } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFilters } from '@/lib/FilterContext'
-
-const NAV = [
-  { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
-  { to: '/campanhas', label: 'Campanhas', icon: Megaphone },
-  { to: '/funil', label: 'Funil', icon: FunnelIcon },
-  { to: '/pipeline', label: 'Pipeline', icon: GitBranch },
-  { to: '/pacientes', label: 'Pacientes', icon: Users },
-  { to: '/sem-origem', label: 'Sem Origem', icon: SearchX },
-  { to: '/insights', label: 'Insights', icon: Lightbulb },
-]
+import { NAV_ITEMS } from '@/lib/nav'
 
 export function Sidebar() {
   const { data } = useFilters()
@@ -23,7 +13,7 @@ export function Sidebar() {
         <span className="text-sm font-bold tracking-tight">Vivera <span className="text-accent">Insights</span></span>
       </div>
       <nav className="flex flex-col gap-0.5 px-2">
-        {NAV.map(item => (
+        {NAV_ITEMS.map(item => (
           <NavLink
             key={item.to}
             to={item.to}
