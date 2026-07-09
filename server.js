@@ -289,9 +289,33 @@ app.get('/api/audit', async (req, res) => {
   }
 });
 
+// Proxy generico para o Pipedrive: mantem o token so no backend.
+// Usado pelo dashboard-vivera.html (fetchAPI chama /api/pipedrive/<recurso>).
+const PIPEDRIVE_PROXY_RESOURCES = new Set(['users', 'deals', 'activities']);
+
+app.get('/api/pipedrive/:resource', async (req, res) => {
+  const { resource } = req.params;
+  if (!PIPEDRIVE_PROXY_RESOURCES.has(resource)) {
+    return res.status(404).json({ success: false, error: 'Recurso nao suportado' });
+  }
+
+  try {
+    const response = await axios.get(`https://api.pipedrive.com/v1/${resource}`, {
+      params: { ...req.query, api_token: PIPEDRIVE_TOKEN }
+    });
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.response?.data?.error || error.message });
+  }
+});
+
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
+});
+
+app.get('/vivera', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard-vivera.html'));
 });
 
 const PORT = process.env.PORT || 3000;
