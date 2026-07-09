@@ -52,7 +52,7 @@ function joinKey(campanha, conjunto, anuncio) {
 async function getMetaAds(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
-  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions}`;
+  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
     console.log(`\nBuscando ads Meta - Account: ${accountId} (${since} a ${until})`);
@@ -80,6 +80,12 @@ async function getMetaAds(since, until) {
             leads = leadAction ? parseInt(leadAction.value) : 0;
           }
 
+          const impressions = parseInt(insight.impressions || 0);
+          const clicks = parseInt(insight.clicks || 0);
+          const ctr = impressions > 0 ? (clicks / impressions * 100) : 0;
+          const cpc = clicks > 0 ? (spend / clicks) : 0;
+          const cpm = impressions > 0 ? (spend / impressions * 1000) : 0;
+
           ads.push({
             accountId,
             campaignId: ad.campaign_id,
@@ -90,7 +96,12 @@ async function getMetaAds(since, until) {
             adName: ad.name,
             status: ad.effective_status || ad.status,
             spend,
-            leads
+            leads,
+            impressions,
+            clicks,
+            ctr,
+            cpc,
+            cpm
           });
           comAtividade++;
         });
@@ -126,13 +137,102 @@ function aggregateMetaAds(ads) {
         conjunto: ad.adsetName,
         anuncio: ad.adName,
         gasto_meta: 0,
-        leads_meta: 0
+        leads_meta: 0,
+        impressoes_meta: 0,
+        cliques_meta: 0
       };
     }
     map[key].gasto_meta += ad.spend;
     map[key].leads_meta += ad.leads;
+    map[key].impressoes_meta += ad.impressions;
+    map[key].cliques_meta += ad.clicks;
   });
   return Object.values(map);
+}
+
+// Serie diaria de gasto/leads no nivel de conta (nao por anuncio), pra montar o
+// grafico de tendencia sem multiplicar o numero de chamadas por anuncio x dia.
+async function getMetaDailySeries(since, until) {
+  const daily = {};
+  const timeRangeParam = JSON.stringify({ since, until });
+
+  for (const accountId of FB_AD_ACCOUNT_IDS) {
+    try {
+      let url = `https://graph.facebook.com/v18.0/act_${accountId}/insights`;
+      let params = {
+        access_token: FB_ACCESS_TOKEN,
+        time_range: timeRangeParam,
+        time_increment: 1,
+        fields: 'spend,actions',
+        limit: 500
+      };
+
+      while (url) {
+        const response = await axios.get(url, { params });
+        const data = response.data.data || [];
+
+        data.forEach(row => {
+          const date = row.date_start;
+          if (!daily[date]) daily[date] = { date, gasto_meta: 0, leads_meta: 0 };
+          daily[date].gasto_meta += parseFloat(row.spend || 0);
+          const leadAction = (row.actions || []).find(a => a.action_type === 'lead');
+          daily[date].leads_meta += leadAction ? parseInt(leadAction.value) : 0;
+        });
+
+        if (response.data.paging && response.data.paging.next) {
+          url = response.data.paging.next;
+          params = undefined;
+        } else {
+          url = null;
+        }
+      }
+    } catch (error) {
+      console.error(`Erro ao buscar serie diaria da conta ${accountId}:`, JSON.stringify(error.response?.data?.error || error.message));
+    }
+  }
+
+  return daily;
+}
+
+// Preenche todos os dias do intervalo (mesmo sem atividade) pra grafico continuo.
+function buildDailySeries(since, until, metaDaily, deals) {
+  const pipedriveDaily = {};
+  deals.forEach(deal => {
+    if (!deal.addDate) return;
+    if (!pipedriveDaily[deal.addDate]) pipedriveDaily[deal.addDate] = { leads_pipedrive: 0, revenue_total: 0 };
+    pipedriveDaily[deal.addDate].leads_pipedrive++;
+    pipedriveDaily[deal.addDate].revenue_total += deal.value;
+  });
+
+  const series = [];
+  const cursor = new Date(since + 'T00:00:00');
+  const end = new Date(until + 'T00:00:00');
+  while (cursor <= end) {
+    const date = cursor.toISOString().slice(0, 10);
+    const meta = metaDaily[date] || { gasto_meta: 0, leads_meta: 0 };
+    const pd = pipedriveDaily[date] || { leads_pipedrive: 0, revenue_total: 0 };
+    series.push({
+      date,
+      gasto_meta: meta.gasto_meta,
+      leads_meta: meta.leads_meta,
+      leads_pipedrive: pd.leads_pipedrive,
+      revenue_total: pd.revenue_total
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return series;
+}
+
+// Funil de status dos deals no Pipedrive (open/won/lost) + taxa de conversao.
+function buildFunnel(deals) {
+  const counts = { open: 0, won: 0, lost: 0 };
+  deals.forEach(deal => {
+    const status = deal.status || 'open';
+    counts[status] = (counts[status] || 0) + 1;
+  });
+  const total = deals.length;
+  const conversion = total > 0 ? ((counts.won || 0) / total * 100).toFixed(1) : '0.0';
+  return { counts, total, conversion };
 }
 
 // Pipedrive: busca Deals (negocios) do funil Inbound dentro do periodo (filtra por add_time).
@@ -204,9 +304,10 @@ app.get('/api/audit', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const [ads, dealsLeads] = await Promise.all([
+    const [ads, dealsLeads, metaDaily] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until)
+      getPipedriveDeals(range.since, range.until),
+      getMetaDailySeries(range.since, range.until)
     ]);
 
     const metaAgg = aggregateMetaAds(ads);
@@ -221,6 +322,8 @@ app.get('/api/audit', async (req, res) => {
         anuncio: c.anuncio,
         gasto_meta: c.gasto_meta,
         leads_meta: c.leads_meta,
+        impressoes_meta: c.impressoes_meta,
+        cliques_meta: c.cliques_meta,
         leads_pipedrive: 0,
         revenue_total: 0,
         leads_details: []
@@ -239,6 +342,8 @@ app.get('/api/audit', async (req, res) => {
           anuncio,
           gasto_meta: 0,
           leads_meta: 0,
+          impressoes_meta: 0,
+          cliques_meta: 0,
           leads_pipedrive: 0,
           revenue_total: 0,
           leads_details: []
@@ -266,23 +371,33 @@ app.get('/api/audit', async (req, res) => {
       const custo_por_lead = c.leads_pipedrive > 0
         ? (c.gasto_meta / c.leads_pipedrive).toFixed(2)
         : 0;
+      const ctr_meta = c.impressoes_meta > 0 ? (c.cliques_meta / c.impressoes_meta * 100).toFixed(2) : '0.00';
+      const cpc_meta = c.cliques_meta > 0 ? (c.gasto_meta / c.cliques_meta).toFixed(2) : '0.00';
+      const cpm_meta = c.impressoes_meta > 0 ? (c.gasto_meta / c.impressoes_meta * 1000).toFixed(2) : '0.00';
 
-      return { ...c, roas, discrepancia, discrepancia_percent, custo_por_lead };
+      return { ...c, roas, discrepancia, discrepancia_percent, custo_por_lead, ctr_meta, cpc_meta, cpm_meta };
     });
 
     result.sort((a, b) => b.gasto_meta - a.gasto_meta);
+
+    const daily = buildDailySeries(range.since, range.until, metaDaily, dealsLeads);
+    const funnel = buildFunnel(dealsLeads);
 
     res.json({
       success: true,
       range,
       data: result,
       meta_ads: ads.sort((a, b) => b.spend - a.spend),
+      daily,
+      funnel,
       summary: {
         total_linhas: result.length,
         gasto_total: result.reduce((sum, r) => sum + r.gasto_meta, 0).toFixed(2),
         revenue_total: result.reduce((sum, r) => sum + r.revenue_total, 0).toFixed(2),
         leads_meta_total: result.reduce((sum, r) => sum + r.leads_meta, 0),
         leads_total: result.reduce((sum, r) => sum + r.leads_pipedrive, 0),
+        impressoes_total: result.reduce((sum, r) => sum + r.impressoes_meta, 0),
+        cliques_total: result.reduce((sum, r) => sum + r.cliques_meta, 0),
         roas_medio: result.length > 0
           ? (result.reduce((sum, r) => sum + parseFloat(r.roas), 0) / result.length).toFixed(2)
           : 0

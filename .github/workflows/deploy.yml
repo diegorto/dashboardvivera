@@ -43,13 +43,18 @@ jobs:
           pm2 save
           sleep 3
           STATUS=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || echo "000")
-          echo "HTTP status: $STATUS"
+          echo "HTTP status (/): $STATUS"
           if [ "$STATUS" != "200" ]; then
             echo "App nao respondeu OK, ultimos logs:"
             pm2 logs dashboardvivera --lines 40 --nostream || true
             exit 1
           fi
-          echo "Deploy verificado com sucesso (HTTP 200)."
+          UNTIL=$(date +%F)
+          SINCE=$(date -d "yesterday" +%F 2>/dev/null || date -v-1d +%F)
+          echo "--- Verificando /api/audit ($SINCE a $UNTIL) ---"
+          AUDIT=$(curl -sS -m 30 "http://127.0.0.1:3000/api/audit?since=$SINCE&until=$UNTIL")
+          echo "$AUDIT" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log('success:',j.success);console.log('meta_ads rows:',(j.meta_ads||[]).length);console.log('data rows:',(j.data||[]).length);console.log('daily rows:',(j.daily||[]).length);console.log('funnel:',JSON.stringify(j.funnel));console.log('summary:',JSON.stringify(j.summary));}catch(e){console.log('resposta nao e JSON valido:',d.slice(0,300));process.exit(1)}})" || (echo "api/audit falhou ao processar" && exit 1)
+          echo "Deploy verificado com sucesso (HTTP 200 + /api/audit OK)."
           EOF
 
       - name: Deploy over SSH (com retry automatico)

@@ -238,9 +238,63 @@
 
         .empty-note { color: #999; font-size: 13px; padding: 10px 0; }
 
+        .funnel-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .funnel-card {
+            background: white;
+            padding: 18px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .funnel-card .funnel-value { font-size: 26px; font-weight: bold; margin-top: 6px; }
+        .funnel-card .funnel-label { font-size: 12px; color: #999; text-transform: uppercase; }
+        .funnel-card.open .funnel-value { color: #667eea; }
+        .funnel-card.won .funnel-value { color: #28a745; }
+        .funnel-card.lost .funnel-value { color: #dc3545; }
+
+        .conversion-banner {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .conversion-banner strong { color: #667eea; font-size: 20px; }
+
         @media (max-width: 900px) {
             .summary { grid-template-columns: 1fr 1fr; }
             .charts-row { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 8px; }
+            .container { border-radius: 8px; }
+            header { padding: 16px 14px; }
+            header h1 { font-size: 19px; }
+            header p { font-size: 12px; }
+            .content { padding: 14px; }
+            .filters-bar { padding: 12px 14px; gap: 8px; }
+            .filters-bar label { margin-right: 0; }
+            .filters-bar input[type="date"] { flex: 1; min-width: 120px; }
+            .preset-btn, .apply-btn { flex: 1 1 auto; padding: 8px 10px; }
+            .refresh-btn { margin-left: 0; width: 100%; order: 10; }
+            .summary { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .summary-card { padding: 12px; }
+            .summary-value { font-size: 16px; }
+            .funnel-row { grid-template-columns: 1fr; }
+            table { font-size: 11px; }
+            th, td { padding: 7px 8px; }
+            .tabs { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
+            .tab-btn { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
         }
     </style>
 </head>
@@ -289,6 +343,8 @@
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="audit">Audit</button>
                     <button class="tab-btn" data-tab="metaads">Meta Ads Detalhado</button>
+                    <button class="tab-btn" data-tab="trend">Tendência</button>
+                    <button class="tab-btn" data-tab="funnel">Funil</button>
                     <button class="tab-btn" data-tab="details">Leads</button>
                 </div>
 
@@ -309,6 +365,26 @@
                     <div class="table-scroll" id="metaAdsTable"></div>
                 </div>
 
+                <!-- Trend Tab -->
+                <div id="trend" class="tab-content">
+                    <div class="chart-box">
+                        <h4>Gasto e Leads por dia</h4>
+                        <canvas id="chartTrend" height="260"></canvas>
+                    </div>
+                </div>
+
+                <!-- Funnel Tab -->
+                <div id="funnel" class="tab-content">
+                    <div class="conversion-banner">
+                        Taxa de conversão (ganhos / total de leads): <strong id="funnelConversion">-</strong>
+                    </div>
+                    <div class="funnel-row" id="funnelCards"></div>
+                    <div class="chart-box">
+                        <h4>Distribuição por status</h4>
+                        <canvas id="chartFunnel" height="220"></canvas>
+                    </div>
+                </div>
+
                 <!-- Details Tab -->
                 <div id="details" class="tab-content">
                     <div id="detailsContainer"></div>
@@ -324,6 +400,8 @@
         let metaAdsSort = { key: 'spend', dir: -1 };
         let chartGastoRevenue = null;
         let chartRoas = null;
+        let chartTrend = null;
+        let chartFunnel = null;
 
         function fmtDate(d) { return d.toISOString().slice(0, 10); }
 
@@ -379,6 +457,8 @@
                 renderCharts(currentData);
                 renderAuditTable();
                 renderMetaAdsTable();
+                renderTrendChart(json.daily || []);
+                renderFunnel(json.funnel || { counts: {}, total: 0, conversion: '0.0' });
                 renderLeadsDetails(currentData);
 
                 loadingEl.style.display = 'none';
@@ -538,7 +618,9 @@
 
             const cols = [
                 ['campaignName', 'Campanha'], ['adsetName', 'Conjunto'], ['adName', 'Anúncio'],
-                ['status', 'Status'], ['spend', 'Gasto (R$)'], ['leads', 'Leads (Meta)']
+                ['status', 'Status'], ['spend', 'Gasto (R$)'], ['leads', 'Leads (Meta)'],
+                ['impressions', 'Impressões'], ['clicks', 'Cliques'],
+                ['ctr', 'CTR (%)'], ['cpc', 'CPC (R$)'], ['cpm', 'CPM (R$)']
             ];
 
             let html = '<table><thead><tr>';
@@ -559,11 +641,101 @@
                     <td>${r.status}</td>
                     <td>R$ ${r.spend.toFixed(2)}</td>
                     <td>${r.leads}</td>
+                    <td>${(r.impressions || 0).toLocaleString('pt-BR')}</td>
+                    <td>${(r.clicks || 0).toLocaleString('pt-BR')}</td>
+                    <td>${(r.ctr || 0).toFixed(2)}</td>
+                    <td>R$ ${(r.cpc || 0).toFixed(2)}</td>
+                    <td>R$ ${(r.cpm || 0).toFixed(2)}</td>
                 </tr>`;
             });
 
             html += '</tbody></table>';
             document.getElementById('metaAdsTable').innerHTML = html;
+        }
+
+        function renderTrendChart(daily) {
+            const labels = daily.map(d => d.date.slice(5).split('-').reverse().join('/'));
+
+            if (chartTrend) chartTrend.destroy();
+            chartTrend = new Chart(document.getElementById('chartTrend'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Gasto (Meta) R$',
+                            data: daily.map(d => d.gasto_meta),
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102,126,234,0.15)',
+                            yAxisID: 'y',
+                            tension: 0.25,
+                            fill: true
+                        },
+                        {
+                            label: 'Leads (Meta)',
+                            data: daily.map(d => d.leads_meta),
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255,193,7,0.15)',
+                            yAxisID: 'y1',
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Leads (Pipedrive)',
+                            data: daily.map(d => d.leads_pipedrive),
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40,167,69,0.15)',
+                            yAxisID: 'y1',
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: {
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'R$' } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: 'Leads' }, grid: { drawOnChartArea: false } }
+                    }
+                }
+            });
+        }
+
+        function renderFunnel(funnel) {
+            const counts = funnel.counts || {};
+            const open = counts.open || 0;
+            const won = counts.won || 0;
+            const lost = counts.lost || 0;
+
+            document.getElementById('funnelConversion').textContent = `${funnel.conversion || '0.0'}%`;
+
+            document.getElementById('funnelCards').innerHTML = `
+                <div class="funnel-card open">
+                    <div class="funnel-label">Em aberto</div>
+                    <div class="funnel-value">${open}</div>
+                </div>
+                <div class="funnel-card won">
+                    <div class="funnel-label">Ganhos</div>
+                    <div class="funnel-value">${won}</div>
+                </div>
+                <div class="funnel-card lost">
+                    <div class="funnel-label">Perdidos</div>
+                    <div class="funnel-value">${lost}</div>
+                </div>
+            `;
+
+            if (chartFunnel) chartFunnel.destroy();
+            chartFunnel = new Chart(document.getElementById('chartFunnel'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Em aberto', 'Ganhos', 'Perdidos'],
+                    datasets: [{
+                        data: [open, won, lost],
+                        backgroundColor: ['#667eea', '#28a745', '#dc3545']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+            });
         }
 
         function renderLeadsDetails(data) {
@@ -600,6 +772,11 @@
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
                 btn.classList.add('active');
                 document.getElementById(btn.dataset.tab).classList.add('active');
+
+                // Charts criados enquanto a aba estava escondida ficam com tamanho 0;
+                // forca um resize quando a aba fica visivel.
+                if (btn.dataset.tab === 'trend' && chartTrend) chartTrend.resize();
+                if (btn.dataset.tab === 'funnel' && chartFunnel) chartFunnel.resize();
             });
         });
 
