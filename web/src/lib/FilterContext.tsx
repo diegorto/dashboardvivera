@@ -37,7 +37,7 @@ interface FilterContextValue {
 const FilterContext = createContext<FilterContextValue | null>(null)
 
 export function FilterProvider({ children }: { children: ReactNode }) {
-  const initial = resolvePreset('30dias')
+  const initial = resolvePreset('mesAtual')
   const [since, setSince] = useState(initial.since)
   const [until, setUntil] = useState(initial.until)
   const [filters, setFilters] = useState<SecondaryFilters>(EMPTY_FILTERS)
