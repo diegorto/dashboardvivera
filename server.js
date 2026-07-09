@@ -33,6 +33,13 @@ const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
 const FIELD_PROCEDIMENTO = 'f7a27fd84e08c5d880f1534646eb07307eb20944';
 const FIELD_TELEFONE = '82a1694b1017b48cf7ed15e0085843b4f3f97d5d';
 
+// Dominio da conta Pipedrive (confirmado via /users/me), usado pra montar links diretos
+// pro deal - ex: https://viveraorofacialavanada.pipedrive.com/deal/1234
+const PIPEDRIVE_COMPANY_DOMAIN = 'viveraorofacialavanada';
+function pipedriveDealUrl(dealId) {
+  return `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com/deal/${dealId}`;
+}
+
 // Pipeline "Inbound" = id 1 (onde entram os leads de trafego pago)
 const INBOUND_PIPELINE_ID = 1;
 // Pipeline "Recepção" = id 2 (fechamentos feitos pela recepção/clinica, sem atribuicao de
@@ -660,7 +667,16 @@ function buildRevenueAtRisk(deals, avgTicket) {
   const potential = d => d.value > 0 ? d.value : avgTicket;
 
   function group(filtered) {
-    const items = filtered.map(d => ({ id: d.id, title: d.personName || d.title, status: d.status, value: round2(potential(d)) }));
+    const items = filtered.map(d => ({
+      id: d.id,
+      title: d.personName || d.title,
+      status: d.status,
+      value: round2(potential(d)),
+      telefone: d.telefone || '',
+      campanha: d.campanha || 'sem_campanha',
+      criativo: d.palavraChave || 'sem_palavra_chave',
+      pipedriveUrl: pipedriveDealUrl(d.id)
+    }));
     return { count: items.length, value: round2(items.reduce((s, d) => s + d.value, 0)), deals: items.slice(0, 100) };
   }
 

@@ -146,6 +146,10 @@ export interface RevenueAtRiskDeal {
   title: string
   status: string
   value: number
+  telefone: string
+  campanha: string
+  criativo: string
+  pipedriveUrl: string
 }
 
 export interface RevenueAtRiskGroup {
