@@ -79,6 +79,8 @@ jobs:
                 console.log('governance sem responsavel:', JSON.stringify(j.governance && j.governance.semResponsavel));
                 console.log('kpis:', JSON.stringify(j.kpis));
                 console.log('totalAdsComGasto:', j.meta && j.meta.totalAdsComGasto);
+                const withUrl = (j.creatives||[]).find(c=>c.adUrl);
+                console.log('amostra adUrl:', withUrl ? withUrl.adUrl : 'nenhum criativo com adUrl');
               }catch(e){ console.log('resposta nao e JSON valido:', d.slice(0,300)); process.exit(1); }
             })
           " || (echo "api/dashboard falhou ao processar" && exit 1)

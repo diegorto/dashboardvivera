@@ -169,7 +169,10 @@ async function getMetaAds(since, until) {
             status: ad.effective_status || ad.status,
             spend, leads, impressions, clicks,
             thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
-            adUrl: `https://www.facebook.com/ads/library/?id=${ad.id}`
+            // Deep link pro Ads Manager (funciona pra qualquer anuncio de quem tem acesso a conta).
+            // A Ads Library publica (facebook.com/ads/library) so indexa de forma confiavel anuncios
+            // politicos/de interesse social - anuncios comerciais normais costumam nao aparecer la.
+            adUrl: `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
           });
         });
 
