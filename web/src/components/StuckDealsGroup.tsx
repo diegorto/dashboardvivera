@@ -1,12 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, MessageCircle } from 'lucide-react'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, whatsappUrl } from '@/lib/utils'
 import type { RevenueAtRiskGroup } from '@/api/types'
-
-function whatsappUrl(telefone: string): string | null {
-  const digits = telefone.replace(/\D/g, '')
-  return digits ? `https://wa.me/${digits}` : null
-}
 
 export function StuckDealsGroup({ label, group }: { label: string; group: RevenueAtRiskGroup }) {
   const [open, setOpen] = useState(false)

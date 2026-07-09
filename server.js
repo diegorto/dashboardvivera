@@ -611,7 +611,8 @@ function buildPatients(deals) {
       dataLead: deal.addDate,
       dataVenda: deal.wonDate,
       status: deal.status,
-      tempoAteFechar
+      tempoAteFechar,
+      pipedriveUrl: pipedriveDealUrl(deal.id)
     };
   }).sort((a, b) => (b.dataVenda || '').localeCompare(a.dataVenda || ''));
 }
@@ -630,7 +631,8 @@ function buildFechamentosRecepcao(deals) {
       closer: closers.length > 0 ? closers.join(', ') : null,
       responsavel: deal.ownerName || '',
       valor: round2(deal.value),
-      dataFechamento: deal.wonDate
+      dataFechamento: deal.wonDate,
+      pipedriveUrl: pipedriveDealUrl(deal.id)
     };
   }).sort((a, b) => (b.dataFechamento || '').localeCompare(a.dataFechamento || ''));
 }

@@ -95,6 +95,7 @@ export interface FechamentoRecepcao {
   responsavel: string
   valor: number
   dataFechamento: string | null
+  pipedriveUrl: string
 }
 
 export interface RecepcaoKpis {
@@ -123,6 +124,7 @@ export interface Patient {
   dataVenda: string | null
   status: string
   tempoAteFechar: number | null
+  pipedriveUrl: string
 }
 
 export interface Governance {

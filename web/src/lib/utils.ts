@@ -26,3 +26,8 @@ export function formatDate(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
+
+export function whatsappUrl(telefone: string): string | null {
+  const digits = telefone.replace(/\D/g, '')
+  return digits ? `https://wa.me/${digits}` : null
+}

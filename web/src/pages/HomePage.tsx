@@ -5,6 +5,7 @@ import { CreativesTable } from '@/components/CreativesTable'
 import { MiniFunnel } from '@/components/MiniFunnel'
 import { DeltaIndicator } from '@/components/DeltaIndicator'
 import { StuckDealsGroup } from '@/components/StuckDealsGroup'
+import { SalesGroup, type SalesGroupItem } from '@/components/SalesGroup'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatBRL, formatNumber, formatDate } from '@/lib/utils'
 
@@ -21,6 +22,13 @@ export function HomePage() {
   const risk = data.revenueAtRisk
   const stuckCount = risk.qualificadosSemAgendamento.count + risk.agendadosFaltaram.count + risk.propostasSemFechamento.count
 
+  const mktSalesItems: SalesGroupItem[] = data.patients
+    .filter(p => p.campanha !== 'sem_campanha')
+    .map(p => ({ id: p.id, nome: p.nome, telefone: p.telefone, valor: p.valor, origem: `${p.campanha} · ${p.criativo}`, pipedriveUrl: p.pipedriveUrl }))
+
+  const recepcaoSalesItems: SalesGroupItem[] = data.recepcao.fechamentos
+    .map(f => ({ id: f.id, nome: f.nome, telefone: f.telefone, valor: f.valor, origem: f.procedimento, pipedriveUrl: f.pipedriveUrl }))
+
   return (
     <div className="flex flex-col gap-5">
       <Card className="border-accent/30 bg-accent-soft/30">
@@ -28,14 +36,14 @@ export function HomePage() {
           <Landmark className="h-4 w-4 text-accent" />
           <CardTitle className="text-accent">Faturamento Total da Empresa</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap items-end justify-between gap-4">
+        <CardContent className="flex flex-col gap-3">
           <div className="flex items-end gap-3">
             <span className="text-3xl font-bold tabular-nums">{formatBRL(data.faturamentoTotal.current)}</span>
             <DeltaIndicator deltaPct={data.faturamentoTotal.deltaPct} />
           </div>
-          <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">
-            <span>Receita vindo do MKT: <span className="font-semibold text-foreground">{formatBRL(data.kpis.receita.current)}</span></span>
-            <span>Recepção: <span className="font-semibold text-foreground">{formatBRL(data.recepcao.kpis.receita.current)}</span></span>
+          <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:flex-wrap sm:gap-8">
+            <SalesGroup label="Receita vindo do MKT" total={data.kpis.receita.current} items={mktSalesItems} />
+            <SalesGroup label="Recepção" total={data.recepcao.kpis.receita.current} items={recepcaoSalesItems} />
           </div>
         </CardContent>
       </Card>
