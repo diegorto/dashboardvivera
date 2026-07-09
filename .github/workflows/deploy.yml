@@ -1,0 +1,84 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+env:
+  DEPLOY_PATH: /var/www/dashboardvivera
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Trust VPS host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Bootstrap VPS (rsync, dir)
+        run: |
+          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -e
+            command -v rsync >/dev/null 2>&1 || (apt-get update -y && apt-get install -y rsync)
+            mkdir -p ${{ env.DEPLOY_PATH }}
+          '
+
+      - name: Sync files to VPS
+        run: |
+          rsync -avz --delete \
+            --exclude '.git' \
+            --exclude '.env' \
+            --exclude 'node_modules' \
+            --exclude '.github' \
+            ./ "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/"
+
+      - name: Install deps, ensure Node/PM2, (re)start app
+        run: |
+          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -e
+            command -v node >/dev/null 2>&1 || (curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && apt-get install -y nodejs)
+            command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+            cd ${{ env.DEPLOY_PATH }}
+            npm install --omit=dev
+            pm2 describe dashboardvivera >/dev/null 2>&1 && pm2 restart dashboardvivera --update-env || pm2 start server.js --name dashboardvivera
+            pm2 save
+            pm2 startup systemd -u root --hp /root >/tmp/pm2-startup.sh 2>/dev/null || true
+            grep "^sudo " /tmp/pm2-startup.sh | bash || true
+          '
+
+      - name: Configure Nginx reverse proxy (idempotent)
+        run: |
+          ssh "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -e
+            command -v nginx >/dev/null 2>&1 || (apt-get update -y && apt-get install -y nginx)
+            cat > /etc/nginx/sites-available/dashboardvivera <<CONF
+          server {
+              listen 80 default_server;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host \$host;
+                  proxy_set_header X-Real-IP \$remote_addr;
+                  proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+              }
+          }
+          CONF
+            ln -sf /etc/nginx/sites-available/dashboardvivera /etc/nginx/sites-enabled/dashboardvivera
+            rm -f /etc/nginx/sites-enabled/default
+            nginx -t
+            systemctl reload nginx || systemctl restart nginx
+            command -v ufw >/dev/null 2>&1 && (ufw allow 22/tcp || true) && (ufw allow 80/tcp || true) || true
+          '
