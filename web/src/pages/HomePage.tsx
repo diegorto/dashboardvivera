@@ -5,7 +5,7 @@ import { CreativesTable } from '@/components/CreativesTable'
 import { MiniFunnel } from '@/components/MiniFunnel'
 import { DeltaIndicator } from '@/components/DeltaIndicator'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { formatBRL, formatNumber } from '@/lib/utils'
+import { formatBRL, formatNumber, formatDate } from '@/lib/utils'
 
 export function HomePage() {
   const { data, filteredCreatives } = useFilters()
@@ -49,7 +49,7 @@ export function HomePage() {
             <div>
               <div className="text-2xl font-bold tabular-nums text-critical">{formatBRL(risk.total)}</div>
               <div className="text-xs text-muted-foreground">
-                {stuckCount} negócios parados que poderiam gerar a receita estimada pelo ticket médio dos últimos fechamentos (tkm médio do período: {formatBRL(data.kpis.ticketMedio.current)})
+                {stuckCount} negócios parados que poderiam gerar a receita estimada pelo ticket médio das vendas de Marketing (Meta Ads) fechadas no período selecionado, {formatDate(data.range.since)} a {formatDate(data.range.until)} (tkm médio do período: {formatBRL(data.kpis.ticketMedio.current)})
               </div>
             </div>
             <div className="flex flex-wrap gap-4 text-xs">
