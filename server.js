@@ -289,9 +289,37 @@ app.get('/api/audit', async (req, res) => {
   }
 });
 
+const PIPEDRIVE_ALLOWED_RESOURCES = new Set(['users', 'deals', 'activities']);
+
+// Proxy generico para o Pipedrive usado pelo painel /sdr: o token nunca chega ao navegador.
+app.get('/api/pipedrive/:resource', async (req, res) => {
+  const { resource } = req.params;
+
+  if (!PIPEDRIVE_ALLOWED_RESOURCES.has(resource)) {
+    return res.status(404).json({ success: false, error: 'Recurso não suportado' });
+  }
+
+  try {
+    const response = await axios.get(`https://api.pipedrive.com/v1/${resource}`, {
+      params: { ...req.query, api_token: PIPEDRIVE_TOKEN }
+    });
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.response?.data?.error || error.message
+    });
+  }
+});
+
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
+});
+
+// Painel Vivera Orofacial - Corrida das SDRs
+app.get('/sdr', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
 });
 
 const PORT = process.env.PORT || 3000;
