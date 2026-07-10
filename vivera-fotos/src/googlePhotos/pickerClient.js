@@ -56,8 +56,13 @@ async function listSessionMediaItems(sessionId) {
     }));
 }
 
+// O baseUrl do Picker exige o mesmo token OAuth pra baixar os bytes (nao e um link publico).
 async function downloadPhotoBytes(baseUrl) {
-  const response = await axios.get(`${baseUrl}=d`, { responseType: 'arraybuffer' });
+  const accessToken = await getAccessToken();
+  const response = await axios.get(`${baseUrl}=d`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    responseType: 'arraybuffer',
+  });
   return Buffer.from(response.data);
 }
 

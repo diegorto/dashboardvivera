@@ -32,6 +32,7 @@ async function processPickerItems(patientId, items) {
   const pending = items.filter((item) => !processedSet.has(item.id));
   let processadas = 0;
   let descartadas = 0;
+  let comErro = 0;
 
   for (const item of pending) {
     try {
@@ -40,7 +41,8 @@ async function processPickerItems(patientId, items) {
       const match = await rekognition.findMatchingPatient(bytes);
       if (!match || match.patientId !== patientId) {
         descartadas += 1;
-        continue; // rosto nao bate com o paciente (ou nenhum rosto detectado) - descarta
+        processedSet.add(item.id); // rosto nao bate (ou nenhum rosto) - descarta e nao tenta de novo
+        continue;
       }
 
       const localFile = `${patientId}/${item.id}.jpg`;
@@ -59,17 +61,18 @@ async function processPickerItems(patientId, items) {
         qualityScore: pose ? pose.qualityScore : 0,
       });
       processadas += 1;
+      processedSet.add(item.id);
     } catch (err) {
       console.error(`Erro ao processar foto ${item.id}: ${err.message}`);
-    } finally {
-      processedSet.add(item.id);
+      comErro += 1;
+      // nao marca como processada - erro pode ser transitorio (rede, token expirado), tenta de novo depois
     }
   }
 
   timeline.processedPhotoIds = Array.from(processedSet);
   saveTimeline(timeline);
 
-  return { selecionadas: items.length, novasProcessadas: pending.length, processadas, descartadas };
+  return { selecionadas: items.length, novasProcessadas: pending.length, processadas, descartadas, comErro };
 }
 
 function getPatientTimeline(patientId, pose) {
