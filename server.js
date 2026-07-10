@@ -344,6 +344,85 @@ app.get('/sdr', (req, res) => {
   }
 });
 
+// KPIs dos Indicadores
+app.get('/kpis', async (req, res) => {
+  try {
+    const users = await axios.get('https://api.pipedrive.com/v1/users', {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+
+    const agda = users.data.data.find(u => u.name === 'Agda');
+    const helenice = users.data.data.find(u => u.name === 'Helenice');
+
+    if (!agda || !helenice) {
+      return res.json({ success: false, error: 'Usuários não encontrados' });
+    }
+
+    const [dealsAgda, dealsHelenice] = await Promise.all([
+      axios.get('https://api.pipedrive.com/v1/deals', {
+        params: { user_id: agda.id, status: 'all_not_deleted', limit: 500, api_token: PIPEDRIVE_TOKEN }
+      }),
+      axios.get('https://api.pipedrive.com/v1/deals', {
+        params: { user_id: helenice.id, status: 'all_not_deleted', limit: 500, api_token: PIPEDRIVE_TOKEN }
+      })
+    ]);
+
+    const allDeals = [...(dealsAgda.data.data || []), ...(dealsHelenice.data.data || [])];
+    const wonDeals = allDeals.filter(d => d.status === 'won');
+
+    const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a';
+    const instagramLeads = allDeals.filter(d => {
+      const plat = String(d[FIELD_PLATAFORMA] || '').toLowerCase();
+      return plat.includes('instagram') || plat.includes('meta');
+    }).length;
+
+    const googleLeads = allDeals.filter(d => {
+      const plat = String(d[FIELD_PLATAFORMA] || '').toLowerCase();
+      return plat.includes('google');
+    }).length;
+
+    const avgClosingTime = wonDeals.length > 0
+      ? wonDeals.filter(d => d.add_time && d.won_time).reduce((sum, d) => {
+          const days = (new Date(d.won_time) - new Date(d.add_time)) / (1000 * 60 * 60 * 24);
+          return sum + Math.max(0, days);
+        }, 0) / wonDeals.length
+      : 0;
+
+    // Motivos de perda
+    const lostDeals = allDeals.filter(d => d.status === 'lost');
+    const lossReasons = {};
+    lostDeals.forEach(d => {
+      const reason = d.lost_reason || 'Sem motivo registrado';
+      lossReasons[reason] = (lossReasons[reason] || 0) + 1;
+    });
+
+    const topLossReasons = Object.entries(lossReasons)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason, count]) => ({ reason, count }));
+
+    res.json({
+      success: true,
+      data: {
+        closingTime: avgClosingTime.toFixed(1),
+        instagramLeads,
+        googleLeads,
+        totalLeads: allDeals.length,
+        wonDeals: wonDeals.length,
+        lostDeals: lostDeals.length,
+        topLossReasons
+      }
+    });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
+// Página de KPIs
+app.get('/dashboard/kpis', (req, res) => {
+  res.sendFile(path.join(__dirname, 'kpis.html'));
+});
+
 // Teste de fetch
 app.get('/test-fetch', (req, res) => {
   res.sendFile(path.join(__dirname, 'test-fetch.html'));
