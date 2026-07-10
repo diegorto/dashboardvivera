@@ -27,6 +27,36 @@
   .header h1 { font-size: 32px; margin-bottom: 5px; }
   .header p { font-size: 14px; opacity: 0.9; }
 
+  .nav-tabs {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+    justify-content: center;
+  }
+
+  .nav-tabs a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+  }
+
+  .nav-tabs a:hover {
+    background: rgba(255,255,255,0.3);
+  }
+
+  .nav-tabs a.active {
+    background: white;
+    color: #dd0000;
+    border-color: #dd0000;
+  }
+
   .container { max-width: 1400px; margin: 0 auto; }
 
   .setup {
@@ -795,6 +825,12 @@
 <div class="header">
   <h1>PAINEL VIVERA OROFACIAL</h1>
   <p>Um time de altíssima performance</p>
+  <nav>
+    <div class="nav-tabs">
+      <a href="/">Audit de Tráfego</a>
+      <a href="/sdr" class="active">Corrida das SDRs</a>
+    </div>
+  </nav>
 </div>
 
 <div class="container">
@@ -1170,11 +1206,13 @@ const PHOTOS = {
   'Meta': 'https://viveraorofacial.com.br/wp-content/uploads/2026/07/meta.png'
 };
 
-const CRC_FIELD = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
-const CRC_ID = 114;
-const AGENDAMENTO_STAGE = 4;
-const COMPARECIMENTO_STAGE = 5;
-const JESSICA_TAG = 'jessica';
+// Configurações do Pipedrive para Vivera Orofacial
+// Ajuste estas constantes conforme seu funil e campos customizados
+const CRC_FIELD = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7'; // Campo "Origem" (CRC)
+const CRC_ID = 114; // Valor esperado para "Origem: CRC"
+const AGENDAMENTO_STAGE = 4; // Stage do funil "Agendamento"
+const COMPARECIMENTO_STAGE = 5; // Stage do funil "Comparecimento"
+const JESSICA_TAG = 'jessica'; // Tag para categorizar fechamentos especiais
 
 const CALL_GOALS = {
   day: 15,

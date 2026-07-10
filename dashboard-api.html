@@ -36,6 +36,39 @@
         header h1 { font-size: 26px; margin-bottom: 5px; }
         header p { opacity: 0.9; font-size: 13px; }
 
+        header nav {
+            text-align: center;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .nav-tabs a {
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .nav-tabs a:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .nav-tabs a.active {
+            background: white;
+            color: #667eea;
+            border-color: #667eea;
+        }
+
         .filters-bar {
             background: #f8f9fa;
             padding: 15px 30px;
@@ -249,6 +282,12 @@
         <header>
             <h1>Audit: Meta Ads vs Pipedrive</h1>
             <p>Leads que o Meta diz que gerou vs leads confirmados no Pipedrive</p>
+            <nav>
+                <div class="nav-tabs">
+                    <a href="/" class="active">Audit de Tráfego</a>
+                    <a href="/sdr">Corrida das SDRs</a>
+                </div>
+            </nav>
         </header>
 
         <div class="filters-bar">
