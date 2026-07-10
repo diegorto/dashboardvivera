@@ -16,6 +16,10 @@ app.get('/cadastro', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'cadastro.html'));
 });
 
+app.get('/painel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'painel.html'));
+});
+
 app.get('/', (req, res) => {
   res.json({ ok: true, service: 'vivera-fotos' });
 });

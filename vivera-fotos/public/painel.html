@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Painel - Vivera Fotos</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 32px auto; padding: 0 16px; color: #111; }
+  h2 { margin-bottom: 4px; }
+  .sub { color: #666; font-size: 14px; margin-bottom: 20px; }
+  button { padding: 12px 16px; font-size: 16px; background: #111; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+  button:disabled { opacity: 0.6; }
+  button.secondary { background: #eee; color: #111; }
+  #status { margin: 16px 0; padding: 12px; border-radius: 6px; display: none; white-space: pre-wrap; }
+  #status.ok { background: #e6f4ea; color: #1e4620; display: block; }
+  #status.err { background: #fce8e6; color: #611a15; display: block; }
+  .patient { border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin-top: 12px; }
+  .patient h3 { margin: 0 0 8px; }
+  .poses { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .poses button { padding: 8px 12px; font-size: 14px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 12px; }
+  .gallery figure { margin: 0; }
+  .gallery img { width: 100%; border-radius: 6px; display: block; }
+  .gallery figcaption { font-size: 11px; color: #666; text-align: center; margin-top: 4px; }
+  a.link { color: #111; }
+</style>
+</head>
+<body>
+<h2>Painel Vivera Fotos</h2>
+<div class="sub">Varre sua biblioteca do Google Fotos e identifica os pacientes cadastrados.</div>
+
+<button id="processar">Processar Google Photos</button>
+<a class="link" href="/cadastro" style="margin-left:12px;">+ cadastrar paciente</a>
+<div id="status"></div>
+
+<div id="pacientes"></div>
+
+<script>
+const statusEl = document.getElementById('status');
+const pacientesEl = document.getElementById('pacientes');
+
+async function carregarPacientes() {
+  const res = await fetch('/api/patients');
+  const patients = await res.json();
+  pacientesEl.innerHTML = '';
+  patients.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'patient';
+    div.innerHTML = `
+      <h3>${p.name}</h3>
+      <div class="poses">
+        <button class="secondary" data-id="${p.id}" data-pose="">Todas</button>
+        <button class="secondary" data-id="${p.id}" data-pose="frontal">Frontal</button>
+        <button class="secondary" data-id="${p.id}" data-pose="perfil_45">Perfil 45º</button>
+        <button class="secondary" data-id="${p.id}" data-pose="lateral">Lateral</button>
+      </div>
+      <div class="gallery" id="gallery-${p.id}"></div>
+    `;
+    pacientesEl.appendChild(div);
+  });
+  pacientesEl.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.addEventListener('click', () => verTimeline(btn.dataset.id, btn.dataset.pose));
+  });
+}
+
+async function verTimeline(patientId, pose) {
+  const gallery = document.getElementById('gallery-' + patientId);
+  gallery.innerHTML = 'Carregando...';
+  try {
+    const url = '/api/patients/' + patientId + '/timeline' + (pose ? '?pose=' + pose : '');
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!res.ok) { gallery.innerHTML = 'Erro: ' + data.error; return; }
+    if (!data.fotos.length) { gallery.innerHTML = 'Nenhuma foto encontrada ainda para esse filtro.'; return; }
+    gallery.innerHTML = '';
+    data.fotos.forEach(f => {
+      const fig = document.createElement('figure');
+      const data_ = f.creationTime ? f.creationTime.slice(0, 10) : '';
+      fig.innerHTML = `<img src="${f.url}" loading="lazy"><figcaption>${data_} · ${f.pose}</figcaption>`;
+      gallery.appendChild(fig);
+    });
+  } catch (err) {
+    gallery.innerHTML = 'Erro de conexão: ' + err.message;
+  }
+}
+
+document.getElementById('processar').addEventListener('click', async () => {
+  const btn = document.getElementById('processar');
+  btn.disabled = true;
+  statusEl.className = '';
+  statusEl.textContent = 'Processando... isso pode demorar dependendo de quantas fotos novas tiver na sua biblioteca.';
+  statusEl.style.display = 'block';
+  try {
+    const res = await fetch('/api/timeline/process', { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      statusEl.className = 'ok';
+      statusEl.textContent = `Concluído! Fotos na biblioteca: ${data.scanned}. Novas analisadas: ${data.novasProcessadas}. Identificadas de pacientes cadastrados: ${data.matched}.`;
+      carregarPacientes();
+    } else {
+      statusEl.className = 'err';
+      statusEl.textContent = 'Erro: ' + data.error;
+    }
+  } catch (err) {
+    statusEl.className = 'err';
+    statusEl.textContent = 'Erro de conexão: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+carregarPacientes();
+</script>
+</body>
+</html>
