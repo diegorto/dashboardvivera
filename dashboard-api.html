@@ -531,7 +531,7 @@
             rows = sortRows(rows, auditSort);
 
             const cols = [
-                ['campanha', 'Campanha'], ['conjunto', 'Conjunto'], ['anuncio', 'Anúncio / Palavra-chave'],
+                ['campanha', 'Campanha'], ['anuncio', 'Criativo + Público'],
                 ['gasto_meta', 'Gasto (R$)'], ['leads_meta', 'Leads Meta'], ['leads_pipedrive', 'Leads Pipedrive'],
                 ['discrepancia', 'Discrepância'], ['revenue_total', 'Revenue (R$)'], ['roas', 'ROAS'], ['custo_por_lead', 'Custo/Lead']
             ];
@@ -552,8 +552,12 @@
 
                 html += `<tr>
                     <td>${r.campanha || 'sem_campanha'}</td>
-                    <td>${r.conjunto || 'sem_conjunto'}</td>
-                    <td>${r.anuncio || 'sem_palavra_chave'}</td>
+                    <td>
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <span>${r.anuncio || 'sem_palavra_chave'}</span>
+                            <span class="tag-badge" style="background: #e8eef7; color: #667eea;">👥 ${r.conjunto || 'sem_conjunto'}</span>
+                        </div>
+                    </td>
                     <td>R$ ${r.gasto_meta.toFixed(2)}</td>
                     <td>${r.leads_meta}</td>
                     <td>${r.leads_pipedrive}</td>
