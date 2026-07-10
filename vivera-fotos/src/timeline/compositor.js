@@ -2,8 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const processor = require('./processor');
-const photosClient = require('../googlePhotos/photosClient');
-const { DATA_DIR } = require('../config');
+const { DATA_DIR, PHOTOS_DIR } = require('../config');
 
 const COMPOSITES_DIR = path.join(DATA_DIR, 'composites');
 if (!fs.existsSync(COMPOSITES_DIR)) fs.mkdirSync(COMPOSITES_DIR, { recursive: true });
@@ -45,10 +44,9 @@ function labelSvg(text, width) {
   );
 }
 
-// Baixa, equaliza (auto-contraste/brilho) e redimensiona uma foto pra altura padrao.
+// Le a foto ja baixada localmente e equaliza (auto-contraste/brilho) + redimensiona.
 async function prepareImage(entry) {
-  const mediaItem = await photosClient.getMediaItem(entry.photoId);
-  const bytes = await photosClient.downloadPhotoBytes(mediaItem.baseUrl);
+  const bytes = fs.readFileSync(path.join(PHOTOS_DIR, entry.localFile));
   return sharp(bytes)
     .rotate() // aplica orientacao EXIF antes de qualquer coisa
     .resize({ height: TARGET_HEIGHT })
