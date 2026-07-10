@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Analytics Dashboard</title>
+  <link rel="stylesheet" href="/css/dashboard-whatsapp.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <h1>📊 WhatsApp Analytics Dashboard</h1>
+        <p class="subtitle">Análise de performance das SDRs em tempo real</p>
+      </div>
+      <div class="header-right">
+        <div class="filter-group">
+          <label for="dateRange">Período:</label>
+          <select id="dateRange" class="filter-select">
+            <option value="today">Hoje</option>
+            <option value="7days" selected>Últimos 7 dias</option>
+            <option value="30days">Últimos 30 dias</option>
+            <option value="90days">Últimos 90 dias</option>
+            <option value="all">Tudo</option>
+          </select>
+        </div>
+        <button id="refreshBtn" class="btn btn-primary">🔄 Atualizar</button>
+        <a href="/" class="btn btn-secondary">← Voltar</a>
+      </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+      <div class="spinner"></div>
+      <p>Carregando dados...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+    <!-- KPIs Cards -->
+    <section class="kpis-section">
+      <h2>📈 Métricas Principais</h2>
+      <div class="kpis-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon">📞</div>
+          <div class="kpi-content">
+            <h3>Total de Chamadas</h3>
+            <p class="kpi-value" id="totalCalls">-</p>
+            <span class="kpi-label">realizadas</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">✅</div>
+          <div class="kpi-content">
+            <h3>Chamadas Atendidas</h3>
+            <p class="kpi-value" id="answeredCalls">-</p>
+            <span class="kpi-label">conversas</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">📊</div>
+          <div class="kpi-content">
+            <h3>Taxa de Atendimento</h3>
+            <p class="kpi-value" id="answerRate">-</p>
+            <span class="kpi-label">taxa %</span>
+          </div>
+        </div>
+
+        <div class="kpi-card">
+          <div class="kpi-icon">⏱️</div>
+          <div class="kpi-content">
+            <h3>Tempo Médio</h3>
+            <p class="kpi-value" id="avgDuration">-</p>
+            <span class="kpi-label">segundos</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts Section -->
+    <section class="charts-section">
+      <div class="chart-container">
+        <h2>⏰ Tempo até Primeira Mensagem</h2>
+        <div class="chart-wrapper">
+          <canvas id="firstMessageChart"></canvas>
+          <div class="chart-info">
+            <p><strong>Média:</strong> <span id="msgAvg">-</span> min</p>
+            <p><strong>Mediana:</strong> <span id="msgMedian">-</span> min</p>
+            <p><strong>P95:</strong> <span id="msgP95">-</span> min</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-container">
+        <h2>📞 Tempo até Primeira Ligação</h2>
+        <div class="chart-wrapper">
+          <canvas id="firstCallChart"></canvas>
+          <div class="chart-info">
+            <p><strong>Média:</strong> <span id="callAvg">-</span> min</p>
+            <p><strong>Mediana:</strong> <span id="callMedian">-</span> min</p>
+            <p><strong>P95:</strong> <span id="callP95">-</span> min</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hourly Patterns -->
+    <section class="charts-section">
+      <div class="chart-container full-width">
+        <h2>🕐 Taxa de Atendimento por Hora do Dia</h2>
+        <div class="chart-wrapper">
+          <canvas id="hourlyChart"></canvas>
+          <p class="chart-insight" id="bestHourInsight">-</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Message Impact Card -->
+    <section class="impact-section">
+      <h2>💬 Impacto de Mensagem Prévia</h2>
+      <div class="impact-card">
+        <div class="impact-column with-msg">
+          <h3>✓ Com Mensagem Prévia</h3>
+          <p class="impact-rate" id="withMsgRate">-</p>
+          <p class="impact-count" id="withMsgCount">-</p>
+        </div>
+        <div class="impact-separator">
+          <div class="impact-arrow">→</div>
+        </div>
+        <div class="impact-column without-msg">
+          <h3>✗ Sem Mensagem Prévia</h3>
+          <p class="impact-rate" id="withoutMsgRate">-</p>
+          <p class="impact-count" id="withoutMsgCount">-</p>
+        </div>
+        <div class="impact-result">
+          <h3>📈 Impacto</h3>
+          <p class="impact-value" id="impactValue">-</p>
+          <p class="impact-insight">🚀 Enviar mensagem antes de ligar melhora significativamente o atendimento!</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Message Types Table -->
+    <section class="tables-section">
+      <h2>📝 Efetividade por Tipo de Mensagem</h2>
+      <div class="table-wrapper">
+        <table id="messageTypesTable" class="data-table">
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Enviadas</th>
+              <th>Respostas</th>
+              <th>Taxa de Resposta</th>
+              <th>Tempo Médio</th>
+            </tr>
+          </thead>
+          <tbody id="messageTypesBody">
+            <tr><td colspan="5" class="no-data">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Recent Calls Table -->
+    <section class="tables-section">
+      <h2>📞 Últimas Chamadas</h2>
+      <div class="table-controls">
+        <label for="statusFilter">Filtrar por:</label>
+        <select id="statusFilter" class="filter-select">
+          <option value="all">Todas</option>
+          <option value="completed">Atendidas</option>
+          <option value="missed">Não atendidas</option>
+        </select>
+      </div>
+      <div class="table-wrapper">
+        <table id="recentCallsTable" class="data-table">
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Número</th>
+              <th>Data/Hora</th>
+              <th>Duração</th>
+              <th>SDR</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="recentCallsBody">
+            <tr><td colspan="6" class="no-data">Carregando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button id="prevPageBtn" class="btn btn-small">← Anterior</button>
+        <span id="pageInfo">Página 1</span>
+        <button id="nextPageBtn" class="btn btn-small">Próxima →</button>
+      </div>
+    </section>
+
+    <!-- Script Compliance (N8N Inspector) -->
+    <section class="script-section">
+      <h2>🎯 Análise de Aderência ao Script (N8N)</h2>
+
+      <!-- Compliance Overview -->
+      <div class="compliance-overview">
+        <div class="compliance-card">
+          <h3>Taxa Geral de Conformidade</h3>
+          <div class="compliance-gauge">
+            <div class="gauge-container">
+              <div class="gauge-value" id="complianceValue">-</div>
+              <div class="gauge-label">%</div>
+            </div>
+            <p class="gauge-subtitle" id="complianceStatus">Carregando...</p>
+          </div>
+        </div>
+
+        <div class="compliance-chart-container">
+          <canvas id="complianceTrendChart"></canvas>
+        </div>
+      </div>
+
+      <!-- By SDR -->
+      <div class="compliance-by-sdr">
+        <h3>Conformidade por SDR</h3>
+        <div class="sdr-compliance-list" id="sdrComplianceList">
+          <p>Carregando...</p>
+        </div>
+      </div>
+
+      <!-- Issues Found -->
+      <div class="compliance-issues">
+        <h3>🚨 Problemas Detectados</h3>
+        <div class="issues-list" id="issuesList">
+          <p>Carregando...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Insights -->
+    <section class="insights-section">
+      <h2>💡 Insights do Período</h2>
+      <div class="insights-box">
+        <ul id="insightsList">
+          <li>Carregando insights...</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <script src="/js/dashboard-whatsapp.js"></script>
+</body>
+</html>

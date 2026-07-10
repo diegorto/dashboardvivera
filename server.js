@@ -322,6 +322,186 @@ app.get('/sdr', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
 });
 
+// Dashboard de WhatsApp Analytics
+app.get('/dashboard/whatsapp', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'dashboard-whatsapp.html'));
+});
+
+// API: WhatsApp Stats (KPIs básicos)
+app.get('/api/whatsapp/stats', async (req, res) => {
+  try {
+    // TODO: Buscar dados do banco MySQL do monitor de WhatsApp
+    // Por enquanto, retorna dados mock para testes
+    res.json({
+      total_calls: 245,
+      answered_calls: 156,
+      answer_rate: 63.7,
+      avg_duration: 287,
+      period: req.query.range || '30days'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: WhatsApp Calls (Últimas chamadas)
+app.get('/api/whatsapp/calls', async (req, res) => {
+  try {
+    // TODO: Buscar dados do banco MySQL do monitor de WhatsApp
+    res.json([
+      {
+        id: 1,
+        client_name: 'João Silva',
+        phone_number: '48991234567',
+        timestamp: new Date().toISOString(),
+        duration: 342,
+        sdr_name: 'helenice',
+        status: 'completed'
+      },
+      {
+        id: 2,
+        client_name: 'Maria Santos',
+        phone_number: '48991234568',
+        timestamp: new Date(Date.now() - 900000).toISOString(),
+        duration: 495,
+        sdr_name: 'agda',
+        status: 'completed'
+      }
+    ]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Lead Timing (Tempo até primeira mensagem/ligação)
+app.get('/api/whatsapp/lead-timing', async (req, res) => {
+  try {
+    // TODO: Buscar dados do banco MySQL
+    res.json({
+      message_timing: {
+        average: 8.4,
+        median: 5,
+        p95: 45,
+        distribution: [
+          { label: '0-5 min', count: 120 },
+          { label: '5-15 min', count: 180 },
+          { label: '15-60 min', count: 140 },
+          { label: '>60 min', count: 60 }
+        ]
+      },
+      call_timing: {
+        average: 18.7,
+        median: 12,
+        p95: 120,
+        distribution: [
+          { label: '0-15 min', count: 85 },
+          { label: '15-30 min', count: 120 },
+          { label: '30-60 min', count: 95 },
+          { label: '>60 min', count: 80 }
+        ]
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Patterns (Padrões e análise)
+app.get('/api/whatsapp/patterns', async (req, res) => {
+  try {
+    // TODO: Buscar dados do banco MySQL
+    res.json({
+      hourly_patterns: [
+        { hour: 9, rate: 71.2, attempts: 32 },
+        { hour: 10, rate: 68.1, attempts: 28 },
+        { hour: 11, rate: 65.5, attempts: 25 },
+        { hour: 12, rate: 62.0, attempts: 20 },
+        { hour: 13, rate: 58.3, attempts: 24 },
+        { hour: 14, rate: 72.3, attempts: 35 },
+        { hour: 15, rate: 75.5, attempts: 40 },
+        { hour: 16, rate: 73.2, attempts: 38 },
+        { hour: 17, rate: 70.1, attempts: 32 },
+        { hour: 18, rate: 65.0, attempts: 28 }
+      ],
+      message_previa_impact: {
+        with_message_rate: 72.5,
+        with_message_count: 120,
+        without_message_rate: 51.2,
+        without_message_count: 125
+      },
+      insights: [
+        'Saudação é 2x mais efetiva que Follow-up',
+        'Melhor horário: 14h-17h (72.3% de atendimento)',
+        'Mensagem prévia melhora 21.3% de atendimento'
+      ]
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Message Types (Efetividade por tipo)
+app.get('/api/whatsapp/message-types', async (req, res) => {
+  try {
+    // TODO: Buscar dados do banco MySQL
+    res.json({
+      types: [
+        {
+          type: 'Saudação',
+          sent: 245,
+          responses: 198,
+          response_rate: 80.8,
+          avg_response_time: 0.5
+        },
+        {
+          type: 'Proposta',
+          sent: 156,
+          responses: 89,
+          response_rate: 57.1,
+          avg_response_time: 2.3
+        },
+        {
+          type: 'Follow-up',
+          sent: 203,
+          responses: 76,
+          response_rate: 37.4,
+          avg_response_time: 4.1
+        }
+      ]
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Script Compliance (Análise de aderência ao script via N8N)
+app.get('/api/whatsapp/script-compliance', async (req, res) => {
+  try {
+    // TODO: Integrar com N8N para análise de script
+    res.json({
+      daily_compliance: 82.5,
+      by_sdr: [
+        { sdr: 'helenice', compliance: 85.2, conversations: 42 },
+        { sdr: 'agda', compliance: 79.8, conversations: 38 }
+      ],
+      compliance_trend: [
+        { date: '2026-07-06', rate: 75.2 },
+        { date: '2026-07-07', rate: 78.5 },
+        { date: '2026-07-08', rate: 80.1 },
+        { date: '2026-07-09', rate: 81.3 },
+        { date: '2026-07-10', rate: 82.5 }
+      ],
+      issues: [
+        { type: 'missing_greeting', count: 5, severity: 'high' },
+        { type: 'skipped_qualification', count: 8, severity: 'medium' },
+        { type: 'rushed_closing', count: 3, severity: 'low' }
+      ]
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   const range = defaultDateRange();
