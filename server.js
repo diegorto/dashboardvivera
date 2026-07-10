@@ -161,14 +161,23 @@ function objectionNames(deal) {
 // Busca o link de previa compartilhavel de um anuncio (o mesmo que "Compartilhar um link"
 // no Ads Manager gera - abre a previa real do criativo sem exigir login). E um edge proprio
 // da Graph API, nao da pra pedir junto com a listagem de ads via field-expansion.
+let debugShareLinkLogged = false;
 async function fetchAdShareLink(adId) {
   try {
     const response = await axios.get(`https://graph.facebook.com/v18.0/${adId}/previewshareablelink`, {
       params: { access_token: FB_ACCESS_TOKEN }, timeout: 10000
     });
+    if (!debugShareLinkLogged) {
+      debugShareLinkLogged = true;
+      console.log('DEBUG previewshareablelink resposta:', JSON.stringify(response.data));
+    }
     const entry = response.data && Array.isArray(response.data.data) ? response.data.data[0] : response.data;
     return (entry && entry.share_link) || null;
   } catch (error) {
+    if (!debugShareLinkLogged) {
+      debugShareLinkLogged = true;
+      console.log('DEBUG previewshareablelink erro:', JSON.stringify(error.response?.data || error.message));
+    }
     return null;
   }
 }

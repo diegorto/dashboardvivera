@@ -91,6 +91,9 @@ jobs:
           fi
           echo "Deploy verificado com sucesso (HTTP 200 + /api/dashboard OK)."
 
+          echo "--- DEBUG TEMPORARIO: log do previewshareablelink ---"
+          pm2 logs dashboardvivera --lines 100 --nostream --out | grep -A5 "DEBUG previewshareablelink" || echo "nenhum log DEBUG encontrado ainda"
+
           echo "--- Verificando /api/tintim-audit (nao bloqueia o deploy se falhar) ---"
           TINTIM_RESP=$(curl -sS -m 120 "http://127.0.0.1:3000/api/tintim-audit" || echo '{"success":false,"error":"curl falhou"}')
           echo "$TINTIM_RESP" | node -e "
