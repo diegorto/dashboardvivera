@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Conformidade de Scripts</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .header h1 { color: #075E54; font-size: 26px; margin-bottom: 10px; }
+
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .metric-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .metric-card h2 { color: #075E54; font-size: 20px; margin-bottom: 15px; }
+
+    .metric-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+    .metric-row .label { color: #666; }
+    .metric-row .value { font-weight: 600; color: #075E54; }
+
+    .score-bar { width: 100%; height: 8px; background: #eee; border-radius: 4px; margin: 10px 0; overflow: hidden; }
+    .score-fill { height: 100%; background: #4CAF50; }
+    .score-fill.warning { background: #FF9800; }
+    .score-fill.danger { background: #f44336; }
+
+    .empty { text-align: center; color: #999; padding: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Dashboard - Conformidade de Scripts</h1>
+      <p>Ultima semana</p>
+    </div>
+
+    <% if (!metrics.length) { %>
+      <div class="empty">Sem metricas ainda. Elas aparecem apos a primeira analise diaria via n8n.</div>
+    <% } %>
+
+    <div class="metrics-grid">
+      <% metrics.forEach(function(m) { %>
+        <div class="metric-card">
+          <h2><%= m.sdr_name.toUpperCase() %></h2>
+
+          <div class="metric-row"><span class="label">Total de Conversas:</span><span class="value"><%= m.total_conv %></span></div>
+          <div class="metric-row"><span class="label">Conformes (>=80%):</span><span class="value"><%= m.conforming %></span></div>
+          <div class="metric-row"><span class="label">Aderencia Media:</span><span class="value"><%= Math.round(m.avg_adherence) %>%</span></div>
+
+          <div class="score-bar">
+            <div class="score-fill <%= m.avg_adherence >= 80 ? '' : (m.avg_adherence >= 60 ? 'warning' : 'danger') %>" style="width: <%= m.avg_adherence %>%"></div>
+          </div>
+
+          <div class="metric-row"><span class="label">Chamadas Atendidas:</span><span class="value"><%= m.calls_answered %></span></div>
+          <div class="metric-row"><span class="label">Duracao Media:</span><span class="value"><%= Math.round(m.avg_duration / 60) %> min</span></div>
+        </div>
+      <% }); %>
+    </div>
+  </div>
+</body>
+</html>
