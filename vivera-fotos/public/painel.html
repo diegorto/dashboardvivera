@@ -104,7 +104,7 @@ async function iniciarSelecao(patientId, btn) {
           const importRes = await fetch(`/api/patients/${patientId}/picker/import`, { method: 'POST' });
           const importData = await importRes.json();
           if (importRes.ok) {
-            statusPicker.textContent = `Concluído! ${importData.selecionadas} foto(s) selecionada(s), ${importData.novasProcessadas} nova(s) analisada(s).`;
+            statusPicker.textContent = `Concluído! ${importData.selecionadas} foto(s) selecionada(s), ${importData.processadas} aceita(s) (rosto confere), ${importData.descartadas} descartada(s) (rosto não confere ou não detectado).`;
             carregarPacientes();
           } else {
             statusPicker.textContent = 'Erro ao importar: ' + importData.error;

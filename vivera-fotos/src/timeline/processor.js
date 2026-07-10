@@ -17,9 +17,12 @@ function saveTimeline(timeline) {
   store.write(TIMELINE_FILE, timeline);
 }
 
-// Processa as fotos que o paciente/usuario selecionou via Google Photos Picker.
+// Processa as fotos que o usuario selecionou via Google Photos Picker.
 // Baixa os bytes uma unica vez e guarda localmente (o link do Google expira em ~1h,
-// entao nao da pra depender dele pra exibir depois) e classifica a pose de cada foto.
+// entao nao da pra depender dele pra exibir depois). Antes de aceitar a foto,
+// confere pelo rosto (Rekognition) se e realmente o paciente cadastrado - assim
+// da pra selecionar de forma mais ampla no Picker que o sistema descarta sozinho
+// quem nao bate (ex: familiares, outras pessoas na mesma foto/album).
 async function processPickerItems(patientId, items) {
   const timeline = loadTimeline();
   const processedSet = new Set(timeline.processedPhotoIds);
@@ -28,10 +31,18 @@ async function processPickerItems(patientId, items) {
 
   const pending = items.filter((item) => !processedSet.has(item.id));
   let processadas = 0;
+  let descartadas = 0;
 
   for (const item of pending) {
     try {
       const bytes = await pickerClient.downloadPhotoBytes(item.baseUrl);
+
+      const match = await rekognition.findMatchingPatient(bytes);
+      if (!match || match.patientId !== patientId) {
+        descartadas += 1;
+        continue; // rosto nao bate com o paciente (ou nenhum rosto detectado) - descarta
+      }
+
       const localFile = `${patientId}/${item.id}.jpg`;
       fs.writeFileSync(path.join(patientDir, `${item.id}.jpg`), bytes);
 
@@ -42,6 +53,7 @@ async function processPickerItems(patientId, items) {
         filename: item.filename,
         creationTime: item.creationTime,
         localFile,
+        similarity: match.similarity,
         pose: pose ? pose.pose : 'desconhecida',
         yaw: pose ? pose.yaw : null,
         qualityScore: pose ? pose.qualityScore : 0,
@@ -57,7 +69,7 @@ async function processPickerItems(patientId, items) {
   timeline.processedPhotoIds = Array.from(processedSet);
   saveTimeline(timeline);
 
-  return { selecionadas: items.length, novasProcessadas: pending.length, processadas };
+  return { selecionadas: items.length, novasProcessadas: pending.length, processadas, descartadas };
 }
 
 function getPatientTimeline(patientId, pose) {
