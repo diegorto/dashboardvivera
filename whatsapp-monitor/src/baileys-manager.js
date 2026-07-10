@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const pino = require('pino');
@@ -23,8 +23,16 @@ class BaileysManager {
 
     const { state, saveCreds } = await useMultiFileAuthState(authPath);
 
+    let version;
+    try {
+      ({ version } = await fetchLatestBaileysVersion());
+    } catch (error) {
+      console.error(`[Baileys] Nao consegui buscar a versao mais recente do WhatsApp Web (${error.message}), usando a padrao da lib`);
+    }
+
     const sock = makeWASocket({
       auth: state,
+      version,
       printQRInTerminal: false,
       browser: ['Ubuntu', 'Chrome', '120.0.0.0'],
       logger: pino({ level: 'error' }),
@@ -50,11 +58,16 @@ class BaileysManager {
 
       if (update.connection === 'close') {
         await db.query('UPDATE whatsapp_sessions SET status = ? WHERE session_name = ?', ['disconnected', sessionName]);
-        console.log(`[Baileys] Desconectado: ${sessionName}`);
 
-        const shouldReconnect = update.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+        const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+        const reason = update.lastDisconnect?.error?.message || 'sem detalhe';
+        console.log(`[Baileys] Desconectado: ${sessionName} (statusCode=${statusCode}, motivo=${reason})`);
+
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
         if (shouldReconnect) {
           setTimeout(() => this.initSession(sessionName, sdrName, phoneNumber), 5000);
+        } else {
+          console.log(`[Baileys] ${sessionName} fez logout - apague a pasta auth/${sessionName} e reinicie pra gerar um novo QR code`);
         }
       }
     });
