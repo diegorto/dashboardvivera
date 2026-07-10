@@ -822,24 +822,28 @@ function buildGovernance(deals) {
   };
 }
 
-// "Valor potencial" de um deal aberto: usa o campo value do proprio negocio quando
-// preenchido; cai pro ticket medio realizado no periodo quando o negocio ainda nao
-// tem valor definido (comum em estagios iniciais do funil).
-function buildRevenueAtRisk(deals, avgTicket) {
-  const potential = d => d.value > 0 ? d.value : avgTicket;
-
+// Valor de um deal parado = valor real cadastrado no Pipedrive, sem estimativa nenhuma.
+// Negocios sem valor definido entram na lista/contagem normalmente (pra nao esconder que
+// estao parados), mas nao entram na soma em R$ - contados a parte em "semOrcamento".
+function buildRevenueAtRisk(deals) {
   function group(filtered) {
     const items = filtered.map(d => ({
       id: d.id,
       title: d.personName || d.title,
       status: d.status,
-      value: round2(potential(d)),
+      value: round2(d.value || 0),
       telefone: d.telefone || '',
       campanha: d.campanha || 'sem_campanha',
       criativo: d.palavraChave || 'sem_palavra_chave',
       pipedriveUrl: pipedriveDealUrl(d.id)
     }));
-    return { count: items.length, value: round2(items.reduce((s, d) => s + d.value, 0)), deals: items.slice(0, 100) };
+    const comValor = items.filter(d => d.value > 0);
+    return {
+      count: items.length,
+      value: round2(comValor.reduce((s, d) => s + d.value, 0)),
+      semOrcamento: items.length - comValor.length,
+      deals: items.slice(0, 100)
+    };
   }
 
   const qualificadosSemAgendamento = group(deals.filter(d => d.status === 'open' && rankOf(d) === 2));
@@ -937,11 +941,7 @@ app.get('/api/dashboard', async (req, res) => {
     // data selecionado - negocio parado importa mesmo que o usuario esteja olhando "Mes atual".
     const revenueAtRiskRange = lastNMonthsRange(3);
     const dealsForRisk = inboundDealsAll.filter(d => inRange(d, revenueAtRiskRange.since, revenueAtRiskRange.until));
-    const wonForRiskTicket = dealsForRisk.filter(d => isMetaAttributed(d) && d.status === 'won');
-    const avgTicketForRisk = wonForRiskTicket.length > 0
-      ? wonForRiskTicket.reduce((s, d) => s + d.value, 0) / wonForRiskTicket.length
-      : kpis.ticketMedio.current;
-    const revenueAtRisk = buildRevenueAtRisk(dealsForRisk, avgTicketForRisk);
+    const revenueAtRisk = buildRevenueAtRisk(dealsForRisk);
 
     const recepcaoKpis = buildRecepcaoKpis(recepcaoDeals, previousRecepcaoDeals);
     const fechamentosRecepcao = buildFechamentosRecepcao(recepcaoDeals);
@@ -957,7 +957,7 @@ app.get('/api/dashboard', async (req, res) => {
       success: true,
       range, previousRange: prevRange,
       kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
-      revenueAtRiskRange, revenueAtRiskAvgTicket: round2(avgTicketForRisk),
+      revenueAtRiskRange,
       recepcao: { kpis: recepcaoKpis, fechamentos: fechamentosRecepcao },
       faturamentoTotal,
       meta: {

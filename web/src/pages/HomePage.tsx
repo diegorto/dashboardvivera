@@ -21,6 +21,7 @@ export function HomePage() {
 
   const risk = data.revenueAtRisk
   const stuckCount = risk.qualificadosSemAgendamento.count + risk.agendadosFaltaram.count + risk.propostasSemFechamento.count
+  const semOrcamentoCount = risk.qualificadosSemAgendamento.semOrcamento + risk.agendadosFaltaram.semOrcamento + risk.propostasSemFechamento.semOrcamento
 
   const mktSalesItems: SalesGroupItem[] = data.patients
     .filter(p => p.campanha !== 'sem_campanha')
@@ -58,7 +59,8 @@ export function HomePage() {
             <div>
               <div className="text-2xl font-bold tabular-nums text-critical">{formatBRL(risk.total)}</div>
               <div className="text-xs text-muted-foreground">
-                {stuckCount} negócios parados nos últimos 3 meses ({formatDate(data.revenueAtRiskRange.since)} a {formatDate(data.revenueAtRiskRange.until)}) que poderiam gerar a receita estimada pelo ticket médio das vendas de Marketing (Meta Ads) fechadas nessa mesma janela (tkm médio: {formatBRL(data.revenueAtRiskAvgTicket)}) — independente do filtro de período selecionado acima
+                {stuckCount} negócios parados nos últimos 3 meses ({formatDate(data.revenueAtRiskRange.since)} a {formatDate(data.revenueAtRiskRange.until)}), somando só o orçamento real já registrado no Pipedrive — sem estimativa. Independente do filtro de período selecionado acima.
+                {semOrcamentoCount > 0 && <span> {semOrcamentoCount} desses negócios ainda não têm valor definido no Pipedrive, então não entram nessa soma.</span>}
               </div>
             </div>
             <div className="flex flex-col gap-3 text-xs sm:flex-row sm:flex-wrap sm:gap-8">

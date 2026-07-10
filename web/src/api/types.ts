@@ -168,6 +168,7 @@ export interface RevenueAtRiskDeal {
 export interface RevenueAtRiskGroup {
   count: number
   value: number
+  semOrcamento: number
   deals: RevenueAtRiskDeal[]
 }
 
@@ -233,7 +234,6 @@ export interface DashboardResponse {
   governance: Governance
   revenueAtRisk: RevenueAtRisk
   revenueAtRiskRange: { since: string; until: string }
-  revenueAtRiskAvgTicket: number
   insights: Insight[]
   leadsSemOrigem: LeadSemOrigem[]
   recepcao: Recepcao
