@@ -86,13 +86,33 @@ async function iniciarSelecao(patientId, btn) {
   const statusPicker = document.getElementById('picker-status-' + patientId);
   btn.disabled = true;
   statusPicker.textContent = 'Abrindo o Google Photos...';
+
+  // Abre a aba em branco JA, ainda dentro do clique do usuario - se esperar a
+  // resposta do servidor antes de abrir, o Safari/Chrome do celular bloqueia
+  // o pop-up silenciosamente (nao conta mais como acao direta do usuario).
+  const novaAba = window.open('', '_blank');
+
   try {
     const res = await fetch(`/api/patients/${patientId}/picker/session`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) { statusPicker.textContent = 'Erro: ' + data.error; btn.disabled = false; return; }
+    if (!res.ok) {
+      statusPicker.textContent = 'Erro: ' + data.error;
+      btn.disabled = false;
+      if (novaAba) novaAba.close();
+      return;
+    }
 
-    window.open(data.pickerUri, '_blank');
-    statusPicker.textContent = 'Escolha as fotos na aba que abriu e volte aqui. Verificando...';
+    if (novaAba) {
+      novaAba.location.href = data.pickerUri;
+      statusPicker.textContent = 'Escolha as fotos na aba que abriu e volte aqui. Verificando...';
+    } else {
+      statusPicker.textContent = 'O navegador bloqueou a aba. Toque no link para abrir: ';
+      const link = document.createElement('a');
+      link.href = data.pickerUri;
+      link.target = '_blank';
+      link.textContent = 'Abrir seleção de fotos';
+      statusPicker.appendChild(link);
+    }
 
     const poll = setInterval(async () => {
       try {
