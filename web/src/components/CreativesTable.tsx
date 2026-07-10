@@ -8,7 +8,9 @@ import { useSort } from '@/lib/useSort'
 import { formatBRL, formatBRLPrecise, formatNumber } from '@/lib/utils'
 import type { Creative } from '@/api/types'
 
-export function CreativesTable({ rows, searchable = false }: { rows: Creative[]; searchable?: boolean }) {
+export function CreativesTable({
+  rows, searchable = false, defaultSortKey = 'receita',
+}: { rows: Creative[]; searchable?: boolean; defaultSortKey?: keyof Creative }) {
   const [search, setSearch] = useState('')
 
   const filtered = useMemo(() => {
@@ -17,7 +19,7 @@ export function CreativesTable({ rows, searchable = false }: { rows: Creative[];
     return rows.filter(r => r.campanha.toLowerCase().includes(q) || r.conjunto.toLowerCase().includes(q) || r.anuncio.toLowerCase().includes(q))
   }, [rows, search])
 
-  const { sorted, sortKey, sortDir, toggle } = useSort(filtered, 'receita')
+  const { sorted, sortKey, sortDir, toggle } = useSort(filtered, defaultSortKey)
 
   return (
     <div className="flex flex-col gap-2">

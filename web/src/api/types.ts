@@ -27,6 +27,8 @@ export interface Creative {
   agendados: number
   compareceram: number
   compras: number
+  perdidos: number
+  objecoes: FunnelObjection[]
   receita: number
   roas: number
   receitaPorLead: number

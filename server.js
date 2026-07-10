@@ -439,9 +439,9 @@ function buildCreatives(ads, deals) {
       map[key] = {
         campanha: ad.campaignName, conjunto: ad.adsetName, anuncio: ad.adName,
         investimento: 0, impressoes: 0, cliques: 0, mensagensMeta: 0,
-        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
+        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0, perdidos: 0,
         receita: 0, thumbnailUrl: ad.thumbnailUrl, adUrl: ad.adUrl, adStatus: ad.status,
-        adId: ad.adId, dealDates: []
+        adId: ad.adId, dealDates: [], objectionCounts: {}
       };
     }
     map[key].investimento += ad.spend;
@@ -460,8 +460,8 @@ function buildCreatives(ads, deals) {
       map[key] = {
         campanha, conjunto, anuncio,
         investimento: 0, impressoes: 0, cliques: 0, mensagensMeta: 0,
-        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0,
-        receita: 0, thumbnailUrl: null, adUrl: null, adStatus: null, adId: null, dealDates: []
+        leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compras: 0, perdidos: 0,
+        receita: 0, thumbnailUrl: null, adUrl: null, adStatus: null, adId: null, dealDates: [], objectionCounts: {}
       };
     }
     const r = map[key];
@@ -471,6 +471,10 @@ function buildCreatives(ads, deals) {
     if (rank >= 3 || deal.status === 'won') r.agendados++;
     if (rank >= 4 || deal.status === 'won') r.compareceram++;
     if (deal.status === 'won') { r.compras++; r.receita += deal.value; r.dealDates.push({ date: deal.wonDate || deal.addDate, value: deal.value }); }
+    if (deal.status === 'lost') {
+      r.perdidos++;
+      objectionNames(deal).forEach(tag => { r.objectionCounts[tag] = (r.objectionCounts[tag] || 0) + 1; });
+    }
   });
 
   return Object.values(map).map(r => {
@@ -491,10 +495,16 @@ function buildCreatives(ads, deals) {
     if (r.receita >= 1 && roas < 1.0 && r.investimento >= 500) status = 'desligar';
     else if (roas >= 2.0 && r.compras >= 3 && trendDirection !== 'down') status = 'escalar';
 
+    const objecoes = Object.entries(r.objectionCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
     return {
       campanha: r.campanha, conjunto: r.conjunto, anuncio: r.anuncio,
       investimento: round2(r.investimento), leads: r.leads, mensagensMeta: r.mensagensMeta,
       qualificados: r.qualificados, agendados: r.agendados, compareceram: r.compareceram, compras: r.compras,
+      perdidos: r.perdidos, objecoes,
       receita: round2(r.receita), roas: round2(roas),
       receitaPorLead: round2(receitaPorLead), receitaPorAgendamento: round2(receitaPorAgendamento),
       ctr: round2(ctr), cpc: round2(cpc), impressoes: r.impressoes, cliques: r.cliques,

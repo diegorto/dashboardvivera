@@ -2,22 +2,28 @@ import { AlertTriangle, UserX, Landmark } from 'lucide-react'
 import { useFilters } from '@/lib/FilterContext'
 import { KpiCard } from '@/components/KpiCard'
 import { CreativesTable } from '@/components/CreativesTable'
+import { LostCreativesTable } from '@/components/LostCreativesTable'
 import { MiniFunnel } from '@/components/MiniFunnel'
 import { DeltaIndicator } from '@/components/DeltaIndicator'
 import { StuckDealsGroup } from '@/components/StuckDealsGroup'
 import { SalesGroup, type SalesGroupItem } from '@/components/SalesGroup'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatBRL, formatNumber, formatDate } from '@/lib/utils'
+import type { Creative } from '@/api/types'
+
+function top10By(rows: Creative[], key: keyof Creative) {
+  return [...rows].sort((a, b) => (b[key] as number) - (a[key] as number)).slice(0, 10)
+}
 
 export function HomePage() {
   const { data, filteredCreatives } = useFilters()
   if (!data) return null
 
-  const top10 = [...filteredCreatives].sort((a, b) => b.receita - a.receita).slice(0, 10)
-  const worst10 = [...filteredCreatives]
-    .filter(c => c.investimento > 0)
-    .sort((a, b) => a.roas - b.roas)
-    .slice(0, 10)
+  const topLeads = top10By(filteredCreatives, 'leads')
+  const topQualificados = top10By(filteredCreatives, 'qualificados')
+  const topAgendados = top10By(filteredCreatives, 'agendados')
+  const topCompareceram = top10By(filteredCreatives, 'compareceram')
+  const topReceita = top10By(filteredCreatives, 'receita')
 
   const risk = data.revenueAtRisk
   const stuckCount = risk.qualificadosSemAgendamento.count + risk.agendadosFaltaram.count + risk.propostasSemFechamento.count
@@ -97,13 +103,33 @@ export function HomePage() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Top 10 Criativos</h2>
-        <CreativesTable rows={top10} />
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Leads Recebidos</h2>
+        <CreativesTable rows={topLeads} defaultSortKey="leads" />
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">Top 10 Piores</h2>
-        <CreativesTable rows={worst10} />
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Leads Qualificados</h2>
+        <CreativesTable rows={topQualificados} defaultSortKey="qualificados" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Leads Agendados</h2>
+        <CreativesTable rows={topAgendados} defaultSortKey="agendados" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Leads Comparecidos</h2>
+        <CreativesTable rows={topCompareceram} defaultSortKey="compareceram" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Vendas em R$ Ganhas</h2>
+        <CreativesTable rows={topReceita} defaultSortKey="receita" />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-semibold">Top 10 Criativos — Perdidos</h2>
+        <LostCreativesTable rows={filteredCreatives} />
       </section>
 
       <MiniFunnel funnel={data.funnel} />
