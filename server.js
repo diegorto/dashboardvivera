@@ -161,7 +161,7 @@ function objectionNames(deal) {
 async function getMetaAds(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
-  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},` +
+  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},preview_shareable_link,` +
     `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
@@ -209,10 +209,10 @@ async function getMetaAds(since, until) {
             status: ad.effective_status || ad.status,
             spend, leads, mensagens, impressions, clicks,
             thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
-            // Deep link pro Ads Manager - exige login, mas funciona pra qualquer anuncio de
-            // quem tem acesso a conta. A Ads Library publica e o edge previewshareablelink
-            // (tentados antes) nao sao confiaveis/nao existem na API publica pra esse uso.
-            adUrl: `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
+            // preview_shareable_link e um campo direto do Ad (nao um edge separado - essa era
+            // a confusao da tentativa anterior). Abre a previa real sem exigir login. Cai pro
+            // deep link do Ads Manager quando a Meta nao devolve (ex: anuncio muito antigo).
+            adUrl: ad.preview_shareable_link || `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
           });
         });
 
