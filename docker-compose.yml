@@ -24,6 +24,9 @@ services:
       - ./whatsapp-monitor/.env
     volumes:
       - ./whatsapp-monitor/auth:/app/auth
+    ports:
+      # acesso direto por IP:porta pra testar sem precisar configurar DNS/Traefik antes
+      - "4001:4001"
     networks:
       - n8n_default
     labels:
