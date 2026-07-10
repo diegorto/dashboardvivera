@@ -17,6 +17,21 @@ services:
       - traefik.http.routers.vivera-fotos.tls.certresolver=mytlschallenge
       - traefik.http.services.vivera-fotos.loadbalancer.server.port=4000
 
+  vivera-sdr:
+    build: ./vivera-sdr
+    restart: always
+    env_file:
+      - ./vivera-sdr/.env
+    networks:
+      - n8n_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vivera-sdr.rule=Host(`sdr.srv1522176.hstgr.cloud`)
+      - traefik.http.routers.vivera-sdr.tls=true
+      - traefik.http.routers.vivera-sdr.entrypoints=web,websecure
+      - traefik.http.routers.vivera-sdr.tls.certresolver=mytlschallenge
+      - traefik.http.services.vivera-sdr.loadbalancer.server.port=4001
+
 networks:
   n8n_default:
     external: true
