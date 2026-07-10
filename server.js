@@ -19,7 +19,6 @@ try {
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
 // Credenciais (carregadas do .env, nao ficam hardcoded no codigo)
 const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
@@ -343,6 +342,11 @@ app.get('/sdr', (req, res) => {
   } else {
     res.status(404).send('Dashboard não encontrado');
   }
+});
+
+// Teste de fetch
+app.get('/test-fetch', (req, res) => {
+  res.sendFile(path.join(__dirname, 'test-fetch.html'));
 });
 
 // Dashboard de WhatsApp Analytics
