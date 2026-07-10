@@ -4,6 +4,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 app.use(cors());
@@ -319,7 +320,19 @@ app.get('/', (req, res) => {
 
 // Painel Vivera Orofacial - Corrida das SDRs
 app.get('/sdr', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
+  const sdrPath = path.join(__dirname, 'dashboard-sdr.html');
+  if (fs.existsSync(sdrPath)) {
+    let html = fs.readFileSync(sdrPath, 'utf-8');
+    // Injetar o token como variável window
+    html = html.replace(
+      'const API_TOKEN = window.PIPEDRIVE_API_TOKEN || \'\';',
+      `const API_TOKEN = '${PIPEDRIVE_TOKEN}';`
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  } else {
+    res.status(404).send('Dashboard não encontrado');
+  }
 });
 
 // Dashboard de WhatsApp Analytics
