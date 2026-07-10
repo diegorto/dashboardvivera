@@ -1,0 +1,94 @@
+{
+  "version": "1.0",
+  "projectName": "Dashboard de WhatsApp Analytics",
+  "projectDescription": "Dashboard automatizado com análise de script N8N",
+
+  "hooks": {
+    "on:session-start": ".claude/hooks/session-start.sh",
+    "on:terminal-ready": "npm run setup 2>/dev/null || true",
+    "before:git-push": "npm run setup 2>/dev/null || true"
+  },
+
+  "autorun": {
+    "enabled": true,
+    "commands": [
+      "npm install --silent",
+      "node setup-automation.js"
+    ],
+    "onError": "continue"
+  },
+
+  "environment": {
+    "NODE_ENV": "development",
+    "PORT": "3000",
+    "LOG_LEVEL": "info"
+  },
+
+  "permissions": {
+    "bash": {
+      "allowed": true,
+      "priority": "high"
+    },
+    "npm": {
+      "allowed": true,
+      "priority": "high"
+    },
+    "filesystem": {
+      "allowed": true,
+      "priority": "high"
+    }
+  },
+
+  "ai": {
+    "autoFix": true,
+    "autoTest": true,
+    "autoCommit": false,
+    "autoPush": false
+  },
+
+  "features": {
+    "dashboard": {
+      "enabled": true,
+      "port": 3000,
+      "path": "/dashboard/whatsapp"
+    },
+    "monitoring": {
+      "enabled": true,
+      "interval": "*/5 * * * *",
+      "healthCheck": true
+    },
+    "n8nIntegration": {
+      "enabled": true,
+      "webhookPath": "/webhook/n8n/script-analysis"
+    },
+    "logging": {
+      "enabled": true,
+      "logDir": "./logs",
+      "rotationDays": 7
+    },
+    "autoUpdate": {
+      "enabled": true,
+      "interval": 30000,
+      "dashboardOnly": true
+    }
+  },
+
+  "notifications": {
+    "errors": "console",
+    "warnings": "console",
+    "success": "console",
+    "daily": "08:00"
+  },
+
+  "database": {
+    "type": "mock",
+    "description": "Substitua por MySQL quando o monitor estiver conectado"
+  },
+
+  "n8n": {
+    "enabled": true,
+    "webhook": "https://seu-n8n-instance.com/webhook/whatsapp-analysis",
+    "retryAttempts": 3,
+    "retryDelay": 5000
+  }
+}

@@ -252,5 +252,14 @@
   </div>
 
   <script src="/js/dashboard-whatsapp.js"></script>
+  <script src="/js/auto-updater.js"></script>
+  <script>
+    // Inicializar auto-refresh do dashboard
+    if (typeof DashboardAutoUpdater !== 'undefined') {
+      const updater = new DashboardAutoUpdater(30); // 30 segundos
+      updater.start();
+      console.log('🤖 Auto-updater ativado');
+    }
+  </script>
 </body>
 </html>

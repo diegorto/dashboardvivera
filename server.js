@@ -6,6 +6,16 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
+// 🤖 Auto-load automação se existir
+try {
+  const autoScheduler = require('./src/auto-scheduler.js');
+  const n8nWebhook = require('./src/n8n-webhook.js');
+  global.autoScheduler = autoScheduler;
+  global.n8nWebhook = n8nWebhook;
+} catch (e) {
+  console.log('ℹ️  Módulos de automação ainda não configurados');
+}
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -515,8 +525,43 @@ app.get('/api/whatsapp/script-compliance', async (req, res) => {
   }
 });
 
+// API: Health Check do sistema
+app.get('/api/health', (req, res) => {
+  const healthFile = path.join(__dirname, 'data', 'health.json');
+  try {
+    const health = JSON.parse(fs.readFileSync(healthFile, 'utf8'));
+    res.json(health);
+  } catch (e) {
+    res.json({ status: 'initializing', uptime: process.uptime() });
+  }
+});
+
+// API: Cache status
+app.get('/api/cache-status', (req, res) => {
+  const cacheFile = path.join(__dirname, 'data', 'cache', 'dashboard-cache.json');
+  try {
+    const cache = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+    res.json({
+      cached: !!cache.lastUpdate,
+      lastUpdate: cache.lastUpdate,
+      age: cache.lastUpdate ? Math.round((Date.now() - new Date(cache.lastUpdate)) / 1000) + 's' : 'never'
+    });
+  } catch (e) {
+    res.json({ cached: false });
+  }
+});
+
+// 🤖 Setup automático de webhooks e schedulers
+if (global.n8nWebhook) {
+  global.n8nWebhook.setupWebhooks(app);
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
+  // Iniciar automação
+  if (global.autoScheduler) {
+    global.autoScheduler.startSchedulers();
+  }
   const range = defaultDateRange();
   console.log(`
 Servidor rodando em http://localhost:${PORT}

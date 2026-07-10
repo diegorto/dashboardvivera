@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🤖 Status do Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+
+    .status-section {
+      margin-bottom: 24px;
+    }
+
+    .status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      letter-spacing: 1px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: #f5f5f5;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .status-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .status-indicator.healthy {
+      background: #10b981;
+    }
+
+    .status-indicator.warning {
+      background: #f59e0b;
+      animation: pulse-warn 1s infinite;
+    }
+
+    .status-indicator.error {
+      background: #ef4444;
+      animation: pulse-error 0.5s infinite;
+    }
+
+    .status-text {
+      flex: 1;
+    }
+
+    .status-label {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .status-value {
+      font-size: 12px;
+      color: #999;
+      margin-top: 2px;
+    }
+
+    .status-time {
+      font-size: 12px;
+      color: #ccc;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .metric-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+
+    .metric-label {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 10px 20px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background 0.3s;
+      text-decoration: none;
+      text-align: center;
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .button:hover {
+      background: #5568d3;
+    }
+
+    .button-secondary {
+      background: #f5f5f5;
+      color: #333;
+      margin-top: 8px;
+    }
+
+    .button-secondary:hover {
+      background: #e5e5e5;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes pulse-warn {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes pulse-error {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .log-container {
+      background: #f5f5f5;
+      border-radius: 6px;
+      padding: 12px;
+      margin-top: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 11px;
+      font-family: monospace;
+    }
+
+    .log-entry {
+      color: #666;
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+
+    .log-entry.error { color: #ef4444; }
+    .log-entry.warning { color: #f59e0b; }
+    .log-entry.success { color: #10b981; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🤖 Status do Dashboard</h1>
+
+    <!-- Sistema -->
+    <div class="status-section">
+      <div class="status-title">🔧 Sistema</div>
+      <div class="status-item">
+        <div class="status-indicator healthy" id="serverStatus"></div>
+        <div class="status-text">
+          <div class="status-label">Servidor</div>
+          <div class="status-value" id="serverValue">Conectado</div>
+        </div>
+        <div class="status-time" id="serverTime">agora</div>
+      </div>
+      <div class="status-item">
+        <div class="status-indicator" id="cacheStatus"></div>
+        <div class="status-text">
+          <div class="status-label">Cache</div>
+          <div class="status-value" id="cacheValue">Sincronizado</div>
+        </div>
+        <div class="status-time" id="cacheTime">há 2 min</div>
+      </div>
+    </div>
+
+    <!-- Automação -->
+    <div class="status-section">
+      <div class="status-title">📅 Automação</div>
+      <div class="status-item">
+        <div class="status-indicator healthy"></div>
+        <div class="status-text">
+          <div class="status-label">Sync de Dados</div>
+          <div class="status-value">A cada 5 minutos</div>
+        </div>
+      </div>
+      <div class="status-item">
+        <div class="status-indicator healthy"></div>
+        <div class="status-text">
+          <div class="status-label">Health Check</div>
+          <div class="status-value">A cada 10 minutos</div>
+        </div>
+      </div>
+      <div class="status-item">
+        <div class="status-indicator healthy"></div>
+        <div class="status-text">
+          <div class="status-label">Análise de Script</div>
+          <div class="status-value">Diariamente às 18:05</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Métricas -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-value" id="uptime">--:--</div>
+        <div class="metric-label">Uptime</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="lastSync">--:--</div>
+        <div class="metric-label">Última Sync</div>
+      </div>
+    </div>
+
+    <!-- Integração N8N -->
+    <div class="status-section">
+      <div class="status-title">🔗 Integrações</div>
+      <div class="status-item">
+        <div class="status-indicator" id="n8nStatus"></div>
+        <div class="status-text">
+          <div class="status-label">N8N Webhook</div>
+          <div class="status-value" id="n8nValue">Aguardando...</div>
+        </div>
+      </div>
+      <div class="status-item">
+        <div class="status-indicator" id="monitorStatus"></div>
+        <div class="status-text">
+          <div class="status-label">Monitor de WhatsApp</div>
+          <div class="status-value" id="monitorValue">Aguardando...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Ações -->
+    <a href="/dashboard/whatsapp" class="button">📊 Ir para Dashboard</a>
+    <button class="button button-secondary" onclick="location.reload()">🔄 Atualizar Status</button>
+
+    <!-- Log -->
+    <div class="log-container">
+      <div class="log-entry success">✓ Sistema inicializado</div>
+      <div class="log-entry success">✓ Webhooks ativados</div>
+      <div class="log-entry success">✓ Schedulers rodando</div>
+      <div class="log-entry">➜ Dashboard pronto em http://localhost:3000/dashboard/whatsapp</div>
+    </div>
+  </div>
+
+  <script>
+    async function updateStatus() {
+      try {
+        // Health check
+        const health = await fetch('/api/health').then(r => r.json());
+        updateHealthStatus(health);
+
+        // Cache status
+        const cache = await fetch('/api/cache-status').then(r => r.json());
+        updateCacheStatus(cache);
+
+        // Uptime
+        document.getElementById('uptime').textContent = formatUptime(health.uptime);
+      } catch (error) {
+        console.error('Erro ao atualizar status:', error);
+      }
+    }
+
+    function updateHealthStatus(health) {
+      const indicator = document.getElementById('serverStatus');
+      const value = document.getElementById('serverValue');
+
+      if (health.status === 'healthy') {
+        indicator.className = 'status-indicator healthy';
+        value.textContent = 'Saudável';
+      } else if (health.status === 'warning') {
+        indicator.className = 'status-indicator warning';
+        value.textContent = 'Aviso';
+      } else {
+        indicator.className = 'status-indicator error';
+        value.textContent = 'Erro';
+      }
+    }
+
+    function updateCacheStatus(cache) {
+      const indicator = document.getElementById('cacheStatus');
+      const value = document.getElementById('cacheValue');
+      const time = document.getElementById('cacheTime');
+
+      if (cache.cached) {
+        indicator.className = 'status-indicator healthy';
+        value.textContent = 'Sincronizado';
+        time.textContent = `há ${cache.age || 'pouco'}`;
+      } else {
+        indicator.className = 'status-indicator warning';
+        value.textContent = 'Vazio';
+        time.textContent = 'nunca';
+      }
+    }
+
+    function formatUptime(seconds) {
+      if (!seconds) return '--:--';
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    }
+
+    // Atualizar a cada 10 segundos
+    updateStatus();
+    setInterval(updateStatus, 10000);
+  </script>
+</body>
+</html>

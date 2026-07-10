@@ -4,9 +4,15 @@
   "description": "Dashboard em tempo real: Meta Ads vs Pipedrive - Calcula ROAS automaticamente",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "server": "node server.js",
-    "dev": "nodemon server.js"
+    "setup": "node setup-automation.js",
+    "setup:auto": "node setup-automation.js && npm start",
+    "start": "npm run setup && node server.js",
+    "server": "npm run setup && node server.js",
+    "dev": "npm run setup && nodemon server.js",
+    "dev:fast": "nodemon server.js",
+    "monitor": "node src/auto-scheduler.js",
+    "logs": "tail -f logs/dashboard-*.log",
+    "health": "cat data/health.json | jq ."
   },
   "keywords": [
     "pipedrive",
