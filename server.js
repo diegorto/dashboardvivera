@@ -835,7 +835,7 @@ function buildGovernance(deals) {
 // Valor de um deal parado = valor real cadastrado no Pipedrive, sem estimativa nenhuma.
 // Negocios sem valor definido entram na lista/contagem normalmente (pra nao esconder que
 // estao parados), mas nao entram na soma em R$ - contados a parte em "semOrcamento".
-function buildRevenueAtRisk(deals) {
+function buildRevenueAtRisk(deals, ticketMedio = 0) {
   function group(filtered) {
     const items = filtered.map(d => ({
       id: d.id,
@@ -848,10 +848,12 @@ function buildRevenueAtRisk(deals) {
       pipedriveUrl: pipedriveDealUrl(d.id)
     }));
     const comValor = items.filter(d => d.value > 0);
+    const semValor = items.filter(d => d.value === 0);
+    const valorComEstimativa = comValor.reduce((s, d) => s + d.value, 0) + (semValor.length * ticketMedio);
     return {
       count: items.length,
-      value: round2(comValor.reduce((s, d) => s + d.value, 0)),
-      semOrcamento: items.length - comValor.length,
+      value: round2(valorComEstimativa),
+      semOrcamento: semValor.length,
       deals: items.slice(0, 100)
     };
   }
@@ -951,7 +953,13 @@ app.get('/api/dashboard', async (req, res) => {
     // data selecionado - negocio parado importa mesmo que o usuario esteja olhando "Mes atual".
     const revenueAtRiskRange = lastNMonthsRange(3);
     const dealsForRisk = inboundDealsAll.filter(d => inRange(d, revenueAtRiskRange.since, revenueAtRiskRange.until));
-    const revenueAtRisk = buildRevenueAtRisk(dealsForRisk);
+
+    // Calcula ticket medio dos ultimos 3 meses pra estimar negocjos sem orcamento
+    const dealsClosedIn3Months = inboundDealsAll.filter(d => inRange(d, revenueAtRiskRange.since, revenueAtRiskRange.until) && d.status === 'won');
+    const totalReceitaIn3M = dealsClosedIn3Months.reduce((s, d) => s + (d.value || 0), 0);
+    const ticketMedio3M = dealsClosedIn3Months.length > 0 ? totalReceitaIn3M / dealsClosedIn3Months.length : 0;
+
+    const revenueAtRisk = buildRevenueAtRisk(dealsForRisk, ticketMedio3M);
 
     const recepcaoKpis = buildRecepcaoKpis(recepcaoDeals, previousRecepcaoDeals);
     const fechamentosRecepcao = buildFechamentosRecepcao(recepcaoDeals);
@@ -968,6 +976,7 @@ app.get('/api/dashboard', async (req, res) => {
       range, previousRange: prevRange,
       kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
       revenueAtRiskRange,
+      ticketMedio3M: round2(ticketMedio3M),
       recepcao: { kpis: recepcaoKpis, fechamentos: fechamentosRecepcao },
       faturamentoTotal,
       meta: {
