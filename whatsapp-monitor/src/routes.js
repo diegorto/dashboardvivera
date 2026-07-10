@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const axios = require('axios');
+const QRCode = require('qrcode');
 const router = express.Router();
 
 const config = require('./config');
@@ -52,7 +53,17 @@ router.get('/api/qr/:sessionName', async (req, res) => {
   const { sessionName } = req.params;
   const sess = await db.queryOne('SELECT qr_code, status FROM whatsapp_sessions WHERE session_name = ?', [sessionName]);
   if (!sess) return res.status(404).json({ error: 'Sessao nao encontrada' });
-  res.json(sess);
+
+  let qr_image = null;
+  if (sess.qr_code) {
+    try {
+      qr_image = await QRCode.toDataURL(sess.qr_code, { width: 320, margin: 1 });
+    } catch (error) {
+      console.error(`[QR] Erro ao gerar imagem: ${error.message}`);
+    }
+  }
+
+  res.json({ status: sess.status, qr_image });
 });
 
 router.get('/sdr/:sdrName', authenticateSDR, async (req, res) => {

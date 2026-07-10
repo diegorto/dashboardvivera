@@ -18,6 +18,7 @@
     "mysql2": "^3.6.5",
     "node-cron": "^3.0.2",
     "pino": "^8.16.2",
+    "qrcode": "^1.5.4",
     "uuid": "^9.0.0"
   },
   "devDependencies": {

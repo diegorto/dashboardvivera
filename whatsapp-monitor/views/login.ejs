@@ -25,6 +25,13 @@
     button[type="submit"] { width: 100%; margin-top: 12px; padding: 10px; background: #075E54; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     button[type="submit"]:hover { background: #054C3F; }
     input[type="radio"] { display: none; }
+    .qr-btn { margin-top: 8px; padding: 6px 10px; font-size: 12px; background: #2196F3; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .qr-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+    .qr-modal.open { display: flex; }
+    .qr-modal-box { background: #fff; padding: 32px; border-radius: 8px; text-align: center; max-width: 360px; }
+    .qr-modal-box img { width: 280px; height: 280px; }
+    .qr-modal-box p { color: #666; font-size: 13px; margin-top: 16px; }
+    .qr-modal-box button { margin-top: 16px; padding: 8px 16px; background: #075E54; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -46,6 +53,9 @@
             <div class="title"><%= s.sdr_name.toUpperCase() %></div>
             <div class="number"><%= s.phone_number %></div>
             <div class="status <%= s.status === 'connected' ? 'connected' : '' %>"><%= s.status %></div>
+            <% if (s.status !== 'connected') { %>
+              <button type="button" class="qr-btn" onclick="event.preventDefault(); showQR('<%= s.session_name %>')">Ver QR code</button>
+            <% } %>
           </label>
         <% }); %>
       </div>
@@ -53,5 +63,58 @@
       <button type="submit">Entrar</button>
     </form>
   </div>
+
+  <div class="qr-modal" id="qr-modal">
+    <div class="qr-modal-box">
+      <h2 id="qr-modal-title" style="color:#075E54;margin-bottom:8px;"></h2>
+      <div id="qr-modal-content">Gerando QR code...</div>
+      <p>Abre o WhatsApp no celular do numero, vai em Aparelhos conectados > Conectar um aparelho, e escaneia.</p>
+      <button onclick="closeQR()">Fechar</button>
+    </div>
+  </div>
+
+  <script>
+    let qrPollTimer = null;
+    let qrSessionName = null;
+
+    function showQR(sessionName) {
+      qrSessionName = sessionName;
+      document.getElementById('qr-modal-title').textContent = sessionName.toUpperCase();
+      document.getElementById('qr-modal-content').innerHTML = 'Gerando QR code...';
+      document.getElementById('qr-modal').classList.add('open');
+      pollQR();
+      qrPollTimer = setInterval(pollQR, 3000);
+    }
+
+    function closeQR() {
+      document.getElementById('qr-modal').classList.remove('open');
+      if (qrPollTimer) clearInterval(qrPollTimer);
+      qrPollTimer = null;
+    }
+
+    async function pollQR() {
+      if (!qrSessionName) return;
+      try {
+        const res = await fetch(`/api/qr/${qrSessionName}`);
+        const data = await res.json();
+        const content = document.getElementById('qr-modal-content');
+
+        if (data.status === 'connected') {
+          content.innerHTML = 'Conectado! Recarregando...';
+          if (qrPollTimer) clearInterval(qrPollTimer);
+          setTimeout(() => location.reload(), 1000);
+          return;
+        }
+
+        if (data.qr_image) {
+          content.innerHTML = `<img src="${data.qr_image}" alt="QR code">`;
+        } else {
+          content.innerHTML = 'Aguardando QR code ser gerado...';
+        }
+      } catch (err) {
+        document.getElementById('qr-modal-content').innerHTML = 'Erro ao carregar QR code.';
+      }
+    }
+  </script>
 </body>
 </html>
