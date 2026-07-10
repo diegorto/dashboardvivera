@@ -158,12 +158,41 @@ function objectionNames(deal) {
 }
 
 // Busca ads (nivel anuncio individual) da Meta, com spend/leads/impressoes/cliques no periodo.
-async function getMetaAds(since, until) {
+// Busca o link de previa compartilhavel de um anuncio (o mesmo que "Compartilhar um link"
+// no Ads Manager gera - abre a previa real do criativo sem exigir login). E um edge proprio
+// da Graph API, nao da pra pedir junto com a listagem de ads via field-expansion.
+async function fetchAdShareLink(adId) {
+  try {
+    const response = await axios.get(`https://graph.facebook.com/v18.0/${adId}/previewshareablelink`, {
+      params: { access_token: FB_ACCESS_TOKEN }, timeout: 10000
+    });
+    const entry = response.data && Array.isArray(response.data.data) ? response.data.data[0] : response.data;
+    return (entry && entry.share_link) || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Busca os share links de varios anuncios em paralelo limitado, pra nao estourar rate limit.
+async function fetchAdShareLinksBatch(adIds, concurrency = 8) {
+  const results = new Map();
+  let index = 0;
+  async function worker() {
+    while (index < adIds.length) {
+      const i = index++;
+      const adId = adIds[i];
+      results.set(adId, await fetchAdShareLink(adId));
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, adIds.length) }, worker));
+  return results;
+}
+
+async function getMetaAds(since, until, fetchShareLinks = true) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
   const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},` +
-    `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks},` +
-    `previewshareablelink{share_link}`;
+    `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
     let url = `https://graph.facebook.com/v18.0/act_${accountId}/ads`;
@@ -199,15 +228,6 @@ async function getMetaAds(since, until) {
           const impressions = parseInt(insight.impressions || 0);
           const clicks = parseInt(insight.clicks || 0);
 
-          // Link de previa compartilhavel do proprio anuncio (endpoint oficial da Graph API,
-          // o mesmo que a opcao "Compartilhar um link" usa no Ads Manager) - abre a previa do
-          // criativo sem exigir login. Cai pro deep link do Ads Manager se a Meta nao devolver
-          // (comum em anuncios pausados/removidos ha muito tempo).
-          const shareLink = ad.previewshareablelink && (
-            (Array.isArray(ad.previewshareablelink.data) && ad.previewshareablelink.data[0] && ad.previewshareablelink.data[0].share_link) ||
-            ad.previewshareablelink.share_link
-          );
-
           ads.push({
             accountId,
             campaignId: ad.campaign_id,
@@ -219,7 +239,10 @@ async function getMetaAds(since, until) {
             status: ad.effective_status || ad.status,
             spend, leads, mensagens, impressions, clicks,
             thumbnailUrl: ad.creative ? ad.creative.thumbnail_url : null,
-            adUrl: shareLink || `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
+            // Cai pro deep link do Ads Manager por padrao; substituido pelo link de previa
+            // real logo abaixo, quando a Meta devolve um (nem sempre devolve pra anuncios
+            // antigos/pausados ha muito tempo).
+            adUrl: `https://www.facebook.com/adsmanager/manage/ads?act=${accountId}&selected_ad_ids=${ad.id}`
           });
         });
 
@@ -234,6 +257,14 @@ async function getMetaAds(since, until) {
     } catch (error) {
       console.error(`Erro ao buscar ads da conta ${accountId}:`, JSON.stringify(error.response?.data?.error || error.message));
     }
+  }
+
+  if (fetchShareLinks && ads.length > 0) {
+    const shareLinks = await fetchAdShareLinksBatch(ads.map(a => a.adId));
+    ads.forEach(ad => {
+      const link = shareLinks.get(ad.adId);
+      if (link) ad.adUrl = link;
+    });
   }
 
   return ads;
@@ -867,7 +898,7 @@ app.get('/api/dashboard', async (req, res) => {
 
     const [currentAds, previousAds, allDeals] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getMetaAds(prevRange.since, prevRange.until),
+      getMetaAds(prevRange.since, prevRange.until, false), // periodo anterior nunca mostra link, poupa chamadas
       fetchAllDeals()
     ]);
 
