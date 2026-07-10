@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cadastrar Paciente - Vivera</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #111; }
+  label { display: block; margin-top: 16px; font-weight: 600; }
+  input[type=text] { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; margin-top: 6px; }
+  input[type=file] { margin-top: 8px; }
+  button { margin-top: 24px; width: 100%; padding: 12px; font-size: 16px; background: #111; color: #fff; border: none; border-radius: 6px; }
+  button:disabled { opacity: 0.6; }
+  .consent { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; }
+  .consent label { font-weight: normal; margin: 0; }
+  #result { margin-top: 20px; padding: 12px; border-radius: 6px; display: none; }
+  #result.ok { background: #e6f4ea; color: #1e4620; display: block; }
+  #result.err { background: #fce8e6; color: #611a15; display: block; }
+</style>
+</head>
+<body>
+<h2>Cadastrar paciente</h2>
+<form id="f">
+  <label for="name">Nome do paciente</label>
+  <input type="text" id="name" name="name" required>
+
+  <label for="photo">Foto de referência (rosto frontal, boa iluminação)</label>
+  <input type="file" id="photo" name="photo" accept="image/*" required>
+
+  <div class="consent">
+    <input type="checkbox" id="consentimento" required>
+    <label for="consentimento">Confirmo que obtive o consentimento do paciente para uso de sua imagem/dados biométricos (LGPD).</label>
+  </div>
+
+  <button type="submit">Cadastrar</button>
+</form>
+<div id="result"></div>
+<script>
+document.getElementById('f').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const button = form.querySelector('button');
+  const result = document.getElementById('result');
+
+  const fd = new FormData();
+  fd.append('name', document.getElementById('name').value);
+  fd.append('photo', document.getElementById('photo').files[0]);
+  fd.append('consentimento', document.getElementById('consentimento').checked ? 'true' : 'false');
+
+  button.disabled = true;
+  result.className = '';
+  result.textContent = 'Enviando...';
+  result.style.display = 'block';
+
+  try {
+    const res = await fetch('/api/patients', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (res.ok) {
+      result.className = 'ok';
+      result.textContent = 'Paciente cadastrado: ' + data.name + ' (id: ' + data.id + ')';
+      form.reset();
+    } else {
+      result.className = 'err';
+      result.textContent = 'Erro: ' + data.error;
+    }
+  } catch (err) {
+    result.className = 'err';
+    result.textContent = 'Erro de conexão: ' + err.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
