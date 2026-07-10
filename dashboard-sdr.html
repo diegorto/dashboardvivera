@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel Vivera Orofacial</title>
-<style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel Corrida de F1 - Vivera Insights</title>
+  <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
@@ -791,7 +791,6 @@
 </style>
 </head>
 <body>
-
 <div class="header">
   <h1>PAINEL VIVERA OROFACIAL</h1>
   <p>Um time de altíssima performance</p>
@@ -1162,7 +1161,9 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-const BASE = '/api/pipedrive';
+// Token será injetado pelo servidor via window.PIPEDRIVE_API_TOKEN
+const API_TOKEN = window.PIPEDRIVE_API_TOKEN || '';
+const BASE = 'https://api.pipedrive.com/v1';
 
 const PHOTOS = {
   'Agda': 'https://viveraorofacial.com.br/wp-content/uploads/2026/07/ChatGPT-Image-4-de-jul.-de-2026-18_10_44.png',
@@ -1319,7 +1320,8 @@ function getMonthData(deals, activities) {
 }
 
 async function fetchAPI(endpoint, params = {}) {
-  const url = new URL(BASE + endpoint, window.location.origin);
+  const url = new URL(BASE + endpoint);
+  url.searchParams.set('api_token', API_TOKEN);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString());
@@ -1360,7 +1362,6 @@ function calcMetrics(deals, activities, dates) {
 
   const wonDeals = deals.filter(d => d.status === 'won' && inRange(d, 'won_time', dates.start, dates.end));
 
-  // Normalizar string removendo acentos e convertendo para lowercase
   const normalize = (str) => {
     return String(str)
       .toLowerCase()
@@ -1368,7 +1369,6 @@ function calcMetrics(deals, activities, dates) {
       .replace(/[̀-ͯ]/g, '');
   };
 
-  // Separar fechamentos: com tag jessica vs sem tag jessica
   const dealsWithoutJessica = wonDeals.filter(d => {
     if (!d.labels) return true;
     const labels = Array.isArray(d.labels) ? d.labels : [d.labels];
@@ -1646,6 +1646,73 @@ function destroyAllCharts() {
   });
 }
 
+function calcMetaMeasures() {
+  return {
+    today: META_GOALS.day.comparecimentos,
+    prevDay: META_GOALS.day.comparecimentos,
+    week: META_GOALS.week.comparecimentos,
+    prevWeek: META_GOALS.week.comparecimentos,
+    month: META_GOALS.month.comparecimentos,
+    prevMonth: META_GOALS.month.comparecimentos
+  };
+}
+
+async function loadDashboard() {
+  showLoading(true);
+
+  try {
+    const users = await fetchAPI('/users');
+    const agda = users.find(u => u.name === 'Agda');
+    const helenice = users.find(u => u.name === 'Helenice');
+
+    if (!agda || !helenice) {
+      throw new Error('Não conseguimos encontrar Agda ou Helenice. Verifique os nomes dos usuários.');
+    }
+
+    const [dealsAgda, dealsHelenice, activitiesAgda, activitiesHelenice] = await Promise.all([
+      fetchAllPages('/deals', { user_id: agda.id, status: 'all_not_deleted' }),
+      fetchAllPages('/deals', { user_id: helenice.id, status: 'all_not_deleted' }),
+      fetchAllPages('/activities', { user_id: agda.id }),
+      fetchAllPages('/activities', { user_id: helenice.id })
+    ]);
+
+    const agdaMetrics = {
+      today: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('day', 0)),
+      prevDay: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('day', 1)),
+      week: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('week', 0)),
+      prevWeek: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('week', 1)),
+      month: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('month', 0)),
+      prevMonth: calcMetrics(dealsAgda, activitiesAgda, getPeriodDates('month', 1))
+    };
+
+    const heleniceMet = {
+      today: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('day', 0)),
+      prevDay: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('day', 1)),
+      week: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('week', 0)),
+      prevWeek: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('week', 1)),
+      month: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('month', 0)),
+      prevMonth: calcMetrics(dealsHelenice, activitiesHelenice, getPeriodDates('month', 1))
+    };
+
+    document.getElementById('photoAgda').src = PHOTOS.Agda;
+    document.getElementById('photoHelenice').src = PHOTOS.Helenice;
+    document.getElementById('photoMeta').src = PHOTOS.Meta;
+
+    const months = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    document.getElementById('currentMonth').textContent = months[new Date().getMonth()];
+
+    renderData(agdaMetrics, heleniceMet);
+    renderRace(agdaMetrics.month, heleniceMet.month);
+    renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenice);
+
+    showLoading(false);
+  } catch (error) {
+    console.error('Erro:', error);
+    showError('Erro ao carregar dados: ' + error.message);
+    showLoading(false);
+  }
+}
+
 function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenice) {
   destroyAllCharts();
 
@@ -1742,15 +1809,14 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          borderDash: [5, 5]
+          pointRadius: 5
         }
       ]
     },
     options: commonOptions
   });
 
-  chartInstances.calls = new Chart(document.getElementById('chartCalls').getContext('2d'), {
+  chartInstances.callSuccess = new Chart(document.getElementById('chartCalls').getContext('2d'), {
     type: 'line',
     data: {
       labels: agdaData.months,
@@ -1758,8 +1824,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Agda - Ligações Atendidas',
           data: agdaData.monthlyData.callSuccess,
-          borderColor: '#dd0000',
-          backgroundColor: 'rgba(221, 0, 0, 0.1)',
+          borderColor: '#ff6666',
+          backgroundColor: 'rgba(255, 102, 102, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1768,8 +1834,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Helenice - Ligações Atendidas',
           data: heleData.monthlyData.callSuccess,
-          borderColor: '#3366ff',
-          backgroundColor: 'rgba(51, 102, 255, 0.1)',
+          borderColor: '#99ccff',
+          backgroundColor: 'rgba(153, 204, 255, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1778,8 +1844,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Meta - Ligações Atendidas',
           data: metaData.metaMonthlyData.callSuccess,
-          borderColor: '#666666',
-          backgroundColor: 'rgba(102, 102, 102, 0.1)',
+          borderColor: '#999999',
+          backgroundColor: 'rgba(153, 153, 153, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1798,8 +1864,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Agda - Comparecimentos',
           data: agdaData.monthlyData.comparecimentos,
-          borderColor: '#dd0000',
-          backgroundColor: 'rgba(221, 0, 0, 0.1)',
+          borderColor: '#ff6666',
+          backgroundColor: 'rgba(255, 102, 102, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1808,8 +1874,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Helenice - Comparecimentos',
           data: heleData.monthlyData.comparecimentos,
-          borderColor: '#3366ff',
-          backgroundColor: 'rgba(51, 102, 255, 0.1)',
+          borderColor: '#99ccff',
+          backgroundColor: 'rgba(153, 204, 255, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1818,8 +1884,8 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
         {
           label: 'Meta - Comparecimentos',
           data: metaData.metaMonthlyData.comparecimentos,
-          borderColor: '#666666',
-          backgroundColor: 'rgba(102, 102, 102, 0.1)',
+          borderColor: '#999999',
+          backgroundColor: 'rgba(153, 153, 153, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
@@ -1836,40 +1902,34 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
       labels: agdaData.months,
       datasets: [
         {
-          label: 'Agda',
+          label: 'Agda - Fechamentos',
           data: agdaData.monthlyData.fechamentos,
-          borderColor: '#dd0000',
-          backgroundColor: 'rgba(221, 0, 0, 0.1)',
+          borderColor: '#ff6666',
+          backgroundColor: 'rgba(255, 102, 102, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#dd0000',
-          pointBorderColor: '#dd0000'
+          pointRadius: 5
         },
         {
-          label: 'Helenice',
+          label: 'Helenice - Fechamentos',
           data: heleData.monthlyData.fechamentos,
-          borderColor: '#3366ff',
-          backgroundColor: 'rgba(51, 102, 255, 0.1)',
+          borderColor: '#99ccff',
+          backgroundColor: 'rgba(153, 204, 255, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#3366ff',
-          pointBorderColor: '#3366ff'
+          pointRadius: 5
         },
         {
-          label: 'Meta',
+          label: 'Meta - Fechamentos',
           data: metaData.metaMonthlyData.fechamentos,
-          borderColor: '#666666',
-          backgroundColor: 'rgba(102, 102, 102, 0.1)',
+          borderColor: '#999999',
+          backgroundColor: 'rgba(153, 153, 153, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#666666',
-          pointBorderColor: '#666666'
+          pointRadius: 5
         }
       ]
     },
@@ -1882,67 +1942,38 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
       labels: agdaData.months,
       datasets: [
         {
-          label: 'Agda',
+          label: 'Agda - Fechamentos (R$)',
           data: agdaData.monthlyData.fechamentosValor,
-          borderColor: '#dd0000',
-          backgroundColor: 'rgba(221, 0, 0, 0.1)',
+          borderColor: '#ff6666',
+          backgroundColor: 'rgba(255, 102, 102, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#dd0000',
-          pointBorderColor: '#dd0000'
+          pointRadius: 5
         },
         {
-          label: 'Helenice',
+          label: 'Helenice - Fechamentos (R$)',
           data: heleData.monthlyData.fechamentosValor,
-          borderColor: '#3366ff',
-          backgroundColor: 'rgba(51, 102, 255, 0.1)',
+          borderColor: '#99ccff',
+          backgroundColor: 'rgba(153, 204, 255, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#3366ff',
-          pointBorderColor: '#3366ff'
+          pointRadius: 5
         },
         {
-          label: 'Meta',
+          label: 'Meta - Fechamentos (R$)',
           data: metaData.metaMonthlyData.fechamentosValor,
-          borderColor: '#666666',
-          backgroundColor: 'rgba(102, 102, 102, 0.1)',
+          borderColor: '#999999',
+          backgroundColor: 'rgba(153, 153, 153, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#666666',
-          pointBorderColor: '#666666'
+          pointRadius: 5
         }
       ]
     },
-    options: {
-      ...commonOptions,
-      plugins: {
-        ...commonOptions.plugins,
-        tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          padding: 12,
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 13 },
-          cornerRadius: 6,
-          callbacks: {
-            title: function(context) {
-              return context[0].dataset.label;
-            },
-            label: function(context) {
-              return 'R$ ' + context.parsed.y.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-            },
-            afterLabel: function(context) {
-              return context.label;
-            }
-          }
-        }
-      }
-    }
+    options: commonOptions
   });
 
   chartInstances.oportunidades = new Chart(document.getElementById('chartOportunidades').getContext('2d'), {
@@ -1951,414 +1982,46 @@ function renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenic
       labels: agdaData.months,
       datasets: [
         {
-          label: 'Agda',
+          label: 'Agda - Oportunidades',
           data: agdaData.monthlyData.oportunidadesValor,
-          borderColor: '#dd0000',
-          backgroundColor: 'rgba(221, 0, 0, 0.1)',
+          borderColor: '#ff6666',
+          backgroundColor: 'rgba(255, 102, 102, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#dd0000',
-          pointBorderColor: '#dd0000'
+          pointRadius: 5
         },
         {
-          label: 'Helenice',
+          label: 'Helenice - Oportunidades',
           data: heleData.monthlyData.oportunidadesValor,
-          borderColor: '#3366ff',
-          backgroundColor: 'rgba(51, 102, 255, 0.1)',
+          borderColor: '#99ccff',
+          backgroundColor: 'rgba(153, 204, 255, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#3366ff',
-          pointBorderColor: '#3366ff'
+          pointRadius: 5
         },
         {
-          label: 'Meta',
+          label: 'Meta - Oportunidades',
           data: metaData.metaMonthlyData.oportunidadesValor,
-          borderColor: '#666666',
-          backgroundColor: 'rgba(102, 102, 102, 0.1)',
+          borderColor: '#999999',
+          backgroundColor: 'rgba(153, 153, 153, 0.1)',
           tension: 0.4,
           fill: false,
           borderWidth: 2,
-          pointRadius: 5,
-          pointBackgroundColor: '#666666',
-          pointBorderColor: '#666666'
+          pointRadius: 5
         }
       ]
     },
-    options: {
-      ...commonOptions,
-      plugins: {
-        ...commonOptions.plugins,
-        tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          padding: 12,
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 13 },
-          cornerRadius: 6,
-          callbacks: {
-            title: function(context) {
-              return context[0].dataset.label;
-            },
-            label: function(context) {
-              return 'R$ ' + context.parsed.y.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
-            },
-            afterLabel: function(context) {
-              return context.label;
-            }
-          }
-        }
-      }
-    }
+    options: commonOptions
   });
 }
 
-function calcMetaMeasures() {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  const diaAtual = today.getDate();
-
-  const measures = {};
-
-  const todayDayOfWeek = today.getDay();
-  measures.today = (todayDayOfWeek >= 1 && todayDayOfWeek <= 5) ? 4 : 0;
-
-  const prevDay = new Date(today);
-  prevDay.setDate(prevDay.getDate() - 1);
-  const prevDayOfWeek = prevDay.getDay();
-  measures.prevDay = (prevDayOfWeek >= 1 && prevDayOfWeek <= 5) ? 4 : 0;
-
-  const weekStart = new Date(today);
-  weekStart.setDate(today.getDate() - today.getDay() + 1);
-  let weekWorkdays = 0;
-  for (let d = new Date(weekStart); d <= today; d.setDate(d.getDate() + 1)) {
-    const dayOfWeek = d.getDay();
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) weekWorkdays++;
-  }
-  measures.week = Math.round((META_GOALS.week.callAttempts / 5) * weekWorkdays);
-
-  const prevWeekEnd = new Date(weekStart);
-  prevWeekEnd.setDate(prevWeekEnd.getDate() - 1);
-  const prevWeekStart = new Date(prevWeekEnd);
-  prevWeekStart.setDate(prevWeekEnd.getDate() - 6);
-  let prevWeekWorkdays = 0;
-  for (let d = new Date(prevWeekStart); d <= prevWeekEnd; d.setDate(d.getDate() + 1)) {
-    const dayOfWeek = d.getDay();
-    if (dayOfWeek >= 1 && dayOfWeek <= 5) prevWeekWorkdays++;
-  }
-  measures.prevWeek = Math.round((META_GOALS.week.callAttempts / 5) * prevWeekWorkdays);
-
-  const workdaysInMonth = countWorkdaysInMonth(year, month);
-  const workdaysToToday = countWorkdaysToToday(year, month, diaAtual);
-  measures.month = Math.round((META_GOALS.month.callAttempts / workdaysInMonth) * workdaysToToday);
-
-  const prevMonth = month === 0 ? 11 : month - 1;
-  const prevMonthYear = month === 0 ? year - 1 : year;
-  const prevMonthWorkdays = countWorkdaysInMonth(prevMonthYear, prevMonth);
-  measures.prevMonth = Math.round((META_GOALS.month.callAttempts / prevMonthWorkdays) * prevMonthWorkdays);
-
-  return measures;
-}
-
-function setCurrentMonth() {
-  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-  const now = new Date();
-  document.getElementById('currentMonth').textContent = months[now.getMonth()];
-}
-
-function formatPercent(val) {
-  return Math.round(val * 100) + '%';
-}
-
-function formatValue(val, isPercent, indicator, isMoney = false) {
-  if (isPercent) return formatPercent(val);
-  if (isMoney || indicator.includes('Faturamento')) return formatMoney(val);
-  const rounded = Math.round(val * 100) / 100;
-  return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(2);
-}
-
-function createWeeklyRow(indicator, responsible, monthData, weeksData, isPercent = false, isMoney = false) {
-  const periods = [monthData, ...weeksData];
-
-  let html = `<tr>
-    <td class="indicator-cell">${indicator}</td>
-    <td class="responsible-cell">${responsible}</td>`;
-
-  periods.forEach((data, idx) => {
-    const metaFormatted = formatValue(data.meta, isPercent, indicator, isMoney);
-    const realFormatted = formatValue(data.real, isPercent, indicator, isMoney);
-    const isGreen = data.real >= data.meta;
-    const cellClass = isGreen ? 'green' : 'red';
-    const isLastPeriod = idx === periods.length - 1;
-
-    html += `<td class="meta-cell">${metaFormatted}</td>`;
-    html += `<td class="real-cell ${cellClass}${isLastPeriod ? '' : ' group-divider'}">${realFormatted}</td>`;
-  });
-
-  html += `</tr>`;
-  return html;
-}
-
-function getCalendarWeeks(month, year) {
-  const weeks = [];
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-
-  let currentDate = new Date(firstDay);
-  const dayOfWeek = currentDate.getDay();
-
-  if (dayOfWeek !== 0) {
-    currentDate.setDate(currentDate.getDate() - dayOfWeek);
-  }
-
-  while (currentDate <= lastDay) {
-    const weekStart = new Date(currentDate);
-    const weekEnd = new Date(currentDate);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-
-    weeks.push({
-      start: toISO(weekStart),
-      end: toISO(weekEnd)
-    });
-
-    currentDate.setDate(currentDate.getDate() + 7);
-  }
-
-  return weeks;
-}
-
-function formatWeekDisplay(startISO, endISO) {
-  const [startYear, startMonth, startDay] = startISO.split('-');
-  const [endYear, endMonth, endDay] = endISO.split('-');
-  const startFormatted = `${startDay}/${startMonth}`;
-  const endFormatted = `${endDay}/${endMonth}`;
-  return `${startFormatted} a ${endFormatted}`;
-}
-
-function calcWeekMetrics(deals, agda, helenice) {
-  const wonDeals = deals.filter(d => d.status === 'won');
-  const totalFaturamento = wonDeals.reduce((sum, d) => sum + (d.value || 0), 0);
-  const ticketMedio = wonDeals.length > 0 ? totalFaturamento / wonDeals.length : 0;
-
-  const agdaDeals = deals.filter(d => d.user_id === agda?.id);
-  const agdaComparecimentos = agdaDeals.filter(d => d.stage_id === 5).length;
-  const agdaLeads = agdaDeals.length;
-  const agdaPctComparecimentos = agdaLeads > 0 ? agdaComparecimentos / agdaLeads : 0;
-
-  const helDeals = deals.filter(d => d.user_id === helenice?.id);
-  const helComparecimentos = helDeals.filter(d => d.stage_id === 5).length;
-  const helLeads = helDeals.length;
-  const helPctComparecimentos = helLeads > 0 ? helComparecimentos / helLeads : 0;
-
-  const jessicaDeals = wonDeals.filter(d => {
-    if (!d.labels) return false;
-    return Array.isArray(d.labels) ? d.labels.includes(JESSICA_TAG) : d.labels.includes(JESSICA_TAG);
-  });
-  const jessicaFaturamento = jessicaDeals.reduce((sum, d) => sum + (d.value || 0), 0);
-
-  const totalOrcados = deals.reduce((sum, d) => sum + (d.value || 0), 0);
-  const pctConversao = totalOrcados > 0 ? totalFaturamento / totalOrcados : 0;
-
-  const leadsGerados = deals.length;
-
-  return {
-    faturamento: totalFaturamento,
-    oportunidadesCriadas: totalOrcados,
-    ticketMedio,
-    agdaPctComparecimentos,
-    agdaComparecimentos,
-    helPctComparecimentos,
-    helComparecimentos,
-    jessicaFaturamento,
-    pctConversao,
-    leadsGerados
-  };
-}
-
-async function loadIndicators() {
-  try {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-
-    const months = [
-      { month: currentMonth, year: currentYear, id: 'julyBody', headId: 'julyHead' },
-      { month: currentMonth - 1, year: currentMonth === 0 ? currentYear - 1 : currentYear, id: 'juneBody', headId: 'juneHead' },
-      { month: currentMonth - 2, year: currentMonth < 2 ? currentYear - 1 : currentYear, id: 'mayBody', headId: 'mayHead' }
-    ];
-
-    const users = await fetchAPI('/users');
-    const agda = users.find(u => u.name.toLowerCase().includes('agda'));
-    const helenice = users.find(u => u.name.toLowerCase().includes('helenice'));
-
-    const [deals, activities] = await Promise.all([
-      fetchAllPages('/deals', { status: 'all_not_deleted' }),
-      fetchAllPages('/activities')
-    ]);
-
-    for (const period of months) {
-      const { start, end } = getPeriodDatesByMonthYear(period.month, period.year);
-      const tbody = document.getElementById(period.id);
-      const thead = document.getElementById(period.headId);
-
-      const periodDeals = deals.filter(d => {
-        if (!d.add_time) return false;
-        const dDate = d.add_time.substring(0, 10);
-        return dDate >= start && dDate <= end;
-      });
-
-      const calendarWeeks = getCalendarWeeks(period.month, period.year);
-      const weekMetrics = [];
-      const monthMetrics = calcWeekMetrics(periodDeals, agda, helenice);
-
-      for (const week of calendarWeeks) {
-        const weekDeals = periodDeals.filter(d => {
-          const dDate = d.add_time.substring(0, 10);
-          return dDate >= week.start && dDate <= week.end;
-        });
-        weekMetrics.push({
-          ...week,
-          metrics: calcWeekMetrics(weekDeals, agda, helenice)
-        });
-      }
-
-      let headerHtml = `<tr>
-        <th style="min-width: 200px;">Indicadores</th>
-        <th>Responsável</th>
-        <th colspan="2" style="text-align: center;" class="group-divider">Mês (Acumulado)</th>`;
-
-      for (let i = 0; i < calendarWeeks.length; i++) {
-        const week = calendarWeeks[i];
-        const weekDisplay = formatWeekDisplay(week.start, week.end);
-        const isLast = i === calendarWeeks.length - 1;
-        headerHtml += `<th colspan="2" style="text-align: center;"${isLast ? '' : ' class="group-divider"'}>Semana (${weekDisplay})</th>`;
-      }
-
-      headerHtml += `</tr><tr>
-        <th style="min-width: 200px;"></th>
-        <th></th>
-        <th>Meta</th>
-        <th class="group-divider">Real</th>`;
-
-      for (let i = 0; i < calendarWeeks.length; i++) {
-        const isLast = i === calendarWeeks.length - 1;
-        headerHtml += `<th>Meta</th><th${isLast ? '' : ' class="group-divider"'}>Real</th>`;
-      }
-
-      headerHtml += `</tr>`;
-      thead.innerHTML = headerHtml;
-
-      const createPeriodData = (meta, real) => ({ meta, real });
-      let bodyHtml = '';
-
-      const faturamentoWeeks = weekMetrics.map(w => createPeriodData(87500, w.metrics.faturamento));
-      bodyHtml += createWeeklyRow('Faturamento (Total da Clínica)', 'Gerente Comercial', createPeriodData(350000, monthMetrics.faturamento), faturamentoWeeks);
-
-      const oportunidadesWeeks = weekMetrics.map(w => createPeriodData(87500 * 3.33, w.metrics.oportunidadesCriadas));
-      bodyHtml += createWeeklyRow('Oportunidades Criadas (R$)', 'Gerente Comercial', createPeriodData(350000 * 3.33, monthMetrics.oportunidadesCriadas), oportunidadesWeeks, false, true);
-
-      const ticketWeeks = weekMetrics.map(w => createPeriodData(5000, w.metrics.ticketMedio));
-      bodyHtml += createWeeklyRow('Ticket médio (Total da clínica)', 'Gerente Comercial', createPeriodData(5000, monthMetrics.ticketMedio), ticketWeeks);
-
-      const agdaPctWeeks = weekMetrics.map(w => createPeriodData(0.30, w.metrics.agdaPctComparecimentos));
-      bodyHtml += createWeeklyRow('% de Leads que Comparecem (SDR)', 'Agda', createPeriodData(0.30, monthMetrics.agdaPctComparecimentos), agdaPctWeeks, true);
-
-      const agdaNumWeeks = weekMetrics.map(w => createPeriodData(20, w.metrics.agdaComparecimentos));
-      bodyHtml += createWeeklyRow('Número Comparecimento (SDR)', 'Agda', createPeriodData(80, monthMetrics.agdaComparecimentos), agdaNumWeeks);
-
-      const helPctWeeks = weekMetrics.map(w => createPeriodData(0.30, w.metrics.helPctComparecimentos));
-      bodyHtml += createWeeklyRow('% de Leads que Comparecem (SDR)', 'Helenice', createPeriodData(0.30, monthMetrics.helPctComparecimentos), helPctWeeks, true);
-
-      const helNumWeeks = weekMetrics.map(w => createPeriodData(20, w.metrics.helComparecimentos));
-      bodyHtml += createWeeklyRow('Número Comparecimento (SDR)', 'Helenice', createPeriodData(80, monthMetrics.helComparecimentos), helNumWeeks);
-
-      const jessicaWeeks = weekMetrics.map(w => createPeriodData(50000, w.metrics.jessicaFaturamento));
-      bodyHtml += createWeeklyRow('Faturamento (vendas realizadas em R$)', 'Closer nº 1', createPeriodData(200000, monthMetrics.jessicaFaturamento), jessicaWeeks);
-
-      const convWeeks = weekMetrics.map(w => createPeriodData(0.50, w.metrics.pctConversao));
-      bodyHtml += createWeeklyRow('% de conversão (incluindo followup)', 'Closer nº 1', createPeriodData(0.50, monthMetrics.pctConversao), convWeeks, true);
-
-      const leadsWeeks = weekMetrics.map(w => createPeriodData(162.5, w.metrics.leadsGerados));
-      bodyHtml += createWeeklyRow('Quantidade de Lead Gerados (Diretor)', 'Diretor', createPeriodData(650, monthMetrics.leadsGerados), leadsWeeks);
-
-      tbody.innerHTML = bodyHtml;
-    }
-
-    document.getElementById('indicatorsDashboard').style.display = 'block';
-
-  } catch(e) {
-    console.error(e);
-  }
-}
-
-async function loadDashboard() {
-  showLoading(true);
-
-  try {
-    document.getElementById('photoAgda').src = PHOTOS['Agda'];
-    document.getElementById('photoHelenice').src = PHOTOS['Helenice'];
-    document.getElementById('photoMeta').src = PHOTOS['Meta'];
-
-    const users = await fetchAPI('/users');
-    const agda = users.find(u => u.name.toLowerCase().includes('agda'));
-    const helenice = users.find(u => u.name.toLowerCase().includes('helenice'));
-
-    if (!agda || !helenice) throw new Error('Usuárias não encontradas');
-
-    const [dealsAgda, dealsHelenice, activitiesAgda, activitiesHelenice] = await Promise.all([
-      fetchAllPages('/deals', { user_id: agda.id, status: 'all_not_deleted' }),
-      fetchAllPages('/deals', { user_id: helenice.id, status: 'all_not_deleted' }),
-      fetchAllPages('/activities', { user_id: agda.id }),
-      fetchAllPages('/activities', { user_id: helenice.id })
-    ]);
-
-    const periods = {
-      today: { offset: 0, type: 'day' },
-      prevDay: { offset: 1, type: 'day' },
-      week: { offset: 0, type: 'week' },
-      prevWeek: { offset: 1, type: 'week' },
-      month: { offset: 0, type: 'month' },
-      prevMonth: { offset: 1, type: 'month' }
-    };
-
-    const metricsAgda = {};
-    const metricsHelenice = {};
-
-    Object.entries(periods).forEach(([key, { offset, type }]) => {
-      const dates = getPeriodDates(type, offset);
-      metricsAgda[key] = calcMetrics(dealsAgda, activitiesAgda, dates);
-      metricsHelenice[key] = calcMetrics(dealsHelenice, activitiesHelenice, dates);
-    });
-
-    const monthDates = {
-      start: toISO(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
-      end: toISO(new Date())
-    };
-    const monthMetricsAgda = calcMetrics(dealsAgda, activitiesAgda, monthDates);
-    const monthMetricsHelenice = calcMetrics(dealsHelenice, activitiesHelenice, monthDates);
-
-    renderData(metricsAgda, metricsHelenice);
-    renderRace(monthMetricsAgda, monthMetricsHelenice);
-    renderChart(dealsAgda, activitiesAgda, dealsHelenice, activitiesHelenice);
-    loadIndicators();
-
-    showLoading(false);
-  } catch(e) {
-    console.error(e);
-    showError('Erro: ' + e.message);
-    showLoading(false);
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => {
-  setCurrentMonth();
+if (!API_TOKEN) {
+  showError('Token do Pipedrive não encontrado. Verifique se a página foi carregada corretamente.');
+} else {
   loadDashboard();
-  setInterval(loadDashboard, 120000);
-});
+}
 </script>
 </body>
 </html>
