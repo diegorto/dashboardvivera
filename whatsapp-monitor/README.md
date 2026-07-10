@@ -23,36 +23,48 @@ padrao do `vivera-fotos`.
   do dela. A discagem em si e manual - Baileys nao consegue iniciar uma
   chamada de voz, so recebe eventos de chamada.
 
-## Setup no servidor
+## Setup no servidor (automatico)
 
-1. Criar o banco e rodar o schema:
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE vivera_whatsapp"
-   mysql -u root -p vivera_whatsapp < sql/schema.sql
-   ```
-2. Copiar `.env.example` para `.env` e preencher (`DB_*`, `PIPEDRIVE_TOKEN`,
-   `N8N_WEBHOOK`, `SESSION_SECRET`, `SDR_PASSWORD_HELENICE`,
-   `SDR_PASSWORD_AGDA`).
-3. Mapear os usuarios do Pipedrive pra cada SDR (IDs reais, via
-   `GET /users` na API do Pipedrive):
-   ```sql
-   INSERT INTO pipedrive_users_mapping (pipedrive_user_id, pipedrive_user_name, sdr_name)
-   VALUES ('123456', 'Helenice', 'helenice'), ('789012', 'Agda', 'agda');
-   ```
-4. Subir o servico (a partir da raiz do repo, junto com os outros):
-   ```bash
-   docker compose up -d --build whatsapp-monitor
-   ```
-   O `docker-compose.yml` espera o DNS `whatsapp.vivera.srv1522176.hstgr.cloud`
-   apontado pro Traefik - ajustar o `Host()` no label se o subdominio for
-   outro. O volume `./whatsapp-monitor/auth` guarda as credenciais das
-   sessoes Baileys entre restarts - nao apagar.
-5. Configurar os webhooks no Pipedrive apontando pra:
-   - `https://<seu-dominio>/webhook/pipedrive/deal`
-   - `https://<seu-dominio>/webhook/pipedrive/label`
-6. Acessar `/login`, escolher a sessao (Helenice ou Agda), entrar com a
-   senha configurada e escanear o QR code exibido em `/api/qr/:sessionName`
-   com o WhatsApp do respectivo numero.
+O banco (MariaDB) roda como container proprio (`whatsapp-db` no
+`docker-compose.yml`), com o schema em `sql/schema.sql` aplicado sozinho no
+primeiro start - nao precisa de MySQL/senha de root pre-existente na VPS.
+
+```bash
+cd whatsapp-monitor
+bash setup.sh
+```
+
+Isso gera `SESSION_SECRET` e as senhas de login de cada SDR aleatoriamente,
+reaproveita o `PIPEDRIVE_TOKEN` que ja esta no `.env` da raiz do repo, ja
+deixa `N8N_WEBHOOK` configurado, sobe `whatsapp-db` + `whatsapp-monitor` via
+docker compose e tenta mapear Helenice/Agda pros IDs de usuario delas no
+Pipedrive automaticamente. No final imprime a URL do painel e a senha de
+login de cada uma.
+
+O unico passo que não dá pra automatizar: abrir `http://<ip-da-vps>:4001/login`,
+entrar em cada sessão com a senha impressa pelo script e escanear o QR code
+com o WhatsApp do número correspondente.
+
+Se o mapeamento automático do Pipedrive não achar os usuários (nomes
+diferentes de "Helenice"/"Agda" no Pipedrive), preenche manualmente:
+```sql
+INSERT INTO pipedrive_users_mapping (pipedrive_user_id, pipedrive_user_name, sdr_name)
+VALUES ('123456', 'Helenice', 'helenice'), ('789012', 'Agda', 'agda');
+```
+
+Pra ativar a sincronização de deals, configura os webhooks no Pipedrive
+apontando pra:
+- `https://<seu-dominio-ou-ip>:4001/webhook/pipedrive/deal`
+- `https://<seu-dominio-ou-ip>:4001/webhook/pipedrive/label`
+
+Se quiser o domínio bonito com TLS em vez de `IP:4001`, o
+`docker-compose.yml` já tem os labels do Traefik prontos - só apontar o DNS
+`whatsapp.vivera.srv1522176.hstgr.cloud` (ou trocar o `Host()` no label pelo
+subdomínio que preferir).
+
+O volume `./whatsapp-monitor/auth` guarda as credenciais das sessões Baileys
+entre restarts - não apagar. `./whatsapp-monitor/db-data` guarda os dados do
+MariaDB - idem.
 
 ## Rotas
 
@@ -67,11 +79,15 @@ padrao do `vivera-fotos`.
 ## O que ainda depende de teste real
 
 Isso foi montado e revisado localmente (instala, sobe, sintaxe ok), mas sem
-acesso a um WhatsApp, MySQL, Pipedrive ou n8n reais - precisa validar no
-servidor:
+acesso a um WhatsApp, MySQL ou Pipedrive reais - precisa validar no servidor:
 - Conexao Baileys de fato (QR code, persistencia da sessao em `auth/`,
   reconexao automatica).
 - Formato exato do payload dos webhooks do Pipedrive (o codigo assume o
   formato antigo `{ current: {...} }` da v1, como especificado).
 - Deteccao de `in_call` a partir dos status de chamada do Baileys (os
   valores exatos de `status` podem variar por versao da lib).
+
+O webhook de analise do n8n (`N8N_WEBHOOK`) ja esta montado e ativo em
+`https://n8n.srv1522176.hstgr.cloud/webhook/whatsapp-script-analysis`,
+devolvendo `{ results: [{ conversation_id, adherence_score, issues,
+suggestions, ... }] }` - compativel com o que `ia-analysis.js` espera.
