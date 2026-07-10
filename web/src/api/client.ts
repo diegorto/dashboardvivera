@@ -1,10 +1,25 @@
-import type { DashboardResponse, TintimAuditResponse } from './types'
+import type { DashboardResponse, TintimAuditResponse, Funnel } from './types'
 
 export async function fetchDashboard(since: string, until: string): Promise<DashboardResponse> {
   const res = await fetch(`/api/dashboard?since=${since}&until=${until}`)
   const json = await res.json()
   if (!json.success) throw new Error(json.error || 'Erro ao carregar dados')
   return json as DashboardResponse
+}
+
+export interface FunilRealResponse {
+  success: boolean
+  range: { since: string; until: string }
+  funnel: Funnel
+  dealsAnalisados: number
+  error?: string
+}
+
+export async function fetchFunilReal(since: string, until: string): Promise<FunilRealResponse> {
+  const res = await fetch(`/api/funil-real?since=${since}&until=${until}`)
+  const json = await res.json()
+  if (!json.success) throw new Error(json.error || 'Erro ao calcular o funil real')
+  return json as FunilRealResponse
 }
 
 export async function fetchTintimAudit(): Promise<TintimAuditResponse> {

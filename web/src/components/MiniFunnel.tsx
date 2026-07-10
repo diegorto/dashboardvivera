@@ -9,9 +9,10 @@ export function MiniFunnel({ funnel }: { funnel: Funnel }) {
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle>Funil</CardTitle>
-        <Link to="/funil" className="text-xs font-medium text-accent hover:underline">Ver completo →</Link>
+        <Link to="/funil" className="text-xs font-medium text-accent hover:underline">Ver completo (real) →</Link>
       </CardHeader>
       <CardContent className="flex flex-col gap-2.5">
+        <p className="text-[11px] text-muted-foreground">Prévia rápida pela posição atual do negócio. A aba Funil mostra o histórico real de cada etapa.</p>
         {funnel.stages.map(stage => (
           <div key={stage.key} className="flex items-center gap-3">
             <div className="w-28 shrink-0 text-xs font-medium">{stage.label}</div>

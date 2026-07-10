@@ -1,25 +1,61 @@
-import { useState } from 'react'
-import { ChevronRight, AlertTriangle, TrendingUp, Info } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, AlertTriangle, TrendingUp, Info, Loader2 } from 'lucide-react'
 import { useFilters } from '@/lib/FilterContext'
+import { fetchFunilReal } from '@/api/client'
 import { formatNumber, formatPercent, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import type { Insight } from '@/api/types'
+import type { Insight, Funnel } from '@/api/types'
 
 export function FunilPage() {
-  const { data } = useFilters()
+  const { since, until } = useFilters()
+  const [funnel, setFunnel] = useState<Funnel | null>(null)
+  const [dealsAnalisados, setDealsAnalisados] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
-  if (!data) return null
 
-  const funnel = data.funnel
-  const max = funnel.stages[0]?.count || 1
-  const selectedStage = funnel.stages.find(s => s.key === selected)
-  const topCreatives = selected ? funnel.topCreativesByStage[selected] || [] : []
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchFunilReal(since, until)
+      .then(res => { if (!cancelled) { setFunnel(res.funnel); setDealsAnalisados(res.dealsAnalisados) } })
+      .catch(err => { if (!cancelled) setError(err.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [since, until])
+
+  const max = funnel?.stages[0]?.count || 1
+  const selectedStage = funnel?.stages.find(s => s.key === selected)
+  const topCreatives = (funnel && selected) ? funnel.topCreativesByStage[selected] || [] : []
 
   return (
     <div className="flex flex-col gap-4">
       <h1 className="text-lg font-bold">Funil</h1>
 
+      {loading && (
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">
+              Calculando o funil real a partir do histórico de cada negócio no Pipedrive{dealsAnalisados > 0 ? ` (${dealsAnalisados} negócios)` : ''}… isso é mais lento que o resto do painel porque busca o histórico completo, um negócio por vez.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && error && (
+        <Card className="border-critical/30 bg-critical-soft/40">
+          <CardContent className="flex items-center gap-3 p-4">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-critical" />
+            <p className="text-sm text-critical">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!loading && !error && funnel && (
+        <>
       <Card>
         <CardHeader>
           <CardTitle>Evolução do funil</CardTitle>
@@ -63,7 +99,7 @@ export function FunilPage() {
             ))}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Etapas aproximadas pela posição atual do negócio no Pipedrive (o Pipedrive não guarda histórico de passagem por etapa via API padrão). Vendas (status ganho) contam como tendo alcançado no mínimo a etapa de Comparecimento. A barra vermelha mostra quantos dos que chegaram na etapa acabaram perdidos, com os motivos mais comuns.
+            Funil real: cada etapa conta negócios que passaram por ali em algum momento (histórico de mudança de etapa do Pipedrive), não só a posição atual. Vendas (status ganho) contam como tendo alcançado no mínimo a etapa de Comparecimento. A barra vermelha mostra quantos dos que chegaram na etapa acabaram perdidos, com os motivos mais comuns.
           </p>
         </CardContent>
       </Card>
@@ -100,6 +136,8 @@ export function FunilPage() {
           {funnel.insights.map(i => <FunnelInsightRow key={i.id} insight={i} />)}
         </CardContent>
       </Card>
+        </>
+      )}
     </div>
   )
 }

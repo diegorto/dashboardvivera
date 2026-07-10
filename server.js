@@ -372,6 +372,52 @@ async function fetchAllDeals() {
   return deals;
 }
 
+// Historico real de mudancas do deal (Pipedrive guarda isso, mas so devolve por deal - sem
+// endpoint em lote). Usado pra montar o funil "real" (chegou a etapa X em algum momento),
+// em vez da aproximacao pela posicao atual.
+async function fetchDealFlow(dealId) {
+  try {
+    const response = await axios.get(`https://api.pipedrive.com/v1/deals/${dealId}/flow`, {
+      params: { api_token: PIPEDRIVE_TOKEN, limit: 200 }, timeout: 10000
+    });
+    return (response.data && response.data.data) || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+async function fetchDealFlowsBatch(dealIds, concurrency = 15) {
+  const results = new Map();
+  let index = 0;
+  async function worker() {
+    while (index < dealIds.length) {
+      const i = index++;
+      const id = dealIds[i];
+      results.set(id, await fetchDealFlow(id));
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, dealIds.length) }, worker));
+  return results;
+}
+
+// Maior rank de funil que o deal alcancou em algum momento, olhando todo stage_id que ja
+// passou pelo campo (historico real), nao so a posicao atual.
+function maxRankFromFlow(deal, flowEvents) {
+  const stageIds = new Set([deal.stageId]);
+  flowEvents.forEach(e => {
+    if (e.object === 'dealChange' && e.data && e.data.field_key === 'stage_id') {
+      if (e.data.old_value) stageIds.add(parseInt(e.data.old_value));
+      if (e.data.new_value) stageIds.add(parseInt(e.data.new_value));
+    }
+  });
+  let maxRank = 0;
+  stageIds.forEach(sid => {
+    const r = STAGE_RANK[sid];
+    if (r !== undefined && r > maxRank) maxRank = r;
+  });
+  return maxRank;
+}
+
 function inRange(deal, since, until) {
   if (!deal.addDate) return false;
   if (since && deal.addDate < since) return false;
@@ -512,7 +558,11 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
   };
 }
 
-function buildFunnel(deals) {
+// rankFn decide o "rank" de progresso de cada deal no funil. Por padrao usa rankOf() (posicao
+// ATUAL do deal, aproximada). O /api/funil-real passa uma versao baseada no historico real de
+// mudanca de etapa (Pipedrive /deals/{id}/flow), que conta "chegou a etapa X em algum momento"
+// em vez de "esta na etapa X agora" - mais fiel, mas exige 1 chamada de API por deal.
+function buildFunnel(deals, rankFn = rankOf) {
   const counts = { leads: 0, qualificados: 0, agendados: 0, compareceram: 0, compraram: 0 };
   const topCreativesByStage = { leads: {}, qualificados: {}, agendados: {}, compareceram: {}, compraram: {} };
   // Pra cada anuncio, conta qual combinacao campanha/conjunto aparece mais - usado so pra
@@ -520,7 +570,7 @@ function buildFunnel(deals) {
   const anuncioOriginCounts = {};
 
   deals.forEach(deal => {
-    const rank = rankOf(deal);
+    const rank = rankFn(deal);
     const anuncio = deal.palavraChave || 'sem_palavra_chave';
     const bump = (stageKey) => { topCreativesByStage[stageKey][anuncio] = (topCreativesByStage[stageKey][anuncio] || 0) + 1; };
 
@@ -552,7 +602,7 @@ function buildFunnel(deals) {
 
   function perdidosNaEtapa(minRank) {
     if (minRank === null) return { count: 0, objecoes: [] };
-    const lostHere = lostDeals.filter(d => rankOf(d) >= minRank);
+    const lostHere = lostDeals.filter(d => rankFn(d) >= minRank);
     const tagCounts = {};
     lostHere.forEach(d => { objectionNames(d).forEach(tag => { tagCounts[tag] = (tagCounts[tag] || 0) + 1; }); });
     const objecoes = Object.entries(tagCounts).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, 5);
@@ -918,6 +968,29 @@ app.get('/api/dashboard', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro no /api/dashboard:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Funil "real": usa o historico de mudanca de etapa de cada deal (Pipedrive /deals/{id}/flow)
+// em vez da posicao atual. Mais fiel (bate com o que o proprio Insights do Pipedrive mostra),
+// mas exige 1 chamada de API por deal do periodo - roda sob demanda, nao no dashboard principal.
+app.get('/api/funil-real', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = { since: req.query.since || defaults.since, until: req.query.until || defaults.until };
+
+    const allDeals = await fetchAllDeals();
+    const inboundDealsAll = allDeals.filter(d => d.pipelineId === INBOUND_PIPELINE_ID);
+    const deals = inboundDealsAll.filter(d => inRange(d, range.since, range.until));
+
+    const flows = await fetchDealFlowsBatch(deals.map(d => d.id));
+    const rankFn = deal => maxRankFromFlow(deal, flows.get(deal.id) || []);
+    const funnel = buildFunnel(deals, rankFn);
+
+    res.json({ success: true, range, funnel, dealsAnalisados: deals.length });
+  } catch (error) {
+    console.error('Erro no /api/funil-real:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
