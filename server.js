@@ -322,6 +322,76 @@ app.get('/sdr', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
 });
 
+// ============================================
+// 📱 WhatsApp Analytics Endpoints
+// ============================================
+
+const whatsappAnalytics = require('./src/whatsapp-analytics');
+
+app.get('/api/whatsapp/stats', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const stats = await whatsappAnalytics.getStats(days);
+    res.json(stats);
+  } catch (error) {
+    console.error('[WhatsApp API] Erro em /stats:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/calls', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const limit = parseInt(req.query.limit) || 500;
+    const calls = await whatsappAnalytics.getCalls(days, limit);
+    res.json({ data: calls, count: calls.length });
+  } catch (error) {
+    console.error('[WhatsApp API] Erro em /calls:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/lead-timing', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const type = req.query.type || 'messages'; // messages ou calls
+
+    let result;
+    if (type === 'calls') {
+      result = await whatsappAnalytics.getLeadTimingCalls(days);
+    } else {
+      result = await whatsappAnalytics.getLeadTimingMessages(days);
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('[WhatsApp API] Erro em /lead-timing:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/patterns', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const patterns = await whatsappAnalytics.getPatterns(days);
+    res.json(patterns);
+  } catch (error) {
+    console.error('[WhatsApp API] Erro em /patterns:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/whatsapp/message-types', async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const types = await whatsappAnalytics.getMessageTypes(days);
+    res.json(types);
+  } catch (error) {
+    console.error('[WhatsApp API] Erro em /message-types:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   const range = defaultDateRange();
