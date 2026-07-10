@@ -4,6 +4,9 @@ services:
     restart: always
     env_file:
       - ./vivera-fotos/.env
+    volumes:
+      - ./vivera-fotos/data:/app/data
+      - ./vivera-fotos/uploads:/app/uploads
     networks:
       - n8n_default
     labels:
