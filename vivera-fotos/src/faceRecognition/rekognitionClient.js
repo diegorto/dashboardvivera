@@ -76,13 +76,30 @@ function classifyPoseFromYaw(yaw) {
   return 'lateral';
 }
 
+// Nota de qualidade da foto (0-100), usada pra escolher a "melhor" foto de cada
+// dia/pose: prioriza nitidez, brilho equilibrado (nem escura nem estourada) e olhos abertos.
+function computeQualityScore(face) {
+  const sharpness = face.Quality.Sharpness || 0;
+  const brightness = face.Quality.Brightness || 0;
+  const brightnessScore = 100 - Math.abs(brightness - 50) * 2;
+  const eyesOpenBonus = face.EyesOpen && face.EyesOpen.Value ? 15 : 0;
+  return sharpness * 0.5 + Math.max(brightnessScore, 0) * 0.35 + eyesOpenBonus;
+}
+
 async function detectPose(imageBytes) {
   const result = await client.send(
     new DetectFacesCommand({ Image: { Bytes: imageBytes }, Attributes: ['ALL'] })
   );
   const face = result.FaceDetails && result.FaceDetails[0];
   if (!face) return null;
-  return { yaw: face.Pose.Yaw, pose: classifyPoseFromYaw(face.Pose.Yaw) };
+  return {
+    yaw: face.Pose.Yaw,
+    pose: classifyPoseFromYaw(face.Pose.Yaw),
+    sharpness: face.Quality.Sharpness,
+    brightness: face.Quality.Brightness,
+    eyesOpen: face.EyesOpen ? face.EyesOpen.Value : null,
+    qualityScore: computeQualityScore(face),
+  };
 }
 
 module.exports = { indexPatientFace, findMatchingPatient, detectPose, classifyPoseFromYaw };

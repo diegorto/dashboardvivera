@@ -23,6 +23,8 @@
   .gallery img { width: 100%; border-radius: 6px; display: block; }
   .gallery figcaption { font-size: 11px; color: #666; text-align: center; margin-top: 4px; }
   a.link { color: #111; }
+  .before-after { margin-top: 12px; }
+  .before-after img { max-width: 100%; border-radius: 8px; display: block; }
 </style>
 </head>
 <body>
@@ -30,7 +32,9 @@
 <div class="sub">Casa os álbuns do Google Fotos com o nome dos pacientes cadastrados.</div>
 
 <button id="buscarAlbuns">Buscar álbuns do Google Photos</button>
+<button id="rodarAuto" class="secondary">Rodar varredura automática agora</button>
 <a class="link" href="/cadastro" style="margin-left:12px;">+ cadastrar paciente</a>
+<div class="sub" style="margin-top:8px;">A varredura automática também roda sozinha às 8h e 20h todos os dias.</div>
 <div id="status"></div>
 
 <div id="albuns"></div>
@@ -52,11 +56,17 @@ async function carregarPacientes() {
     div.innerHTML = `
       <h3>${p.name}</h3>
       <div class="poses">
-        <button class="secondary" data-id="${p.id}" data-pose="">Todas</button>
+        <button class="secondary" data-id="${p.id}" data-pose="">Todas as fotos</button>
         <button class="secondary" data-id="${p.id}" data-pose="frontal">Frontal</button>
         <button class="secondary" data-id="${p.id}" data-pose="perfil_45">Perfil 45º</button>
         <button class="secondary" data-id="${p.id}" data-pose="lateral">Lateral</button>
       </div>
+      <div class="poses">
+        <button data-baid="${p.id}" data-bapose="frontal">Gerar antes/depois - Frontal</button>
+        <button data-baid="${p.id}" data-bapose="perfil_45">Perfil 45º</button>
+        <button data-baid="${p.id}" data-bapose="lateral">Lateral</button>
+      </div>
+      <div class="before-after" id="before-after-${p.id}"></div>
       <div class="gallery" id="gallery-${p.id}"></div>
     `;
     pacientesEl.appendChild(div);
@@ -64,6 +74,28 @@ async function carregarPacientes() {
   pacientesEl.querySelectorAll('button[data-id]').forEach(btn => {
     btn.addEventListener('click', () => verTimeline(btn.dataset.id, btn.dataset.pose));
   });
+  pacientesEl.querySelectorAll('button[data-baid]').forEach(btn => {
+    btn.addEventListener('click', () => gerarAntesDepois(btn.dataset.baid, btn.dataset.bapose, btn));
+  });
+}
+
+async function gerarAntesDepois(patientId, pose, btn) {
+  const container = document.getElementById('before-after-' + patientId);
+  btn.disabled = true;
+  container.innerHTML = 'Montando antes/depois...';
+  try {
+    const res = await fetch(`/api/patients/${patientId}/before-after?pose=${pose}`, { method: 'POST' });
+    const data = await res.json();
+    if (res.ok) {
+      container.innerHTML = `<img src="${data.url}?t=${Date.now()}" alt="Antes e depois">`;
+    } else {
+      container.innerHTML = 'Erro: ' + data.error;
+    }
+  } catch (err) {
+    container.innerHTML = 'Erro de conexão: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function verTimeline(patientId, pose) {
@@ -159,6 +191,22 @@ async function processarAlbum(albumId, patientId, btn) {
 }
 
 document.getElementById('buscarAlbuns').addEventListener('click', buscarAlbuns);
+
+document.getElementById('rodarAuto').addEventListener('click', async () => {
+  const btn = document.getElementById('rodarAuto');
+  btn.disabled = true;
+  statusEl.className = 'ok';
+  statusEl.textContent = 'Varredura automática iniciada em segundo plano (casa álbuns por nome, processa fotos novas e já gera o antes/depois de cada pose). Isso pode levar alguns minutos - atualize a página daqui a pouco.';
+  statusEl.style.display = 'block';
+  try {
+    await fetch('/api/scheduler/run-now', { method: 'POST' });
+  } catch (err) {
+    statusEl.className = 'err';
+    statusEl.textContent = 'Erro de conexão: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 carregarPacientes();
 </script>

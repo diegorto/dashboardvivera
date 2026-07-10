@@ -38,6 +38,7 @@ async function processGooglePhotosLibrary() {
           creationTime: photo.mediaMetadata.creationTime,
           pose: pose ? pose.pose : 'desconhecida',
           yaw: pose ? pose.yaw : null,
+          qualityScore: pose ? pose.qualityScore : 0,
         });
         matched += 1;
       }
@@ -76,6 +77,7 @@ async function processPatientAlbum(patientId, albumId) {
         creationTime: photo.mediaMetadata.creationTime,
         pose: pose ? pose.pose : 'desconhecida',
         yaw: pose ? pose.yaw : null,
+        qualityScore: pose ? pose.qualityScore : 0,
       });
       processadas += 1;
     } catch (err) {
