@@ -1163,7 +1163,7 @@
 <script>
 // Token será injetado pelo servidor via window.PIPEDRIVE_API_TOKEN
 const API_TOKEN = window.PIPEDRIVE_API_TOKEN || '';
-const BASE = 'https://api.pipedrive.com/v1';
+const BASE = '/api/pipedrive';
 
 const PHOTOS = {
   'Agda': 'https://viveraorofacial.com.br/wp-content/uploads/2026/07/ChatGPT-Image-4-de-jul.-de-2026-18_10_44.png',
@@ -1320,8 +1320,7 @@ function getMonthData(deals, activities) {
 }
 
 async function fetchAPI(endpoint, params = {}) {
-  const url = new URL(BASE + endpoint);
-  url.searchParams.set('api_token', API_TOKEN);
+  const url = new URL(BASE + endpoint, window.location.origin);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString());
