@@ -6,12 +6,14 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 
-// 🤖 Auto-load automação se existir
+// 🤖 Auto-load automação e controle remoto
 try {
   const autoScheduler = require('./src/auto-scheduler.js');
   const n8nWebhook = require('./src/n8n-webhook.js');
+  const remoteControl = require('./src/remote-control.js');
   global.autoScheduler = autoScheduler;
   global.n8nWebhook = n8nWebhook;
+  global.remoteControl = remoteControl;
 } catch (e) {
   console.log('ℹ️  Módulos de automação ainda não configurados');
 }
@@ -634,9 +636,13 @@ app.get('/api/cache-status', (req, res) => {
   }
 });
 
-// 🤖 Setup automático de webhooks e schedulers
+// 🤖 Setup automático de webhooks, schedulers e remote control
 if (global.n8nWebhook) {
   global.n8nWebhook.setupWebhooks(app);
+}
+
+if (global.remoteControl) {
+  global.remoteControl.setupRemoteControl(app);
 }
 
 const PORT = process.env.PORT || 3000;
