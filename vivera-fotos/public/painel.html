@@ -27,12 +27,15 @@
 </head>
 <body>
 <h2>Painel Vivera Fotos</h2>
-<div class="sub">Varre sua biblioteca do Google Fotos e identifica os pacientes cadastrados.</div>
+<div class="sub">Casa os álbuns do Google Fotos com o nome dos pacientes cadastrados.</div>
 
-<button id="processar">Processar Google Photos</button>
+<button id="buscarAlbuns">Buscar álbuns do Google Photos</button>
 <a class="link" href="/cadastro" style="margin-left:12px;">+ cadastrar paciente</a>
 <div id="status"></div>
 
+<div id="albuns"></div>
+
+<h2 style="margin-top:32px;">Pacientes</h2>
 <div id="pacientes"></div>
 
 <script>
@@ -84,30 +87,78 @@ async function verTimeline(patientId, pose) {
   }
 }
 
-document.getElementById('processar').addEventListener('click', async () => {
-  const btn = document.getElementById('processar');
+const albunsEl = document.getElementById('albuns');
+
+async function buscarAlbuns() {
+  const btn = document.getElementById('buscarAlbuns');
   btn.disabled = true;
   statusEl.className = '';
-  statusEl.textContent = 'Processando... isso pode demorar dependendo de quantas fotos novas tiver na sua biblioteca.';
+  statusEl.textContent = 'Buscando álbuns do Google Photos...';
   statusEl.style.display = 'block';
   try {
-    const res = await fetch('/api/timeline/process', { method: 'POST' });
-    const data = await res.json();
-    if (res.ok) {
-      statusEl.className = 'ok';
-      statusEl.textContent = `Concluído! Fotos na biblioteca: ${data.scanned}. Novas analisadas: ${data.novasProcessadas}. Identificadas de pacientes cadastrados: ${data.matched}.`;
-      carregarPacientes();
-    } else {
-      statusEl.className = 'err';
-      statusEl.textContent = 'Erro: ' + data.error;
-    }
+    const res = await fetch('/api/albums');
+    const albuns = await res.json();
+    if (!res.ok) { statusEl.className = 'err'; statusEl.textContent = 'Erro: ' + albuns.error; return; }
+
+    statusEl.className = 'ok';
+    statusEl.textContent = `${albuns.length} álbum(ns) encontrado(s) no Google Photos.`;
+
+    albunsEl.innerHTML = '';
+    albuns.forEach(a => {
+      const div = document.createElement('div');
+      div.className = 'patient';
+      if (a.patient) {
+        div.innerHTML = `
+          <h3>${a.title} <small style="font-weight:normal;color:#666;">(${a.mediaItemsCount || 0} fotos)</small></h3>
+          <div>Paciente correspondente: <strong>${a.patient.name}</strong></div>
+          <button data-album="${a.albumId}" data-patient="${a.patient.id}" style="margin-top:10px;">Gerar antes/depois</button>
+          <div class="status-album" id="status-album-${a.albumId}"></div>
+        `;
+      } else {
+        div.innerHTML = `
+          <h3>${a.title} <small style="font-weight:normal;color:#666;">(${a.mediaItemsCount || 0} fotos)</small></h3>
+          <div style="color:#888;">Nenhum paciente cadastrado com esse nome ainda.</div>
+        `;
+      }
+      albunsEl.appendChild(div);
+    });
+
+    albunsEl.querySelectorAll('button[data-album]').forEach(btn => {
+      btn.addEventListener('click', () => processarAlbum(btn.dataset.album, btn.dataset.patient, btn));
+    });
   } catch (err) {
     statusEl.className = 'err';
     statusEl.textContent = 'Erro de conexão: ' + err.message;
   } finally {
     btn.disabled = false;
   }
-});
+}
+
+async function processarAlbum(albumId, patientId, btn) {
+  const statusAlbum = document.getElementById('status-album-' + albumId);
+  btn.disabled = true;
+  statusAlbum.textContent = 'Processando fotos do álbum...';
+  try {
+    const res = await fetch(`/api/albums/${albumId}/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patientId }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      statusAlbum.textContent = `Concluído! Fotos no álbum: ${data.scanned}. Novas analisadas: ${data.novasProcessadas}.`;
+      carregarPacientes();
+    } else {
+      statusAlbum.textContent = 'Erro: ' + data.error;
+    }
+  } catch (err) {
+    statusAlbum.textContent = 'Erro de conexão: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('buscarAlbuns').addEventListener('click', buscarAlbuns);
 
 carregarPacientes();
 </script>
