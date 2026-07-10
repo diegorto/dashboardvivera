@@ -844,6 +844,32 @@
       </div>
     </div>
 
+    <!-- INDICADORES KPI -->
+    <div class="race-section" id="indicatorsKPI" style="margin-top: 60px;">
+      <div class="race-title">📊 Indicadores do Mês</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
+          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">⏱️ TEMPO FECHAMENTO (Lead Entry)</div>
+          <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 8px;">
+            <span id="avgClosingFromLeadCurrent">-</span>d
+          </div>
+          <div style="font-size: 12px; color: #666;">
+            <span id="avgClosingFromLeadChange">-</span>
+          </div>
+        </div>
+
+        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
+          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">⏱️ TEMPO FECHAMENTO (Avaliação)</div>
+          <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 8px;">
+            <span id="avgClosingFromEvalCurrent">-</span>d
+          </div>
+          <div style="font-size: 12px; color: #666;">
+            <span id="avgClosingFromEvalChange">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- GRÁFICOS DE EVOLUÇÃO -->
     <div class="race-section">
       <div class="race-title">📱 Evolução - Ligações Realizadas</div>
@@ -1351,6 +1377,45 @@ function inRange(item, field, start, end) {
   return d >= start && d <= end;
 }
 
+// Calcula tempo médio de fechamento (desde lead entrar até fechar)
+function calcAvgClosingTimeFromLead(wonDeals) {
+  if (wonDeals.length === 0) return 0;
+  const times = wonDeals
+    .filter(d => d.add_time && d.won_time)
+    .map(d => {
+      const start = new Date(d.add_time);
+      const end = new Date(d.won_time);
+      const days = (end - start) / (1000 * 60 * 60 * 24);
+      return Math.max(0, days);
+    });
+  return times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+}
+
+// Calcula tempo médio de fechamento (desde avaliação até fechar)
+// Usa o first_stage_change_time (primeira mudança de stage) como proxy para avaliação
+function calcAvgClosingTimeFromEvaluation(wonDeals) {
+  if (wonDeals.length === 0) return 0;
+  const times = wonDeals
+    .filter(d => d.first_stage_change_time && d.won_time)
+    .map(d => {
+      const start = new Date(d.first_stage_change_time);
+      const end = new Date(d.won_time);
+      const days = (end - start) / (1000 * 60 * 60 * 24);
+      return Math.max(0, days);
+    })
+    .concat(
+      wonDeals
+        .filter(d => !d.first_stage_change_time && d.stage_change_time && d.won_time)
+        .map(d => {
+          const start = new Date(d.stage_change_time);
+          const end = new Date(d.won_time);
+          const days = (end - start) / (1000 * 60 * 60 * 24);
+          return Math.max(0, days);
+        })
+    );
+  return times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+}
+
 function calcMetrics(deals, activities, dates) {
   const oppDeals = deals.filter(d =>
     d.value > 0 &&
@@ -1404,7 +1469,14 @@ function calcMetrics(deals, activities, dates) {
     a.type === 'ligacao_atendida_' && inRange(a, 'add_time', dates.start, dates.end)
   ).length;
 
-  return { opp, closed, closedJessica, crc, agd, comp, leads, callAttempts, callSuccess };
+  // Calcular tempos médios de fechamento
+  const avgClosingTimeFromLead = calcAvgClosingTimeFromLead(dealsWithoutJessica);
+  const avgClosingTimeFromEvaluation = calcAvgClosingTimeFromEvaluation(dealsWithoutJessica);
+
+  return {
+    opp, closed, closedJessica, crc, agd, comp, leads, callAttempts, callSuccess,
+    avgClosingTimeFromLead, avgClosingTimeFromEvaluation
+  };
 }
 
 function renderData(agda, helenice) {
@@ -1462,6 +1534,32 @@ function renderData(agda, helenice) {
       document.getElementById(`comp${label}Meta`).textContent = META_GOALS[periodType].comparecimentos;
     }
   });
+
+  // Atualizar indicadores KPI - Tempo de Fechamento
+  const currentMonthAvgFromLead = (agda.month.avgClosingTimeFromLead + helenice.month.avgClosingTimeFromLead) / 2;
+  const prevMonthAvgFromLead = (agda.prevMonth.avgClosingTimeFromLead + helenice.prevMonth.avgClosingTimeFromLead) / 2;
+  const changeFromLead = prevMonthAvgFromLead !== 0
+    ? ((currentMonthAvgFromLead - prevMonthAvgFromLead) / prevMonthAvgFromLead) * 100
+    : 0;
+
+  const currentMonthAvgFromEval = (agda.month.avgClosingTimeFromEvaluation + helenice.month.avgClosingTimeFromEvaluation) / 2;
+  const prevMonthAvgFromEval = (agda.prevMonth.avgClosingTimeFromEvaluation + helenice.prevMonth.avgClosingTimeFromEvaluation) / 2;
+  const changeFromEval = prevMonthAvgFromEval !== 0
+    ? ((currentMonthAvgFromEval - prevMonthAvgFromEval) / prevMonthAvgFromEval) * 100
+    : 0;
+
+  function formatChangePercent(pct) {
+    const isNegative = pct < 0;
+    const symbol = isNegative ? '↓' : '↑';
+    const color = isNegative ? '#4ade80' : '#ef4444'; // verde se diminui (bom), vermelho se aumenta (ruim)
+    return `<span style="color: ${color};">${symbol} ${Math.abs(pct).toFixed(1)}%</span>`;
+  }
+
+  document.getElementById('avgClosingFromLeadCurrent').textContent = currentMonthAvgFromLead.toFixed(1);
+  document.getElementById('avgClosingFromLeadChange').innerHTML = formatChangePercent(changeFromLead);
+
+  document.getElementById('avgClosingFromEvalCurrent').textContent = currentMonthAvgFromEval.toFixed(1);
+  document.getElementById('avgClosingFromEvalChange').innerHTML = formatChangePercent(changeFromEval);
 
   document.getElementById('setup').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
