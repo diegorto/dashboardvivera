@@ -17,6 +17,23 @@ services:
       - traefik.http.routers.vivera-fotos.tls.certresolver=mytlschallenge
       - traefik.http.services.vivera-fotos.loadbalancer.server.port=4000
 
+  whatsapp-monitor:
+    build: ./whatsapp-monitor
+    restart: always
+    env_file:
+      - ./whatsapp-monitor/.env
+    volumes:
+      - ./whatsapp-monitor/auth:/app/auth
+    networks:
+      - n8n_default
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.whatsapp-monitor.rule=Host(`whatsapp.vivera.srv1522176.hstgr.cloud`)
+      - traefik.http.routers.whatsapp-monitor.tls=true
+      - traefik.http.routers.whatsapp-monitor.entrypoints=web,websecure
+      - traefik.http.routers.whatsapp-monitor.tls.certresolver=mytlschallenge
+      - traefik.http.services.whatsapp-monitor.loadbalancer.server.port=4001
+
 networks:
   n8n_default:
     external: true

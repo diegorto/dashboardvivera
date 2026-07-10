@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= sdr %> - Painel WhatsApp</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+    .container { display: flex; height: 100vh; }
+
+    .sidebar { width: 320px; background: #fff; border-right: 1px solid #ddd; overflow-y: auto; display: flex; flex-direction: column; }
+    .main { flex: 1; display: flex; flex-direction: column; }
+
+    .header { padding: 16px; background: #075E54; color: #fff; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 18px; }
+    .header .status { font-size: 12px; opacity: 0.9; margin-top: 8px; }
+    .header form button { background: transparent; border: 1px solid rgba(255,255,255,0.5); color: #fff; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+    .sessions { padding: 12px; border-bottom: 1px solid #ddd; display: flex; gap: 8px; flex-wrap: wrap; }
+    .session-badge { padding: 6px 12px; background: #25D366; color: #fff; border-radius: 4px; font-size: 12px; }
+    .session-badge.disconnected { background: #f44336; }
+
+    .conversations-list { padding: 8px; overflow-y: auto; flex: 1; }
+    .conversation-item { padding: 12px; margin: 4px 0; background: #f9f9f9; border-radius: 4px; cursor: pointer; border-left: 4px solid #075E54; }
+    .conversation-item:hover { background: #f0f0f0; }
+    .conversation-item.active { background: #E8F5E9; border-left-color: #25D366; }
+    .conversation-item .name { font-weight: 600; font-size: 14px; }
+    .conversation-item .preview { font-size: 12px; color: #666; margin-top: 4px; }
+    .conversation-item .meta { font-size: 11px; color: #999; margin-top: 4px; }
+
+    .content { flex: 1; display: flex; flex-direction: column; }
+    .messages { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .message { max-width: 70%; padding: 8px 12px; border-radius: 8px; word-wrap: break-word; }
+    .message.in { background: #E8F5E9; align-self: flex-start; }
+    .message.out { background: #075E54; color: #fff; align-self: flex-end; }
+    .message .time { font-size: 10px; opacity: 0.7; margin-top: 4px; }
+
+    .input-area { padding: 12px; background: #fff; border-top: 1px solid #ddd; }
+    .input-wrapper { display: flex; gap: 8px; }
+    .input-wrapper input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; }
+    .input-wrapper button { padding: 8px 16px; background: #075E54; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .input-wrapper button:hover { background: #054C3F; }
+
+    .action-buttons { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .action-buttons button { flex: 1; min-width: 100px; padding: 6px; font-size: 12px; background: #2196F3; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+    .action-buttons button:hover { background: #1976D2; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="sidebar">
+      <div class="header">
+        <div>
+          <h1><%= sdr.toUpperCase() %></h1>
+          <div class="status">Painel de Conversas</div>
+        </div>
+        <form method="POST" action="/logout"><button type="submit">Sair</button></form>
+      </div>
+
+      <div class="sessions">
+        <% sessions.forEach(function(s) { %>
+          <div class="session-badge <%= s.status !== 'connected' ? 'disconnected' : '' %>">
+            <%= s.phone_number %><br><%= s.status %>
+          </div>
+        <% }); %>
+      </div>
+
+      <div class="conversations-list">
+        <% conversations.forEach(function(c) { %>
+          <div class="conversation-item" onclick="loadConversation('<%= c.conversation_id %>')">
+            <div class="name"><%= c.client_name %></div>
+            <div class="preview"><%= c.client_phone %></div>
+            <div class="meta"><%= c.message_count %> msgs | <%= c.call_count %> calls</div>
+            <% if (c.script_adherence) { %>
+              <div class="meta" style="color: <%= c.script_adherence >= 80 ? '#4CAF50' : '#ff9800' %>">
+                <%= Math.round(c.script_adherence) %>% conformidade
+              </div>
+            <% } %>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="header">
+        <div>
+          <h1 id="conv-name">Selecione uma conversa</h1>
+          <div class="status" id="conv-info"></div>
+        </div>
+      </div>
+
+      <div id="messages" class="messages">
+        <div style="text-align: center; color: #999;">Selecione uma conversa para ver as mensagens</div>
+      </div>
+
+      <div class="input-area">
+        <div class="input-wrapper">
+          <input type="text" id="message-input" placeholder="Digite sua mensagem...">
+          <button onclick="sendMessage()">Enviar</button>
+          <button onclick="prepareCall()" style="background: #FF9800;">Ligar</button>
+        </div>
+        <div class="action-buttons">
+          <button onclick="addLabel('Harmonizacao')">Harmonizacao</button>
+          <button onclick="addLabel('Interessado')">Interessado</button>
+          <button onclick="addLabel('Marcou Retorno')">Marcou Retorno</button>
+          <button onclick="addLabel('Urgente')">Urgente</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentConversation = null;
+
+    async function loadConversation(convId) {
+      currentConversation = convId;
+      const response = await fetch(`/api/conversation/${convId}`);
+      const data = await response.json();
+      if (!response.ok) { alert(data.error || 'Erro ao carregar conversa'); return; }
+
+      document.getElementById('conv-name').textContent = data.conversation.client_name;
+      document.getElementById('conv-info').textContent = `${data.conversation.client_phone} | R$ ${data.conversation.pipedrive_value || 'N/A'}`;
+
+      const messagesDiv = document.getElementById('messages');
+      messagesDiv.innerHTML = '';
+
+      data.messages.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.direction === 'inbound' ? 'in' : 'out'}`;
+        const textEl = document.createElement('div');
+        textEl.textContent = msg.text;
+        const timeEl = document.createElement('div');
+        timeEl.className = 'time';
+        timeEl.textContent = new Date(msg.timestamp).toLocaleTimeString('pt-BR');
+        div.appendChild(textEl);
+        div.appendChild(timeEl);
+        messagesDiv.appendChild(div);
+      });
+
+      data.calls.forEach(call => {
+        const div = document.createElement('div');
+        div.style.textAlign = 'center';
+        div.style.color = '#999';
+        div.style.margin = '8px 0';
+        div.textContent = `Chamada ${call.status} - ${call.duration_seconds}s`;
+        messagesDiv.appendChild(div);
+      });
+
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('message-input');
+      const text = input.value;
+      if (!text || !currentConversation) return;
+
+      const response = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: currentConversation, text })
+      });
+      if (!response.ok) { const d = await response.json(); alert(d.error || 'Erro ao enviar'); return; }
+
+      input.value = '';
+      loadConversation(currentConversation);
+    }
+
+    async function prepareCall() {
+      if (!currentConversation) return;
+
+      const response = await fetch('/api/prepare-call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: currentConversation })
+      });
+
+      const data = await response.json();
+      if (!response.ok) { alert(data.error || 'Erro ao preparar ligacao'); return; }
+      alert(`${data.instruction}\nDiscar: ${data.dial}\nDe: ${data.from}`);
+    }
+
+    async function addLabel(label) {
+      if (!currentConversation) return;
+
+      const response = await fetch('/api/add-label', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId: currentConversation, label })
+      });
+      const data = await response.json();
+      if (!response.ok) { alert(data.error || 'Erro ao adicionar label'); return; }
+      alert(`Label "${label}" adicionada!`);
+    }
+  </script>
+</body>
+</html>
