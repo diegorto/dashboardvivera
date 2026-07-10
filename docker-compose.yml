@@ -17,25 +17,9 @@ services:
       - traefik.http.routers.vivera-fotos.tls.certresolver=mytlschallenge
       - traefik.http.services.vivera-fotos.loadbalancer.server.port=4000
 
-  whatsapp-db:
-    image: mariadb:11
-    restart: always
-    environment:
-      MARIADB_DATABASE: vivera_whatsapp
-      MARIADB_USER: whatsapp_monitor
-      MARIADB_PASSWORD: ${WHATSAPP_DB_PASSWORD}
-      MARIADB_RANDOM_ROOT_PASSWORD: "yes"
-    volumes:
-      - ./whatsapp-monitor/db-data:/var/lib/mysql
-      - ./whatsapp-monitor/sql:/docker-entrypoint-initdb.d:ro
-    networks:
-      - n8n_default
-
   whatsapp-monitor:
     build: ./whatsapp-monitor
     restart: always
-    depends_on:
-      - whatsapp-db
     env_file:
       - ./whatsapp-monitor/.env
     volumes:

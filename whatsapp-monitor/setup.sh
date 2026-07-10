@@ -1,123 +1,82 @@
 #!/usr/bin/env bash
-# Automatiza o setup do whatsapp-monitor: gera todos os segredos, escreve o .env,
-# sobe o banco (MariaDB em container, schema aplicado automaticamente) e o app,
-# e tenta mapear Helenice/Agda pros IDs de usuario delas no Pipedrive.
+# Preenche os campos que ainda faltam no whatsapp-monitor/.env (SESSION_SECRET,
+# senhas dos SDRs, N8N_WEBHOOK, PIPEDRIVE_TOKEN reaproveitado da raiz do repo)
+# sem mexer em nada que ja esteja preenchido (ex: DB_* que outra sessao ja configurou).
 #
-# Uso: bash whatsapp-monitor/setup.sh   (a partir da raiz do repo, ou de dentro de whatsapp-monitor/)
+# Uso: bash whatsapp-monitor/setup.sh
 set -euo pipefail
 cd "$(dirname "$0")"
 
-ROOT_ENV="../.env"
 WM_ENV=".env"
+ROOT_ENV="../.env"
 N8N_WEBHOOK_VALUE="https://n8n.srv1522176.hstgr.cloud/webhook/whatsapp-script-analysis"
 
-echo "== whatsapp-monitor: setup automatico =="
+touch "$WM_ENV"
 
-if [ -f "$WM_ENV" ]; then
-  echo "$WM_ENV ja existe - nao vou sobrescrever pra nao perder segredos ja gerados."
-  echo "Apague $(pwd)/$WM_ENV manualmente se quiser gerar tudo de novo."
-  exit 1
-fi
-
-# reaproveita o token do Pipedrive que o resto do projeto ja usa, se existir
-PIPEDRIVE_TOKEN_VALUE=""
-if [ -f "$ROOT_ENV" ]; then
-  PIPEDRIVE_TOKEN_VALUE=$(grep -m1 '^PIPEDRIVE_TOKEN=' "$ROOT_ENV" | cut -d= -f2- || true)
-fi
-
-SESSION_SECRET_VALUE=$(openssl rand -hex 32)
-DB_PASSWORD_VALUE=$(openssl rand -hex 20)
-SDR_PASSWORD_HELENICE_VALUE=$(openssl rand -hex 6)
-SDR_PASSWORD_AGDA_VALUE=$(openssl rand -hex 6)
-
-cat > "$WM_ENV" <<EOF
-PORT=4001
-
-DB_HOST=whatsapp-db
-DB_USER=whatsapp_monitor
-DB_PASSWORD=$DB_PASSWORD_VALUE
-DB_NAME=vivera_whatsapp
-
-PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN_VALUE
-
-N8N_WEBHOOK=$N8N_WEBHOOK_VALUE
-
-SESSION_SECRET=$SESSION_SECRET_VALUE
-
-SDR_PASSWORD_HELENICE=$SDR_PASSWORD_HELENICE_VALUE
-SDR_PASSWORD_AGDA=$SDR_PASSWORD_AGDA_VALUE
-EOF
-chmod 600 "$WM_ENV"
-echo "Gerado $(pwd)/$WM_ENV"
-
-# docker-compose.yml (raiz do repo) le WHATSAPP_DB_PASSWORD do .env da raiz pra injetar no container do banco
-if [ ! -f "$ROOT_ENV" ] || ! grep -q '^WHATSAPP_DB_PASSWORD=' "$ROOT_ENV"; then
-  echo "WHATSAPP_DB_PASSWORD=$DB_PASSWORD_VALUE" >> "$ROOT_ENV"
-  echo "Adicionada WHATSAPP_DB_PASSWORD em $ROOT_ENV"
-fi
-
-if [ -z "$PIPEDRIVE_TOKEN_VALUE" ]; then
-  echo "ATENCAO: nao achei PIPEDRIVE_TOKEN em $ROOT_ENV - a sincronizacao com o Pipedrive vai ficar inativa ate voce preencher isso em $WM_ENV"
-fi
-
-echo
-echo "Subindo whatsapp-db e whatsapp-monitor..."
-cd ..
-docker compose up -d --build whatsapp-db whatsapp-monitor
-
-echo "Aguardando o banco ficar pronto..."
-DB_READY=""
-for i in $(seq 1 30); do
-  if docker compose exec -T -e MYSQL_PWD="$DB_PASSWORD_VALUE" whatsapp-db \
-      mysqladmin ping -u whatsapp_monitor --silent >/dev/null 2>&1; then
-    DB_READY=1
-    break
-  fi
-  sleep 2
-done
-[ -n "$DB_READY" ] && echo "Banco pronto." || echo "Banco demorou mais que o esperado - confira 'docker compose logs whatsapp-db' se algo falhar."
-
-if [ -n "$PIPEDRIVE_TOKEN_VALUE" ] && command -v python3 >/dev/null 2>&1; then
-  echo
-  echo "Tentando mapear automaticamente Helenice/Agda pros usuarios do Pipedrive..."
-  USERS_JSON=$(curl -sS "https://api.pipedrive.com/v1/users?api_token=$PIPEDRIVE_TOKEN_VALUE" || true)
-  for pair in "helenice:Helenice" "agda:Agda"; do
-    key="${pair%%:*}"
-    label="${pair##*:}"
-    user_id=$(echo "$USERS_JSON" | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    for u in (data.get('data') or []):
-        if '$key' in (u.get('name') or '').lower():
-            print(u['id'])
-            break
-except Exception:
-    pass
-" 2>/dev/null || true)
-    if [ -n "$user_id" ]; then
-      docker compose exec -T -e MYSQL_PWD="$DB_PASSWORD_VALUE" whatsapp-db \
-        mysql -u whatsapp_monitor vivera_whatsapp -e \
-        "INSERT IGNORE INTO pipedrive_users_mapping (pipedrive_user_id, pipedrive_user_name, sdr_name) VALUES ('$user_id', '$label', '$key');"
-      echo "  $label -> usuario Pipedrive $user_id (mapeado)"
-    else
-      echo "  Nao achei usuario do Pipedrive com nome parecido com '$label' - mapeie manualmente na tabela pipedrive_users_mapping."
+# preenche KEY= (vazio) ou adiciona KEY=valor se a linha nem existir; nunca sobrescreve valor ja preenchido
+set_if_blank() {
+  local key="$1" value="$2"
+  if grep -q "^${key}=" "$WM_ENV"; then
+    local current
+    current=$(grep "^${key}=" "$WM_ENV" | head -1 | cut -d= -f2-)
+    if [ -z "$current" ]; then
+      local tmp
+      tmp=$(mktemp)
+      awk -v k="$key" -v v="$value" -F= 'BEGIN{OFS="="} $1==k && $2=="" {$0=k"="v} {print}' "$WM_ENV" > "$tmp"
+      mv "$tmp" "$WM_ENV"
+      echo "Preenchido $key"
     fi
-  done
-else
-  echo "Pulando mapeamento automatico do Pipedrive (falta PIPEDRIVE_TOKEN ou python3) - preencher pipedrive_users_mapping manualmente."
+  else
+    echo "${key}=${value}" >> "$WM_ENV"
+    echo "Adicionado $key"
+  fi
+}
+
+set_if_blank PORT 4001
+set_if_blank DB_PORT 3306
+set_if_blank SESSION_SECRET "$(openssl rand -hex 32)"
+set_if_blank SDR_PASSWORD_HELENICE "$(openssl rand -hex 6)"
+set_if_blank SDR_PASSWORD_AGDA "$(openssl rand -hex 6)"
+set_if_blank N8N_WEBHOOK "$N8N_WEBHOOK_VALUE"
+
+# reaproveita o PIPEDRIVE_TOKEN da raiz do repo, so se ainda estiver vazio aqui
+if [ -f "$ROOT_ENV" ]; then
+  ROOT_TOKEN=$(grep -m1 '^PIPEDRIVE_TOKEN=' "$ROOT_ENV" | cut -d= -f2- || true)
+  [ -n "$ROOT_TOKEN" ] && set_if_blank PIPEDRIVE_TOKEN "$ROOT_TOKEN"
 fi
 
-SERVER_IP=$(curl -s --max-time 3 ifconfig.me 2>/dev/null || echo "SEU_IP")
+chmod 600 "$WM_ENV"
 
 echo
-echo "=================================================="
-echo "PRONTO."
-echo "Painel: http://$SERVER_IP:4001/login"
-echo "Login Helenice -> senha: $SDR_PASSWORD_HELENICE_VALUE"
-echo "Login Agda     -> senha: $SDR_PASSWORD_AGDA_VALUE"
-echo "(essas senhas tambem estao salvas em whatsapp-monitor/.env)"
+echo "Conteudo atual de $WM_ENV (valores mascarados, so pra conferir o que ficou vazio):"
+sed -E 's/^([A-Z_]+)=(.+)$/\1=***/; s/^([A-Z_]+)=$/\1=(vazio!)/' "$WM_ENV"
+
+# valida se o host do banco configurado e alcancavel - o erro mais comum aqui e
+# usar o nome do container Docker (ex: vivera-mysql) enquanto a app roda direto
+# no host via "npm start": nesse caso o nome do container so resolve de DENTRO
+# da rede Docker, e o DB_HOST certo pra rodar fora do Docker e 127.0.0.1
+DB_HOST_VALUE=$(grep -m1 '^DB_HOST=' "$WM_ENV" | cut -d= -f2- || true)
+DB_PORT_VALUE=$(grep -m1 '^DB_PORT=' "$WM_ENV" | cut -d= -f2- || echo 3306)
+if [ -n "$DB_HOST_VALUE" ] && command -v node >/dev/null 2>&1; then
+  if ! node -e "
+const net = require('net');
+const s = net.createConnection({ host: process.argv[1], port: Number(process.argv[2]), timeout: 3000 });
+s.on('connect', () => { s.destroy(); process.exit(0); });
+s.on('error', () => process.exit(1));
+s.on('timeout', () => process.exit(1));
+" "$DB_HOST_VALUE" "$DB_PORT_VALUE"; then
+    echo
+    echo "ATENCAO: nao consegui abrir conexao TCP com DB_HOST=$DB_HOST_VALUE:$DB_PORT_VALUE a partir daqui."
+    echo "Se voce vai rodar com 'npm start' direto no host (fora de Docker), troque"
+    echo "DB_HOST=$DB_HOST_VALUE por DB_HOST=127.0.0.1 no $WM_ENV (o nome do container"
+    echo "so resolve de dentro da rede Docker)."
+  else
+    echo
+    echo "Conexao TCP com DB_HOST=$DB_HOST_VALUE:$DB_PORT_VALUE OK."
+  fi
+fi
+
 echo
-echo "Unico passo manual que sobra: abrir o painel, entrar em cada sessao"
-echo "e escanear o QR code com o WhatsApp de cada numero (isso nao da pra automatizar)."
-echo "=================================================="
+echo "Falta so voce rodar a aplicacao:"
+echo "  cd $(pwd) && npm install && npm start"
+echo "(ou, se preferir manter rodando apos fechar o terminal: npx pm2 start server.js --name whatsapp-monitor)"

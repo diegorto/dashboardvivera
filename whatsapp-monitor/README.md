@@ -23,30 +23,48 @@ padrao do `vivera-fotos`.
   do dela. A discagem em si e manual - Baileys nao consegue iniciar uma
   chamada de voz, so recebe eventos de chamada.
 
-## Setup no servidor (automatico)
+## Setup no servidor
 
-O banco (MariaDB) roda como container proprio (`whatsapp-db` no
-`docker-compose.yml`), com o schema em `sql/schema.sql` aplicado sozinho no
-primeiro start - nao precisa de MySQL/senha de root pre-existente na VPS.
+O MySQL e responsabilidade externa (reaproveita um container/instancia que ja
+exista, ex: `vivera-mysql`) - rode `sql/schema.sql` nele uma vez e preencha
+`DB_HOST`/`DB_PORT`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` no `.env`.
 
 ```bash
 cd whatsapp-monitor
 bash setup.sh
 ```
 
-Isso gera `SESSION_SECRET` e as senhas de login de cada SDR aleatoriamente,
-reaproveita o `PIPEDRIVE_TOKEN` que ja esta no `.env` da raiz do repo, ja
-deixa `N8N_WEBHOOK` configurado, sobe `whatsapp-db` + `whatsapp-monitor` via
-docker compose e tenta mapear Helenice/Agda pros IDs de usuario delas no
-Pipedrive automaticamente. No final imprime a URL do painel e a senha de
-login de cada uma.
+`setup.sh` **nao mexe em nada que voce ja tiver preenchido** - so completa o
+que estiver faltando: gera `SESSION_SECRET` e as senhas de login de cada SDR
+aleatoriamente, reaproveita o `PIPEDRIVE_TOKEN` que ja esta no `.env` da raiz
+do repo, ja deixa `N8N_WEBHOOK` configurado, e testa se `DB_HOST` esta
+alcancavel a partir de onde o script roda (o erro mais comum aqui: usar o
+nome do container Docker do MySQL como `DB_HOST` enquanto a app roda via
+`npm start` direto no host - nesse caso o nome do container so resolve de
+dentro da rede Docker, o certo e `DB_HOST=127.0.0.1` com a porta publicada
+pro host).
 
-O unico passo que não dá pra automatizar: abrir `http://<ip-da-vps>:4001/login`,
-entrar em cada sessão com a senha impressa pelo script e escanear o QR code
-com o WhatsApp do número correspondente.
+Depois disso, sobe a aplicacao:
+```bash
+npm install && npm start
+# ou, pra continuar rodando depois de fechar o terminal:
+npx pm2 start server.js --name whatsapp-monitor
+```
 
-Se o mapeamento automático do Pipedrive não achar os usuários (nomes
-diferentes de "Helenice"/"Agda" no Pipedrive), preenche manualmente:
+Ou, se preferir rodar em container (mesmo padrao do `vivera-fotos`, com
+restart automatico e Traefik prontos no `docker-compose.yml` da raiz):
+```bash
+docker compose up -d --build whatsapp-monitor
+```
+Nesse caso `DB_HOST` só resolve pelo nome do container se `vivera-mysql`
+estiver na mesma rede Docker (`n8n_default`) que o `whatsapp-monitor`.
+
+O unico passo que não dá pra automatizar de jeito nenhum: abrir
+`http://<ip-da-vps>:4001/login`, entrar em cada sessão com a senha gerada
+pelo `setup.sh` e escanear o QR code com o WhatsApp do número correspondente.
+
+Se o mapeamento automático do Pipedrive não achar os usuários certos,
+preenche manualmente:
 ```sql
 INSERT INTO pipedrive_users_mapping (pipedrive_user_id, pipedrive_user_name, sdr_name)
 VALUES ('123456', 'Helenice', 'helenice'), ('789012', 'Agda', 'agda');
@@ -63,8 +81,7 @@ Se quiser o domínio bonito com TLS em vez de `IP:4001`, o
 subdomínio que preferir).
 
 O volume `./whatsapp-monitor/auth` guarda as credenciais das sessões Baileys
-entre restarts - não apagar. `./whatsapp-monitor/db-data` guarda os dados do
-MariaDB - idem.
+entre restarts - não apagar.
 
 ## Rotas
 
