@@ -21,6 +21,7 @@ try {
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Credenciais (carregadas do .env, nao ficam hardcoded no codigo)
 const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
