@@ -759,8 +759,9 @@ function buildPatients(deals) {
       tempoAteFechar = Math.round((new Date(deal.wonDate) - new Date(deal.addDate)) / 86400000);
     }
     let tempoOrcamentoVenda = null;
-    if (deal.wonDate && deal.dataComparecimento) {
-      tempoOrcamentoVenda = Math.round((new Date(deal.wonDate) - new Date(deal.dataComparecimento)) / 86400000);
+    const dataBase = deal.dataComparecimento || deal.addDate;
+    if (deal.wonDate && dataBase) {
+      tempoOrcamentoVenda = Math.round((new Date(deal.wonDate) - new Date(dataBase)) / 86400000);
     }
     const closers = closerNames(deal);
     return {
