@@ -47,3 +47,16 @@ export async function applyTintimSuggestion(payload: ApplyTintimSuggestionPayloa
   const json = await res.json()
   if (!json.success) throw new Error(json.error || 'Erro ao atualizar o Pipedrive')
 }
+
+export interface AdPreviewResponse {
+  success: boolean
+  format?: string
+  html?: string
+  error?: string
+}
+
+export async function fetchAdPreview(adId: string, format?: string): Promise<AdPreviewResponse> {
+  const qs = format ? `?format=${encodeURIComponent(format)}` : ''
+  const res = await fetch(`/api/ad-preview/${adId}${qs}`)
+  return res.json() as Promise<AdPreviewResponse>
+}

@@ -1080,6 +1080,40 @@ app.post('/api/tintim-audit/apply', async (req, res) => {
   }
 });
 
+// Previa do anuncio sob demanda (edge /previews da Graph API). O iframe que a Meta
+// devolve vale 24h, mas como e gerado a cada clique, na pratica nunca expira - e
+// permite ver o criativo dentro do dashboard sem login no Facebook nem acesso ao BM.
+const AD_PREVIEW_FORMATS = new Set([
+  'MOBILE_FEED_STANDARD',
+  'DESKTOP_FEED_STANDARD',
+  'INSTAGRAM_STANDARD',
+  'INSTAGRAM_STORY'
+]);
+
+app.get('/api/ad-preview/:adId', async (req, res) => {
+  const { adId } = req.params;
+  if (!/^\d+$/.test(adId)) {
+    return res.status(400).json({ success: false, error: 'adId invalido' });
+  }
+  const format = AD_PREVIEW_FORMATS.has(req.query.format) ? req.query.format : 'MOBILE_FEED_STANDARD';
+
+  try {
+    const response = await axios.get(`https://graph.facebook.com/v18.0/${adId}/previews`, {
+      params: { access_token: FB_ACCESS_TOKEN, ad_format: format },
+      timeout: 15000
+    });
+    const body = response.data.data && response.data.data[0] && response.data.data[0].body;
+    if (!body) {
+      return res.json({ success: false, error: 'A Meta nao retornou previa pra esse anuncio.' });
+    }
+    res.json({ success: true, format, html: body });
+  } catch (error) {
+    const metaErr = error.response && error.response.data && error.response.data.error;
+    console.error(`Erro ao gerar previa do ad ${adId}:`, JSON.stringify(metaErr || error.message));
+    res.json({ success: false, error: (metaErr && metaErr.message) || 'Erro ao gerar previa na Meta.' });
+  }
+});
+
 // Servir o frontend React buildado (web/dist). Fallback pra SPA em qualquer rota nao-API.
 const WEB_DIST = path.join(__dirname, 'web', 'dist');
 if (fs.existsSync(WEB_DIST)) {

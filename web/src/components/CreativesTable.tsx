@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Eye } from 'lucide-react'
+import { AdPreviewModal } from '@/components/AdPreviewModal'
 import { Table, TableHeader, TableBody, TableRow, TableCell } from '@/components/ui/table'
 import { SortHeader } from '@/components/SortHeader'
 import { StatusPill } from '@/components/StatusPill'
@@ -12,6 +13,7 @@ export function CreativesTable({
   rows, searchable = false, defaultSortKey = 'receita',
 }: { rows: Creative[]; searchable?: boolean; defaultSortKey?: keyof Creative }) {
   const [search, setSearch] = useState('')
+  const [preview, setPreview] = useState<Creative | null>(null)
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows
@@ -72,18 +74,35 @@ export function CreativesTable({
               <TableCell><Sparkline data={c.trend} direction={c.trendDirection} /></TableCell>
               <TableCell><StatusPill status={c.status} /></TableCell>
               <TableCell>
-                {c.adUrl ? (
-                  <a href={c.adUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
-                    Ver anúncio <ExternalLink className="h-3 w-3" />
-                  </a>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
+                <div className="flex items-center gap-2 whitespace-nowrap">
+                  {c.adId && (
+                    <button
+                      onClick={() => setPreview(c)}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                    >
+                      <Eye className="h-3 w-3" /> Prévia
+                    </button>
+                  )}
+                  {c.adUrl && (
+                    <a href={c.adUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline">
+                      Ver anúncio <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  {!c.adId && !c.adUrl && <span className="text-xs text-muted-foreground">—</span>}
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      {preview && preview.adId && (
+        <AdPreviewModal
+          adId={preview.adId}
+          adName={preview.anuncio}
+          adUrl={preview.adUrl}
+          onClose={() => setPreview(null)}
+        />
+      )}
     </div>
   )
 }
