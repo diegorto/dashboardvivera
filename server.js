@@ -650,6 +650,48 @@ if (global.remoteControl) {
   global.remoteControl.setupRemoteControl(app);
 }
 
+// Webhook para auto-update via GitHub
+app.post('/webhook/github-deploy', async (req, res) => {
+  try {
+    const { ref } = req.body;
+    const branch = ref ? ref.split('/').pop() : '';
+
+    if (branch !== 'claude/meta-pipe-api-integration-luq1ht') {
+      return res.json({ message: 'Branch ignorada' });
+    }
+
+    console.log('🚀 Webhook acionado - Iniciando deploy...');
+
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+
+    try {
+      console.log('📥 Git pull...');
+      await execPromise('cd /root/dashboardvivera && git pull origin claude/meta-pipe-api-integration-luq1ht');
+
+      console.log('🔄 PM2 restart...');
+      await execPromise('pm2 restart dashboard 2>/dev/null || pm2 start ecosystem.config.js');
+
+      console.log('✅ Deploy concluído!');
+      res.json({
+        success: true,
+        message: 'Deploy realizado com sucesso',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('❌ Erro durante deploy:', error.message);
+      res.json({
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   // Iniciar automação
