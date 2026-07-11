@@ -272,6 +272,21 @@ export interface TintimAuditResponse {
   error?: string
 }
 
+export interface LeadSourceStat {
+  leads: number
+  receita: number
+  cpl?: number | null
+  investimento?: number | null
+}
+
+export interface LeadSources {
+  total: LeadSourceStat
+  google: LeadSourceStat
+  meta: LeadSourceStat
+  indicacao: LeadSourceStat
+  outros: LeadSourceStat
+}
+
 export interface DashboardResponse {
   success: boolean
   range: { since: string; until: string }
@@ -286,6 +301,7 @@ export interface DashboardResponse {
   revenueAtRiskRange: { since: string; until: string }
   insights: Insight[]
   leadsSemOrigem: LeadSemOrigem[]
+  leadSources: LeadSources
   recepcao: Recepcao
   faturamentoTotal: Metric
   meta: { adsAccounts: number; totalAdsComGasto: number; totalDealsNoPeriodo: number }

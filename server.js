@@ -508,6 +508,42 @@ function isMetaAttributed(deal) {
   return !!deal.campanha;
 }
 
+// Classifica a fonte do lead pelos campos Origem/Plataforma do Pipedrive.
+// Origem tem prioridade sobre a inferencia por campanha preenchida.
+function classifyLeadSource(deal) {
+  const txt = `${deal.origem || ''} ${deal.plataforma || ''}`.toLowerCase();
+  if (/google|adwords|pesquisa/.test(txt)) return 'google';
+  if (/indica/.test(txt)) return 'indicacao';
+  if (/meta|instagram|facebook|whatsapp/.test(txt)) return 'meta';
+  if (deal.campanha) return 'meta'; // trafego pago rastreado (hoje so Meta preenche campanha)
+  return 'outros';
+}
+
+function buildLeadSources(deals, ads) {
+  const investimentoMeta = ads.reduce((s, a) => s + a.spend, 0);
+  const mk = () => ({ leads: 0, receita: 0 });
+  const bySource = { google: mk(), meta: mk(), indicacao: mk(), outros: mk() };
+  let receitaTotal = 0;
+  deals.forEach(d => {
+    const src = bySource[classifyLeadSource(d)];
+    src.leads++;
+    if (d.status === 'won') { src.receita += d.value || 0; receitaTotal += d.value || 0; }
+  });
+  return {
+    total: { leads: deals.length, receita: round2(receitaTotal) },
+    // CPL do Google fica null: nao ha integracao com Google Ads (sem dado de investimento).
+    google: { leads: bySource.google.leads, receita: round2(bySource.google.receita), cpl: null, investimento: null },
+    meta: {
+      leads: bySource.meta.leads,
+      receita: round2(bySource.meta.receita),
+      cpl: bySource.meta.leads > 0 && investimentoMeta > 0 ? round2(investimentoMeta / bySource.meta.leads) : null,
+      investimento: round2(investimentoMeta)
+    },
+    indicacao: { leads: bySource.indicacao.leads, receita: round2(bySource.indicacao.receita) },
+    outros: { leads: bySource.outros.leads, receita: round2(bySource.outros.receita) }
+  };
+}
+
 function buildCreatives(ads, deals) {
   const map = {};
 
@@ -1170,6 +1206,7 @@ app.get('/api/dashboard', async (req, res) => {
     const governance = buildGovernance(deals);
     const insights = buildInsights(creatives, funnel, governance, pipeline);
     const leadsSemOrigem = buildLeadsSemOrigem(deals);
+    const leadSources = buildLeadSources(deals, currentAds);
 
     // "Oportunidades Paradas" usa uma janela fixa de 3 meses, independente do filtro de
     // data selecionado - negocio parado importa mesmo que o usuario esteja olhando "Mes atual".
@@ -1197,6 +1234,7 @@ app.get('/api/dashboard', async (req, res) => {
       success: true,
       range, previousRange: prevRange,
       kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
+      leadSources,
       revenueAtRiskRange,
       ticketMedio3M: round2(ticketMedio3M),
       recepcao: { kpis: recepcaoKpis, fechamentos: fechamentosRecepcao },
