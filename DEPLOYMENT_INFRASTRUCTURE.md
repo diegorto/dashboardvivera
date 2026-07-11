@@ -65,6 +65,21 @@ Regras do procedimento:
 - **Instruções numeradas passo a passo** para o Diego, sem pular etapa
 - Quando a API do Pipedrive voltar (cota renova ~4h da manhã), PULAR o passo do `cp` do demo e deixar o cache real ser recriado
 
+### 📌 FORMATO OBRIGATÓRIO das instruções pro Diego (PADRÃO FIXO — nunca mudar)
+Cada passo numerado em negrito (**1.**, **2.**, ...) com o comando SOZINHO dentro do próprio bloco de código, um bloco por passo. NUNCA compactar em lista corrida ou juntar comandos na mesma linha. Exemplo do formato correto:
+
+    **1.** Terminal novo:
+    ```
+    cd /home/user/dashboardvivera
+    ```
+
+    **2.**
+    ```
+    rm -f data/deals-cache.json
+    ```
+
+    (... e assim por diante até o passo 8, terminando com a URL pra abrir no navegador e o que verificar)
+
 ### ⚠️ REGRA CRÍTICA: FRONTEND PRECISA DE BUILD
 O servidor entrega o frontend **buildado** de `web/dist`. Mudanças em `web/src/**` NÃO aparecem só com git pull + restart.
 **Todo deploy com mudança de frontend = 3 passos obrigatórios:**
