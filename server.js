@@ -425,7 +425,8 @@ function getDataComparecimento(deal, flowEvents) {
       const newStageId = parseInt(e.data.new_value);
       const rank = STAGE_RANK[newStageId];
       if (rank !== undefined && rank >= 4) {
-        return e.log_time ? e.log_time.slice(0, 10) : null;
+        const logTime = e.data.log_time || e.timestamp;
+        return logTime ? logTime.slice(0, 10) : null;
       }
     }
   }
