@@ -844,62 +844,6 @@
       </div>
     </div>
 
-    <!-- INDICADORES KPI -->
-    <div class="race-section" id="indicatorsKPI" style="margin-top: 60px;">
-      <div class="race-title">📊 Indicadores do Mês</div>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
-          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">⏱️ TEMPO FECHAMENTO (Lead Entry)</div>
-          <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 8px;">
-            <span id="avgClosingFromLeadCurrent">-</span>d
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <span id="avgClosingFromLeadChange">-</span>
-          </div>
-        </div>
-
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
-          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">⏱️ TEMPO FECHAMENTO (Avaliação)</div>
-          <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 8px;">
-            <span id="avgClosingFromEvalCurrent">-</span>d
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <span id="avgClosingFromEvalChange">-</span>
-          </div>
-        </div>
-
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
-          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">💰 CPL (Custo por Lead)</div>
-          <div style="font-size: 24px; font-weight: bold; color: #333; margin-bottom: 8px;">
-            R$ <span id="cplCurrent">-</span>
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <span id="cplChange">-</span>
-          </div>
-        </div>
-
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
-          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">📱 LEADS INSTAGRAM</div>
-          <div style="font-size: 24px; font-weight: bold; color: #E4405F; margin-bottom: 8px;">
-            <span id="instagramLeadsCurrent">-</span>
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <span id="instagramLeadsChange">-</span>
-          </div>
-        </div>
-
-        <div style="background: #f5f5f5; padding: 20px; border-radius: 8px;">
-          <div style="color: #999; font-size: 12px; margin-bottom: 10px;">🔍 LEADS GOOGLE</div>
-          <div style="font-size: 24px; font-weight: bold; color: #4285F4; margin-bottom: 8px;">
-            <span id="googleLeadsCurrent">-</span>
-          </div>
-          <div style="font-size: 12px; color: #666;">
-            <span id="googleLeadsChange">-</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- GRÁFICOS DE EVOLUÇÃO -->
     <div class="race-section">
       <div class="race-title">📱 Evolução - Ligações Realizadas</div>
@@ -1179,6 +1123,32 @@
       </div>
     </div>
 
+    <!-- INDICADORES KPI - TEMPO DE FECHAMENTO -->
+    <div class="race-section" id="indicatorsKPI" style="margin-top: 60px;">
+      <div class="race-title">📊 Indicadores de Tempo de Fechamento</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div style="background: #fff; padding: 20px; border-radius: 8px; border: 2px solid #dd0000;">
+          <div style="color: #999; font-size: 12px; margin-bottom: 10px; font-weight: bold;">⏱️ TEMPO LEAD → FECHAMENTO</div>
+          <div style="font-size: 28px; font-weight: bold; color: #dd0000; margin-bottom: 8px;">
+            <span id="avgClosingFromLeadCurrent">-</span> dias
+          </div>
+          <div style="font-size: 12px; color: #666;">
+            Variação: <span id="avgClosingFromLeadChange">-</span>
+          </div>
+        </div>
+
+        <div style="background: #fff; padding: 20px; border-radius: 8px; border: 2px solid #dd0000;">
+          <div style="color: #999; font-size: 12px; margin-bottom: 10px; font-weight: bold;">⏱️ TEMPO AVALIAÇÃO → FECHAMENTO</div>
+          <div style="font-size: 28px; font-weight: bold; color: #dd0000; margin-bottom: 8px;">
+            <span id="avgClosingFromEvalCurrent">-</span> dias
+          </div>
+          <div style="font-size: 12px; color: #666;">
+            Variação: <span id="avgClosingFromEvalChange">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- DIVISOR VISUAL -->
     <div style="height: 2px; background: linear-gradient(90deg, #dd0000, transparent); margin: 60px 0;"></div>
 
@@ -1219,7 +1189,7 @@
 <script>
 // Token será injetado pelo servidor via window.PIPEDRIVE_API_TOKEN
 const API_TOKEN = window.PIPEDRIVE_API_TOKEN || '';
-const BASE = '/api/pipedrive';
+const BASE = 'https://api.pipedrive.com/v1';
 
 const PHOTOS = {
   'Agda': 'https://viveraorofacial.com.br/wp-content/uploads/2026/07/ChatGPT-Image-4-de-jul.-de-2026-18_10_44.png',
@@ -1229,7 +1199,6 @@ const PHOTOS = {
 
 const CRC_FIELD = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
 const CRC_ID = 114;
-const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a'; // Campo para rastrear Instagram vs Google
 const AGENDAMENTO_STAGE = 4;
 const COMPARECIMENTO_STAGE = 5;
 const JESSICA_TAG = 'jessica';
@@ -1377,7 +1346,8 @@ function getMonthData(deals, activities) {
 }
 
 async function fetchAPI(endpoint, params = {}) {
-  const url = new URL(BASE + endpoint, window.location.origin);
+  const url = new URL(BASE + endpoint);
+  url.searchParams.set('api_token', API_TOKEN);
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
   const res = await fetch(url.toString());
@@ -1423,7 +1393,6 @@ function calcAvgClosingTimeFromLead(wonDeals) {
 }
 
 // Calcula tempo médio de fechamento (desde avaliação até fechar)
-// Usa o first_stage_change_time (primeira mudança de stage) como proxy para avaliação
 function calcAvgClosingTimeFromEvaluation(wonDeals) {
   if (wonDeals.length === 0) return 0;
   const times = wonDeals
@@ -1483,16 +1452,6 @@ function calcMetrics(deals, activities, dates) {
   const crc = dealsPeriod.filter(d => d[CRC_FIELD] === CRC_ID).length;
   const leads = dealsPeriod.length;
 
-  // Contar leads por plataforma (Instagram vs Google)
-  const instagramLeads = dealsPeriod.filter(d => {
-    const plat = String(d[FIELD_PLATAFORMA] || '').toLowerCase();
-    return plat.includes('instagram') || plat.includes('meta');
-  }).length;
-  const googleLeads = dealsPeriod.filter(d => {
-    const plat = String(d[FIELD_PLATAFORMA] || '').toLowerCase();
-    return plat.includes('google');
-  }).length;
-
   const agd = deals.filter(d =>
     d.stage_id === AGENDAMENTO_STAGE &&
     inRange(d, 'stage_change_time', dates.start, dates.end)
@@ -1514,11 +1473,14 @@ function calcMetrics(deals, activities, dates) {
   const avgClosingTimeFromLead = calcAvgClosingTimeFromLead(dealsWithoutJessica);
   const avgClosingTimeFromEvaluation = calcAvgClosingTimeFromEvaluation(dealsWithoutJessica);
 
-  return {
-    opp, closed, closedJessica, crc, agd, comp, leads, callAttempts, callSuccess,
-    avgClosingTimeFromLead, avgClosingTimeFromEvaluation,
-    instagramLeads, googleLeads
-  };
+  return { opp, closed, closedJessica, crc, agd, comp, leads, callAttempts, callSuccess, avgClosingTimeFromLead, avgClosingTimeFromEvaluation };
+}
+
+function formatChangePercent(pct) {
+  const isNegative = pct < 0;
+  const symbol = isNegative ? '↓' : '↑';
+  const color = isNegative ? '#4ade80' : '#ef4444'; // verde se diminui (bom), vermelho se aumenta (ruim)
+  return `<span style="color: ${color}; font-weight: bold;">${symbol} ${Math.abs(pct).toFixed(1)}%</span>`;
 }
 
 function renderData(agda, helenice) {
@@ -1542,6 +1504,25 @@ function renderData(agda, helenice) {
   };
 
   const metaMeasures = calcMetaMeasures();
+
+  // Atualizar indicadores KPI - Tempo de Fechamento
+  const currentMonthAvgFromLead = (agda.month.avgClosingTimeFromLead + helenice.month.avgClosingTimeFromLead) / 2;
+  const prevMonthAvgFromLead = (agda.prevMonth.avgClosingTimeFromLead + helenice.prevMonth.avgClosingTimeFromLead) / 2;
+  const changeFromLead = prevMonthAvgFromLead !== 0
+    ? ((currentMonthAvgFromLead - prevMonthAvgFromLead) / prevMonthAvgFromLead) * 100
+    : 0;
+
+  const currentMonthAvgFromEval = (agda.month.avgClosingTimeFromEvaluation + helenice.month.avgClosingTimeFromEvaluation) / 2;
+  const prevMonthAvgFromEval = (agda.prevMonth.avgClosingTimeFromEvaluation + helenice.prevMonth.avgClosingTimeFromEvaluation) / 2;
+  const changeFromEval = prevMonthAvgFromEval !== 0
+    ? ((currentMonthAvgFromEval - prevMonthAvgFromEval) / prevMonthAvgFromEval) * 100
+    : 0;
+
+  document.getElementById('avgClosingFromLeadCurrent').textContent = currentMonthAvgFromLead.toFixed(1);
+  document.getElementById('avgClosingFromLeadChange').innerHTML = formatChangePercent(changeFromLead);
+
+  document.getElementById('avgClosingFromEvalCurrent').textContent = currentMonthAvgFromEval.toFixed(1);
+  document.getElementById('avgClosingFromEvalChange').innerHTML = formatChangePercent(changeFromEval);
 
   Object.entries(labels).forEach(([key, label]) => {
     const periodType = periodTypes[key];
@@ -1576,58 +1557,6 @@ function renderData(agda, helenice) {
       document.getElementById(`comp${label}Meta`).textContent = META_GOALS[periodType].comparecimentos;
     }
   });
-
-  // Atualizar indicadores KPI - Tempo de Fechamento
-  const currentMonthAvgFromLead = (agda.month.avgClosingTimeFromLead + helenice.month.avgClosingTimeFromLead) / 2;
-  const prevMonthAvgFromLead = (agda.prevMonth.avgClosingTimeFromLead + helenice.prevMonth.avgClosingTimeFromLead) / 2;
-  const changeFromLead = prevMonthAvgFromLead !== 0
-    ? ((currentMonthAvgFromLead - prevMonthAvgFromLead) / prevMonthAvgFromLead) * 100
-    : 0;
-
-  const currentMonthAvgFromEval = (agda.month.avgClosingTimeFromEvaluation + helenice.month.avgClosingTimeFromEvaluation) / 2;
-  const prevMonthAvgFromEval = (agda.prevMonth.avgClosingTimeFromEvaluation + helenice.prevMonth.avgClosingTimeFromEvaluation) / 2;
-  const changeFromEval = prevMonthAvgFromEval !== 0
-    ? ((currentMonthAvgFromEval - prevMonthAvgFromEval) / prevMonthAvgFromEval) * 100
-    : 0;
-
-  // Contar Instagram e Google leads
-  const currentInstagramLeads = agda.month.instagramLeads + helenice.month.instagramLeads;
-  const prevInstagramLeads = agda.prevMonth.instagramLeads + helenice.prevMonth.instagramLeads;
-  const changeInstagram = prevInstagramLeads !== 0
-    ? ((currentInstagramLeads - prevInstagramLeads) / prevInstagramLeads) * 100
-    : 0;
-
-  const currentGoogleLeads = agda.month.googleLeads + helenice.month.googleLeads;
-  const prevGoogleLeads = agda.prevMonth.googleLeads + helenice.prevMonth.googleLeads;
-  const changeGoogle = prevGoogleLeads !== 0
-    ? ((currentGoogleLeads - prevGoogleLeads) / prevGoogleLeads) * 100
-    : 0;
-
-  function formatChangePercent(pct, isInverted = false) {
-    // isInverted: true para métricas onde diminuição é boa (ex: CPL, tempo)
-    // isInverted: false para métricas onde aumento é bom (ex: leads)
-    const isNegative = isInverted ? pct < 0 : pct > 0;
-    const symbol = isNegative ? '↑' : '↓';
-    const color = isNegative ? '#ef4444' : '#4ade80';
-    return `<span style="color: ${color};">${symbol} ${Math.abs(pct).toFixed(1)}%</span>`;
-  }
-
-  document.getElementById('avgClosingFromLeadCurrent').textContent = currentMonthAvgFromLead.toFixed(1);
-  document.getElementById('avgClosingFromLeadChange').innerHTML = formatChangePercent(changeFromLead, true);
-
-  document.getElementById('avgClosingFromEvalCurrent').textContent = currentMonthAvgFromEval.toFixed(1);
-  document.getElementById('avgClosingFromEvalChange').innerHTML = formatChangePercent(changeFromEval, true);
-
-  document.getElementById('instagramLeadsCurrent').textContent = currentInstagramLeads;
-  document.getElementById('instagramLeadsChange').innerHTML = formatChangePercent(changeInstagram, false);
-
-  document.getElementById('googleLeadsCurrent').textContent = currentGoogleLeads;
-  document.getElementById('googleLeadsChange').innerHTML = formatChangePercent(changeGoogle, false);
-
-  // CPL (Custo por Lead) - será preenchido com dados de investimento quando disponível
-  // Por enquanto, mostra "-" já que o investimento deve vir de uma fonte externa
-  document.getElementById('cplCurrent').textContent = '-';
-  document.getElementById('cplChange').textContent = '-';
 
   document.getElementById('setup').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';

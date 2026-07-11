@@ -236,47 +236,6 @@
 
         .details-section h3 { color: #667eea; margin-bottom: 12px; font-size: 14px; }
 
-        .section-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .section-header h3 { margin: 0; }
-
-        .badges-container {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .tag-badge {
-            display: inline-block;
-            background: #e8eef7;
-            color: #667eea;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        .loss-badge {
-            display: inline-block;
-            background: #fff3cd;
-            color: #856404;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            white-space: nowrap;
-            border: 1px solid #ffc107;
-        }
-
         .empty-note { color: #999; font-size: 13px; padding: 10px 0; }
 
         @media (max-width: 900px) {
@@ -531,7 +490,7 @@
             rows = sortRows(rows, auditSort);
 
             const cols = [
-                ['campanha', 'Campanha'], ['anuncio', 'Criativo + Público'],
+                ['campanha', 'Campanha'], ['conjunto', 'Conjunto'], ['anuncio', 'Anúncio / Palavra-chave'],
                 ['gasto_meta', 'Gasto (R$)'], ['leads_meta', 'Leads Meta'], ['leads_pipedrive', 'Leads Pipedrive'],
                 ['discrepancia', 'Discrepância'], ['revenue_total', 'Revenue (R$)'], ['roas', 'ROAS'], ['custo_por_lead', 'Custo/Lead']
             ];
@@ -552,12 +511,8 @@
 
                 html += `<tr>
                     <td>${r.campanha || 'sem_campanha'}</td>
-                    <td>
-                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <span>${r.anuncio || 'sem_palavra_chave'}</span>
-                            <span class="tag-badge" style="background: #e8eef7; color: #667eea;">👥 ${r.conjunto || 'sem_conjunto'}</span>
-                        </div>
-                    </td>
+                    <td>${r.conjunto || 'sem_conjunto'}</td>
+                    <td>${r.anuncio || 'sem_palavra_chave'}</td>
                     <td>R$ ${r.gasto_meta.toFixed(2)}</td>
                     <td>${r.leads_meta}</td>
                     <td>${r.leads_pipedrive}</td>
@@ -615,22 +570,9 @@
             let detailsHTML = '';
             data.forEach(r => {
                 if (r.leads_details && r.leads_details.length > 0) {
-                    const tagBadges = `
-                        <span class="tag-badge">📁 ${r.campanha || 'sem_campanha'}</span>
-                        <span class="tag-badge">📦 ${r.conjunto || 'sem_conjunto'}</span>
-                        <span class="tag-badge">🏷️ ${r.anuncio || 'sem_palavra_chave'}</span>
-                    `;
-                    const lossReasonBadge = r.motivo_perda ? `<span class="loss-badge">⚠️ ${r.motivo_perda}</span>` : '';
-
                     detailsHTML += `
                         <div class="details-section">
-                            <div class="section-header">
-                                <h3>${r.campanha || 'sem_campanha'}</h3>
-                                <div class="badges-container">
-                                    ${tagBadges}
-                                    ${lossReasonBadge}
-                                </div>
-                            </div>
+                            <h3>${r.campanha || 'sem_campanha'} / ${r.conjunto || 'sem_conjunto'} / ${r.anuncio || 'sem_palavra_chave'}</h3>
                             <div class="table-scroll"><table><thead><tr>
                                 <th>Nome</th><th>Email</th><th>Status</th><th>Data</th><th>Revenue</th>
                             </tr></thead><tbody>`;
