@@ -103,16 +103,6 @@ export function HomePage() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-semibold">CPL e Leads por Origem</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="CPL" metric={data.kpis.cpl} format={formatBRL} invert />
-          <KpiCard label="Leads (Instagram)" metric={data.kpis.leadsInstagram} format={formatNumber} />
-          <KpiCard label="Leads (Google)" metric={data.kpis.leadsGoogle} format={formatNumber} />
-          <KpiCard label="Leads (Indicação)" metric={data.kpis.leadsIndicacao} format={formatNumber} />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold">Top 10 Criativos — Leads Recebidos</h2>
         <CreativesTable rows={topLeads} defaultSortKey="leads" />
       </section>

@@ -104,71 +104,26 @@ export function FunilPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedStage ? `Top 5 criativos — ${selectedStage.label}` : 'Drill-down'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!selectedStage && <p className="text-xs text-muted-foreground">Clique numa etapa do funil acima pra ver os criativos que mais contribuem para ela.</p>}
-            {selectedStage && topCreatives.length === 0 && <p className="text-xs text-muted-foreground">Sem dados nesta etapa no período.</p>}
-            <ul className="flex flex-col gap-2.5">
-              {topCreatives.map(c => (
-                <li key={c.anuncio} className="flex items-start justify-between gap-2 text-sm">
-                  <span>
-                    {c.anuncio}
-                    {(c.campanha || c.conjunto) && (
-                      <span className="text-xs text-muted-foreground"> ({c.campanha} / {c.conjunto})</span>
-                    )}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-muted-foreground">{formatPercent(c.pct, 0)} · {c.count}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{selectedStage ? `Motivos de perda — ${selectedStage.label}` : 'Motivos de perda'}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!selectedStage && <p className="text-xs text-muted-foreground">Clique numa etapa do funil acima pra ver os motivos de perda.</p>}
-            {selectedStage && selectedStage.objecoes.length === 0 && <p className="text-xs text-muted-foreground">Sem perdas registradas nesta etapa.</p>}
-            <ul className="flex flex-col gap-2">
-              {selectedStage?.objecoes.map(o => (
-                <li key={o.tag} className="flex items-center justify-between gap-2 text-sm">
-                  <Badge variant="critical">{o.tag}</Badge>
-                  <span className="shrink-0 tabular-nums font-semibold text-foreground">{o.count}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
-
       <Card>
         <CardHeader>
-          <CardTitle>Motivos de Perda</CardTitle>
+          <CardTitle>{selectedStage ? `Top 5 criativos — ${selectedStage.label}` : 'Drill-down'}</CardTitle>
         </CardHeader>
         <CardContent>
-          {!funnel || funnel.stages.every(s => s.objecoes.length === 0) ? (
-            <p className="text-xs text-muted-foreground">Sem motivos de perda registrados neste período.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
-              {funnel.stages.flatMap(s => s.objecoes).reduce((acc, obj) => {
-                const existing = acc.find(o => o.tag === obj.tag)
-                if (existing) existing.count += obj.count
-                else acc.push({ ...obj })
-                return acc
-              }, [] as typeof funnel.stages[0]['objecoes']).sort((a, b) => b.count - a.count).map(obj => (
-                <Badge key={obj.tag} variant="neutral" className="justify-center py-1 text-xs">
-                  <span>{obj.tag}</span>
-                  <span className="ml-1 opacity-75">({obj.count})</span>
-                </Badge>
-              ))}
-            </div>
-          )}
+          {!selectedStage && <p className="text-xs text-muted-foreground">Clique numa etapa do funil acima pra ver os criativos que mais contribuem para ela.</p>}
+          {selectedStage && topCreatives.length === 0 && <p className="text-xs text-muted-foreground">Sem dados nesta etapa no período.</p>}
+          <ul className="flex flex-col gap-2.5">
+            {topCreatives.map(c => (
+              <li key={c.anuncio} className="flex items-start justify-between gap-2 text-sm">
+                <span>
+                  {c.anuncio}
+                  {(c.campanha || c.conjunto) && (
+                    <span className="text-xs text-muted-foreground"> ({c.campanha} / {c.conjunto})</span>
+                  )}
+                </span>
+                <span className="shrink-0 tabular-nums text-muted-foreground">{formatPercent(c.pct, 0)} · {c.count}</span>
+              </li>
+            ))}
+          </ul>
         </CardContent>
       </Card>
 

@@ -343,9 +343,7 @@ async function fetchAllDeals() {
             status: deal.status,
             stageId: deal.stage_id,
             addDate: (deal.add_time || '').slice(0, 10),
-            updateDate: (deal.update_time || '').slice(0, 10),
             wonDate: deal.won_time ? deal.won_time.slice(0, 10) : null,
-            updateDate: (deal.update_time || '').slice(0, 10),
             value: deal.value || 0,
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
@@ -547,12 +545,7 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     const tempoMedioFechamento = temposFechamento.length > 0
       ? temposFechamento.reduce((s, t) => s + t, 0) / temposFechamento.length
       : 0;
-    const leadsInstagram = attributed.filter(d => d.plataforma && d.plataforma.toLowerCase().includes('instagram')).length;
-    const leadsGoogle = attributed.filter(d => d.plataforma && d.plataforma.toLowerCase().includes('google')).length;
-    const leadsIndicacao = attributed.filter(d => d.origem && d.origem.toLowerCase().includes('indica')).length;
-    const totalLeads = attributed.length;
-    const cpl = investimento > 0 ? investimento / totalLeads : 0;
-    return { receita, compras, investimento, tempoMedioFechamento, leadsInstagram, leadsGoogle, leadsIndicacao, cpl, totalLeads };
+    return { receita, compras, investimento, tempoMedioFechamento };
   }
   const cur = totals(currentAds, currentDeals);
   const prev = totals(previousAds, previousDeals);
@@ -571,11 +564,7 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     investimento: metric(cur.investimento, prev.investimento),
     roas: metric(curRoas, prevRoas),
     cac: metric(curCac, prevCac),
-    tempoMedioFechamento: metric(cur.tempoMedioFechamento, prev.tempoMedioFechamento),
-    cpl: metric(cur.cpl, prev.cpl),
-    leadsInstagram: metric(cur.leadsInstagram, prev.leadsInstagram),
-    leadsGoogle: metric(cur.leadsGoogle, prev.leadsGoogle),
-    leadsIndicacao: metric(cur.leadsIndicacao, prev.leadsIndicacao)
+    tempoMedioFechamento: metric(cur.tempoMedioFechamento, prev.tempoMedioFechamento)
   };
 }
 

@@ -14,10 +14,6 @@ export interface Kpis {
   roas: Metric
   cac: Metric
   tempoMedioFechamento: Metric
-  cpl: Metric
-  leadsInstagram: Metric
-  leadsGoogle: Metric
-  leadsIndicacao: Metric
 }
 
 export interface Creative {
@@ -169,8 +165,6 @@ export interface RevenueAtRiskDeal {
   campanha: string
   criativo: string
   pipedriveUrl: string
-  dataEntrada: string | null
-  dataUltimaMudanca: string | null
 }
 
 export interface RevenueAtRiskGroup {
