@@ -105,6 +105,11 @@ export interface PipelineDealRef {
   etapa: string
   responsavel: string
   dataEntrada: string
+  tags: string[]
+  ultimaInteracao: string | null
+  ultimaMudancaEtapa: string | null
+  telefone: string
+  pipedriveUrl: string
 }
 
 export interface PipelineBucket {

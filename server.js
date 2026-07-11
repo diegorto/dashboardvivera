@@ -387,6 +387,9 @@ async function fetchAllDeals() {
             stageId: deal.stage_id,
             addDate: (deal.add_time || '').slice(0, 10),
             wonDate: deal.won_time ? deal.won_time.slice(0, 10) : null,
+            updateDate: deal.update_time ? deal.update_time.slice(0, 10) : null,
+            stageChangeDate: deal.stage_change_time ? deal.stage_change_time.slice(0, 10) : null,
+            lastActivityDate: deal.last_activity_date || null,
             value: deal.value || 0,
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
@@ -837,7 +840,12 @@ function buildPipelineAging(allOpenDeals) {
         campanha: deal.campanha || 'sem_campanha',
         etapa: stageName(deal),
         responsavel: deal.ownerName || 'Sem responsável',
-        dataEntrada: deal.addDate
+        dataEntrada: deal.addDate,
+        tags: objectionNames(deal),
+        ultimaInteracao: deal.lastActivityDate || deal.updateDate || null,
+        ultimaMudancaEtapa: deal.stageChangeDate || null,
+        telefone: deal.telefone || '',
+        pipedriveUrl: pipedriveDealUrl(deal.id)
       });
     }
 
