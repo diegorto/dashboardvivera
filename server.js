@@ -419,6 +419,19 @@ function maxRankFromFlow(deal, flowEvents) {
   return maxRank;
 }
 
+function getDataComparecimento(deal, flowEvents) {
+  for (const e of flowEvents) {
+    if (e.object === 'dealChange' && e.data && e.data.field_key === 'stage_id') {
+      const newStageId = parseInt(e.data.new_value);
+      const rank = STAGE_RANK[newStageId];
+      if (rank !== undefined && rank >= 4) {
+        return e.log_time ? e.log_time.slice(0, 10) : null;
+      }
+    }
+  }
+  return null;
+}
+
 function inRange(deal, since, until) {
   if (!deal.addDate) return false;
   if (since && deal.addDate < since) return false;
@@ -967,6 +980,16 @@ app.get('/api/dashboard', async (req, res) => {
 
     const recepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, range.since, range.until));
     const previousRecepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, prevRange.since, prevRange.until));
+
+    const wonDealIds = deals.filter(d => d.status === 'won').map(d => d.id);
+    const flows = wonDealIds.length > 0 ? await fetchDealFlowsBatch(wonDealIds) : new Map();
+
+    deals.forEach(deal => {
+      if (deal.status === 'won') {
+        const flowEvents = flows.get(deal.id) || [];
+        deal.dataComparecimento = getDataComparecimento(deal, flowEvents);
+      }
+    });
 
     const kpis = buildKpis(currentAds, deals, previousAds, previousDeals);
     const creatives = buildCreatives(currentAds, deals);
