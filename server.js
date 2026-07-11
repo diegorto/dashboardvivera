@@ -739,7 +739,38 @@ function buildFunnel(deals, rankFn = rankOf) {
       .slice(0, 5);
   });
 
-  return { stages, topCreativesByStage: top5, insights: buildFunnelInsights(stages) };
+  const dealsByStage = {};
+  stageOrder.forEach(key => {
+    const minRank = stageMinRank[key];
+    const stageDeals = deals.filter(d => {
+      if (minRank === null) return false;
+      return rankFn(d) >= minRank;
+    }).map(d => {
+      const motivos = [];
+      const objections = [];
+      objectionNames(d).forEach(tag => {
+        if (LOSS_REASON_TAGS.has(tag)) {
+          motivos.push(tag);
+        } else {
+          objections.push(tag);
+        }
+      });
+      return {
+        id: d.id,
+        nome: d.personName || d.title || 'Sem nome',
+        criativo: d.palavraChave || 'Sem criativo',
+        campanha: d.campanha || 'Sem campanha',
+        conjunto: d.conjunto || 'Sem conjunto',
+        status: d.status,
+        motivos,
+        objections,
+        addDate: d.addDate
+      };
+    });
+    dealsByStage[key] = stageDeals;
+  });
+
+  return { stages, topCreativesByStage: top5, insights: buildFunnelInsights(stages), dealsByStage };
 }
 
 // Conclusoes automaticas sobre a evolucao do funil no periodo - gargalo, etapa com mais

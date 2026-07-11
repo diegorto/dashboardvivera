@@ -77,10 +77,23 @@ export interface FunnelTopCreative {
   conjunto: string
 }
 
+export interface FunnelStageDeal {
+  id: number
+  nome: string
+  criativo: string
+  campanha: string
+  conjunto: string
+  status: string
+  motivos: string[]
+  objections: string[]
+  addDate: string
+}
+
 export interface Funnel {
   stages: FunnelStage[]
   topCreativesByStage: Record<string, FunnelTopCreative[]>
   insights: Insight[]
+  dealsByStage?: Record<string, FunnelStageDeal[]>
 }
 
 export interface PipelineDealRef {

@@ -14,6 +14,7 @@ export function FunilPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'massa' | 'pacientes'>('massa')
 
   useEffect(() => {
     let cancelled = false
@@ -141,24 +142,52 @@ export function FunilPage() {
           </Card>
 
           <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">
-                  {selectedStage ? `Detalhes — ${selectedStage.label}` : 'Detalhes por Etapa'}
-                </CardTitle>
-                {selectedStage && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {allCreatives.length} criativos{selectedStage.motivosPerdas.length > 0 ? ` • Perdidos: ${selectedStage.perdidos}` : ''}
-                  </p>
+            <CardHeader className="pb-4">
+              <div className="flex flex-row items-center justify-between mb-4">
+                <div>
+                  <CardTitle className="text-lg">
+                    {selectedStage ? `Detalhes — ${selectedStage.label}` : 'Detalhes por Etapa'}
+                  </CardTitle>
+                  {selectedStage && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {selectedStage.count} leads{selectedStage.perdidos > 0 ? ` • ${selectedStage.perdidos} perdidos` : ''}
+                    </p>
+                  )}
+                </div>
+                {selected && (
+                  <button
+                    onClick={() => setSelected(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
                 )}
               </div>
-              {selected && (
-                <button
-                  onClick={() => setSelected(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X className="h-5 w-5" />
-                </button>
+              {selectedStage && (
+                <div className="flex gap-2 border-b border-slate-200">
+                  <button
+                    onClick={() => setViewMode('massa')}
+                    className={cn(
+                      'px-4 py-2 text-sm font-medium transition-colors',
+                      viewMode === 'massa'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-slate-600 hover:text-slate-900'
+                    )}
+                  >
+                    % em Massa
+                  </button>
+                  <button
+                    onClick={() => setViewMode('pacientes')}
+                    className={cn(
+                      'px-4 py-2 text-sm font-medium transition-colors',
+                      viewMode === 'pacientes'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-slate-600 hover:text-slate-900'
+                    )}
+                  >
+                    Por Paciente
+                  </button>
+                </div>
               )}
             </CardHeader>
             <CardContent>
@@ -167,44 +196,59 @@ export function FunilPage() {
                   <p className="text-sm text-slate-500">Clique em uma etapa do funil acima para ver detalhes</p>
                 </div>
               )}
-              {selectedStage && selectedStage.motivosPerdas.length > 0 && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="text-sm font-semibold text-red-900 mb-2">Motivos de Perda</div>
-                  <div className="space-y-1.5">
-                    {selectedStage.motivosPerdas.map(m => (
-                      <div key={m.motivo} className="flex items-center justify-between text-xs">
-                        <span className="text-red-700">{m.motivo}</span>
-                        <span className="font-bold text-red-600">{m.count}</span>
+              {selectedStage && viewMode === 'massa' && (
+                <div>
+                  {selectedStage.motivosPerdas.length > 0 && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="text-sm font-semibold text-red-900 mb-3">Motivos de Perda</div>
+                      <div className="space-y-2">
+                        {selectedStage.motivosPerdas.map(m => {
+                          const pct = selectedStage.perdidos > 0 ? ((m.count / selectedStage.perdidos) * 100).toFixed(0) : 0
+                          return (
+                            <div key={m.motivo} className="flex items-center justify-between text-xs">
+                              <div className="flex-1">
+                                <span className="text-red-700 font-medium">{m.motivo}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold text-red-600">{m.count}</span>
+                                <span className="text-red-500 ml-2">({pct}%)</span>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {selectedStage && selectedStage.objecoes.length > 0 && (
-                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="text-sm font-semibold text-yellow-900 mb-2">Tags de Objeção</div>
-                  <div className="space-y-1.5">
-                    {selectedStage.objecoes.map(o => (
-                      <div key={o.tag} className="flex items-center justify-between text-xs">
-                        <span className="text-yellow-700">{o.tag}</span>
-                        <span className="font-bold text-yellow-600">{o.count}</span>
+                    </div>
+                  )}
+                  {selectedStage.objecoes.length > 0 && (
+                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="text-sm font-semibold text-yellow-900 mb-3">Tags de Objeção</div>
+                      <div className="space-y-2">
+                        {selectedStage.objecoes.map(o => {
+                          const pct = selectedStage.perdidos > 0 ? ((o.count / selectedStage.perdidos) * 100).toFixed(0) : 0
+                          return (
+                            <div key={o.tag} className="flex items-center justify-between text-xs">
+                              <div className="flex-1">
+                                <span className="text-yellow-700 font-medium">{o.tag}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-bold text-yellow-600">{o.count}</span>
+                                <span className="text-yellow-500 ml-2">({pct}%)</span>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+                  {selectedStage.motivosPerdas.length === 0 && selectedStage.objecoes.length === 0 && (
+                    <div className="p-4 bg-slate-50 rounded-lg">
+                      <p className="text-xs text-slate-600">Nenhum motivo de perda ou objeção nesta etapa</p>
+                    </div>
+                  )}
                 </div>
               )}
-              {selectedStage && allCreatives.length === 0 && selectedStage.motivosPerdas.length === 0 && selectedStage.objecoes.length === 0 && (
-                <p className="text-sm text-slate-500">Sem dados nesta etapa no período.</p>
-              )}
-              {selectedStage && allCreatives.length > 0 && (
-                <div className="pt-2">
-                  <div className="text-sm font-semibold text-slate-900 mb-2">Criativos Top 5</div>
-                  <div className="space-y-2">
-                    {allCreatives.map((c, idx) => (
-                      <CreativeRow key={`${c.anuncio}-${idx}`} creative={c} rank={idx + 1} />
-                    ))}
-                  </div>
-                </div>
+              {selectedStage && viewMode === 'pacientes' && funnel?.dealsByStage && (
+                <PacientesTable deals={funnel.dealsByStage[selectedStage.key] || []} />
               )}
             </CardContent>
           </Card>
@@ -262,6 +306,72 @@ function FunnelInsightRow({ insight }: { insight: Insight }) {
     <div className={cn('flex items-start gap-3 rounded-lg border px-4 py-3 text-sm', colorMap[insight.severity])}>
       <Icon className="mt-0.5 h-4 w-4 shrink-0 flex-shrink-0" />
       <span>{insight.text}</span>
+    </div>
+  )
+}
+
+function PacientesTable({ deals }: { deals: any[] }) {
+  if (deals.length === 0) {
+    return (
+      <div className="p-4 bg-slate-50 rounded-lg">
+        <p className="text-xs text-slate-600">Nenhum paciente nesta etapa</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-slate-200 bg-slate-50">
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Nº</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Paciente</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Criativo</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Campanha / Conjunto</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Motivo de Perda</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-700">Tags de Objeção</th>
+          </tr>
+        </thead>
+        <tbody>
+          {deals.map((deal, idx) => (
+            <tr key={deal.id} className="border-b border-slate-100 hover:bg-slate-50 transition">
+              <td className="px-3 py-2 text-slate-500 font-medium">#{idx + 1}</td>
+              <td className="px-3 py-2 text-slate-900 font-medium">{deal.nome}</td>
+              <td className="px-3 py-2 text-slate-700">{deal.criativo}</td>
+              <td className="px-3 py-2 text-slate-600">
+                <div className="text-slate-700">{deal.campanha}</div>
+                <div className="text-slate-500">{deal.conjunto}</div>
+              </td>
+              <td className="px-3 py-2">
+                {deal.motivos.length > 0 ? (
+                  <div className="space-y-1">
+                    {deal.motivos.map((m: string) => (
+                      <div key={m} className="bg-red-100 text-red-700 px-2 py-0.5 rounded inline-block mr-1 whitespace-nowrap">
+                        {m}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </td>
+              <td className="px-3 py-2">
+                {deal.objections.length > 0 ? (
+                  <div className="space-y-1">
+                    {deal.objections.map((o: string) => (
+                      <div key={o} className="bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded inline-block mr-1 whitespace-nowrap">
+                        {o}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-slate-400">—</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
