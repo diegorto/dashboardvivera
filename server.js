@@ -435,6 +435,18 @@ app.get('/dashboard/whatsapp', (req, res) => {
   res.sendFile(path.join(__dirname, 'views', 'dashboard-whatsapp.html'));
 });
 
+// 🎯 RAIZ - Dashboard na página inicial
+app.get('/', (req, res) => {
+  // Se pedir dashboard, serve o WhatsApp analytics
+  if (req.query.page === 'remote') {
+    // Rota remota se tiver query param
+    res.sendFile(path.join(__dirname, 'public', 'status.html'));
+  } else {
+    // Default: Dashboard WhatsApp
+    res.sendFile(path.join(__dirname, 'views', 'dashboard-whatsapp.html'));
+  }
+});
+
 // API: WhatsApp Stats (KPIs básicos)
 app.get('/api/whatsapp/stats', async (req, res) => {
   try {
