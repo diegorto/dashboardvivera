@@ -106,6 +106,35 @@ Quando você faz uma requisição para `/deals/{id}/flow` no Pipedrive, os event
 - **Configuração local**: `.env` (não commitado no git)
 - **Configuração produção**: `config.json` (não commitado, só no deploy via webhook)
 
+## Funnel - Motivos de Perda e Objeções
+
+### Mudanças Implementadas
+1. **Extração de Loss Reason**: Agora extrai `loss_reason_id` do Pipedrive para cada deal perdido
+2. **Mapa de Motivos**: Constante `LOSS_REASONS` mapeia IDs para motivos (ex: Distância, Sem interesse, Objeção financeira)
+3. **Display no Funil**: 
+   - Motivos de perda em **vermelho** abaixo de cada etapa
+   - Tags de objeção em **amarelo** quando expande a etapa
+   - Separação clara com contagem de cada motivo/tag
+
+### Estrutura de Dados Atualizada
+- **FunnelStage** agora inclui `motivosPerdas: FunnelLossReason[]`
+- **FunnelLossReason**: `{ motivo: string, count: number }`
+- **Objeções** continuam em `objecoes: FunnelObjection[]`
+
+### Valores de Loss Reason (LOSS_REASONS)
+```javascript
+{
+  '1': 'Não qualificado',
+  '2': 'Distância/Localização',
+  '3': 'Sem interesse',
+  '4': 'Objeção financeira',
+  '5': 'Medo/Insegurança',
+  '6': 'Não respondeu',
+  '7': 'Concorrência',
+  '8': 'Não compareceu'
+}
+```
+
 ## Debugging
 
 ### Verificar se servidor está rodando
@@ -125,4 +154,9 @@ pm2 logs
 ```bash
 node server.js
 curl "http://localhost:3000/api/dashboard?since=2026-07-01&until=2026-07-11" | jq '.patients[] | select(.nome == "Eliane Luiz")'
+```
+
+### Testar Funil com Loss Reasons
+```bash
+curl "http://localhost:3000/api/funil-real?since=2026-07-01&until=2026-07-11" | jq '.funnel.stages[] | {label, perdidos, motivosPerdas, objecoes}'
 ```
