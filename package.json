@@ -1,12 +1,13 @@
 {
-  "name": "pipedrive-custom-fields-audit",
-  "version": "1.0.0",
-  "description": "Dashboard em tempo real: Meta Ads vs Pipedrive - Calcula ROAS automaticamente",
+  "name": "vivera-insights",
+  "version": "2.0.0",
+  "description": "Vivera Insights: sistema de decisao para reunioes executivas Marketing x Comercial (Meta Ads + Pipedrive)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "server": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build:web": "cd web && npm install && npm run build"
   },
   "keywords": [
     "pipedrive",

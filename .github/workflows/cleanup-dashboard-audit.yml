@@ -1,0 +1,24 @@
+name: Cleanup old dashboard-audit process
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Stop and remove old pm2 process
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script: |
+            echo "--- pm2 error logs (dashboardvivera) ---"
+            pm2 logs dashboardvivera --lines 40 --nostream --err || true
+            echo "--- restarting dashboardvivera ---"
+            pm2 restart dashboardvivera
+            sleep 3
+            pm2 save
+            pm2 list

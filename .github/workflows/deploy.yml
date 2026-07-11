@@ -1,0 +1,135 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - claude/meta-pipe-api-integration-xsxna2
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend (Vivera Insights)
+        run: |
+          cd web
+          npm install
+          npm run build
+
+      - name: Install sshpass
+        run: sudo apt-get update -y -q && sudo apt-get install -y -q sshpass
+
+      - name: Build remote .env file
+        env:
+          PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
+          FB_ACCESS_TOKEN: ${{ secrets.FB_ACCESS_TOKEN }}
+          FB_AD_ACCOUNT_IDS: ${{ secrets.FB_AD_ACCOUNT_IDS }}
+          TINTIM_ACCOUNT_CODE: ${{ secrets.TINTIM_ACCOUNT_CODE }}
+          TINTIM_ACCOUNT_TOKEN: ${{ secrets.TINTIM_ACCOUNT_TOKEN }}
+        run: |
+          cat > /tmp/app.env <<EOF
+          PIPEDRIVE_TOKEN=$PIPEDRIVE_TOKEN
+          FB_ACCESS_TOKEN=$FB_ACCESS_TOKEN
+          FB_AD_ACCOUNT_IDS=$FB_AD_ACCOUNT_IDS
+          TINTIM_ACCOUNT_CODE=$TINTIM_ACCOUNT_CODE
+          TINTIM_ACCOUNT_TOKEN=$TINTIM_ACCOUNT_TOKEN
+          PORT=3000
+          EOF
+
+      - name: Build remote deploy script
+        run: |
+          cat > /tmp/deploy_remote.sh <<'EOF'
+          set -e
+          mkdir -p /root/apps/dashboardvivera
+          mv /tmp/app.env /root/apps/dashboardvivera/.env
+          cd /root/apps/dashboardvivera
+          npm install --omit=dev
+          command -v pm2 >/dev/null 2>&1 || npm install -g pm2
+          pm2 delete dashboardvivera >/dev/null 2>&1 || true
+          pm2 start server.js --name dashboardvivera
+          pm2 save
+          sleep 3
+          STATUS=$(curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/ || echo "000")
+          echo "HTTP status (/): $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "App nao respondeu OK, ultimos logs:"
+            pm2 logs dashboardvivera --lines 40 --nostream || true
+            exit 1
+          fi
+          UNTIL=$(date +%F)
+          SINCE=$(date -d "30 days ago" +%F 2>/dev/null || date -v-30d +%F)
+          echo "--- Verificando /api/dashboard ($SINCE a $UNTIL) ---"
+          RESP=$(curl -sS -m 60 "http://127.0.0.1:3000/api/dashboard?since=$SINCE&until=$UNTIL")
+          echo "$RESP" | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              try{
+                const j=JSON.parse(d);
+                console.log('success:', j.success);
+                console.log('creatives:', (j.creatives||[]).length);
+                console.log('patients:', (j.patients||[]).length);
+                console.log('funnel leads:', j.funnel && j.funnel.stages && j.funnel.stages[0] ? j.funnel.stages[0].count : 'n/a');
+                console.log('governance sem responsavel:', JSON.stringify(j.governance && j.governance.semResponsavel));
+                console.log('kpis:', JSON.stringify(j.kpis));
+                console.log('totalAdsComGasto:', j.meta && j.meta.totalAdsComGasto);
+                const withUrl = (j.creatives||[]).find(c=>c.adUrl);
+                console.log('amostra adUrl:', withUrl ? withUrl.adUrl : 'nenhum criativo com adUrl');
+              }catch(e){ console.log('resposta nao e JSON valido:', d.slice(0,300)); process.exit(1); }
+            })
+          " || (echo "api/dashboard falhou ao processar" && exit 1)
+          ADS_COUNT=$(echo "$RESP" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);console.log(j.meta.totalAdsComGasto||0)}catch(e){console.log(0)}})")
+          if [ "$ADS_COUNT" = "0" ]; then
+            echo "AVISO: 0 ads retornados do Meta nos ultimos 30 dias, verificando logs para erro de API:"
+            pm2 logs dashboardvivera --lines 60 --nostream --err || true
+          fi
+          echo "Deploy verificado com sucesso (HTTP 200 + /api/dashboard OK)."
+
+          echo "--- Verificando /api/tintim-audit (nao bloqueia o deploy se falhar) ---"
+          TINTIM_RESP=$(curl -sS -m 120 "http://127.0.0.1:3000/api/tintim-audit" || echo '{"success":false,"error":"curl falhou"}')
+          echo "$TINTIM_RESP" | node -e "
+            let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
+              try{
+                const j=JSON.parse(d);
+                if(!j.success){ console.log('AVISO tintim-audit:', j.error); process.exit(0); }
+                const rec = (j.items||[]).filter(i=>i.tintim && i.tintim.hasAdData).length;
+                const semRastreio = (j.items||[]).filter(i=>i.tintim && i.tintim.found && !i.tintim.hasAdData).length;
+                console.log('tintim-audit ok. leads sem origem:', (j.items||[]).length, '| telefones checados:', j.checked, '| recuperaveis:', rec, '| tintim tambem sem rastreio:', semRastreio);
+              }catch(e){ console.log('AVISO: resposta do tintim-audit nao e JSON valido:', d.slice(0,300)); }
+            })
+          " || true
+          EOF
+
+      - name: Deploy over SSH (com retry automatico)
+        env:
+          SSHPASS: ${{ secrets.SSH_PASSWORD }}
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USER }}
+        run: |
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -p 22"
+          SCP_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 -P 22"
+          MAX_ATTEMPTS=15
+          attempt=1
+          until [ $attempt -gt $MAX_ATTEMPTS ]; do
+            echo "=== Tentativa $attempt de $MAX_ATTEMPTS ==="
+            if sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "mkdir -p /root/apps/dashboardvivera/web" \
+              && sshpass -e scp $SCP_OPTS server.js package.json package-lock.json "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/" \
+              && sshpass -e scp $SCP_OPTS -r web/dist "$REMOTE_USER@$REMOTE_HOST:/root/apps/dashboardvivera/web/" \
+              && sshpass -e scp $SCP_OPTS /tmp/app.env /tmp/deploy_remote.sh "$REMOTE_USER@$REMOTE_HOST:/tmp/" \
+              && sshpass -e ssh $SSH_OPTS "$REMOTE_USER@$REMOTE_HOST" "bash /tmp/deploy_remote.sh"
+            then
+              echo "Deploy concluido com sucesso na tentativa $attempt."
+              exit 0
+            fi
+            echo "Falhou na tentativa $attempt. Aguardando antes de tentar de novo..."
+            attempt=$((attempt + 1))
+            sleep 20
+          done
+          echo "Todas as $MAX_ATTEMPTS tentativas falharam."
+          exit 1
