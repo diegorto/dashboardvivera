@@ -78,7 +78,7 @@ export function FunilPage() {
                           'border border-slate-200 bg-white hover:bg-slate-50',
                           selected === stage.key && 'border-blue-400 bg-blue-50 ring-2 ring-blue-200'
                         )}
-                        style={{ minWidth: '140px' }}
+                        style={{ minWidth: '160px' }}
                       >
                         <div className="text-center w-full">
                           <div className="text-2xl font-bold text-slate-900">{formatNumber(stage.count)}</div>
@@ -104,25 +104,11 @@ export function FunilPage() {
                         <div className="text-center w-full">
                           <div className="text-sm font-semibold text-slate-900">{stage.label}</div>
                           {stage.perdidos > 0 && (
-                            <div className="text-xs text-red-600 font-medium mt-1">
+                            <div className="text-xs text-red-600 font-bold mt-1">
                               {stage.perdidos} perdidos ({lossRate}%)
                             </div>
                           )}
                         </div>
-
-                        {stage.objecoes.length > 0 && (
-                          <div className="w-full flex flex-col gap-1">
-                            {stage.objecoes.slice(0, 3).map(o => (
-                              <Badge
-                                key={o.tag}
-                                variant="critical"
-                                className="text-[9px] justify-center bg-red-100 text-red-700 hover:bg-red-200"
-                              >
-                                {o.tag} ({o.count})
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
                       </button>
 
                       {i < funnel.stages.length - 1 && (
@@ -138,7 +124,7 @@ export function FunilPage() {
                 })}
               </div>
               <p className="mt-4 text-xs text-slate-500 leading-relaxed">
-                Funil real baseado no histórico completo de cada negócio no Pipedrive. Vermelho = perdidos com objeções mais comuns.
+                Funil real baseado no histórico completo de cada negócio no Pipedrive. Vermelho = perdidos. Clique em uma etapa para ver os criativos.
               </p>
             </CardContent>
           </Card>
@@ -183,35 +169,6 @@ export function FunilPage() {
 
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg">Motivos de Perda</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {funnel.stages.length === 0 ? (
-                <p className="text-sm text-slate-500">Sem dados disponíveis.</p>
-              ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                  {funnel.stages
-                    .flatMap(s => s.objecoes)
-                    .reduce((acc, obj) => {
-                      const existing = acc.find(o => o.tag === obj.tag)
-                      if (existing) existing.count += obj.count
-                      else acc.push({ ...obj })
-                      return acc
-                    }, [] as typeof funnel.stages[0]['objecoes'])
-                    .sort((a, b) => b.count - a.count)
-                    .map(obj => (
-                      <div key={obj.tag} className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                        <div className="text-lg font-bold text-red-700">{obj.count}</div>
-                        <div className="text-xs text-red-600 mt-1">{obj.tag}</div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-4">
               <CardTitle className="text-lg">Insights</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -229,22 +186,22 @@ export function FunilPage() {
 
 function CreativeRow({ creative, rank }: { creative: FunnelTopCreative; rank: number }) {
   return (
-    <div className="border border-slate-200 rounded-lg p-3 hover:shadow-sm transition-all">
-      <div className="flex items-start justify-between gap-3">
+    <div className="border border-slate-200 rounded-lg p-4 hover:shadow-sm hover:border-blue-300 transition-all">
+      <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded px-2 py-1 w-6 text-center">#{rank}</span>
-            <span className="font-medium text-slate-900 break-words">{creative.anuncio}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded px-2.5 py-1 w-7 text-center">#{rank}</span>
+            <span className="font-medium text-slate-900 break-words flex-1">{creative.anuncio}</span>
           </div>
           {(creative.campanha || creative.conjunto) && (
-            <div className="text-xs text-slate-500 mt-1 ml-8">
-              {creative.campanha} / {creative.conjunto}
+            <div className="text-xs text-slate-600 mt-2 ml-10">
+              <span className="font-medium">{creative.campanha}</span> / <span>{creative.conjunto}</span>
             </div>
           )}
         </div>
         <div className="text-right shrink-0">
           <div className="text-lg font-bold text-blue-600">{creative.count}</div>
-          <div className="text-xs text-slate-500">{formatPercent(creative.pct, 0)} da etapa</div>
+          <div className="text-xs text-slate-500">{formatPercent(creative.pct, 0)}</div>
         </div>
       </div>
     </div>
