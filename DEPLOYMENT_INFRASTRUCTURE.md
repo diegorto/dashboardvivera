@@ -44,6 +44,15 @@ Usa a data de comparecimento (quando entrou no estágio de Comparecimento), ou f
 
 ## Deploy no Servidor Remoto
 
+### ⚠️ REGRA CRÍTICA: FRONTEND PRECISA DE BUILD
+O servidor entrega o frontend **buildado** de `web/dist`. Mudanças em `web/src/**` NÃO aparecem só com git pull + restart.
+**Todo deploy com mudança de frontend = 3 passos obrigatórios:**
+1. `git pull origin claude/meta-pipe-api-integration-luq1ht`
+2. `npm run build:web` (na RAIZ do projeto — o script `build` não existe na raiz, é `build:web`)
+3. `pkill -9 node && npm start &`
+
+Mudança só no `server.js` (backend) = pode pular o passo 2.
+
 ### Procedimento
 1. SSH para o servidor:
    ```bash
