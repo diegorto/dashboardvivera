@@ -531,12 +531,13 @@ function buildLeadSources(deals, ads) {
   });
   return {
     total: { leads: deals.length, receita: round2(receitaTotal) },
-    // CPL do Google fica null: nao ha integracao com Google Ads (sem dado de investimento).
-    google: { leads: bySource.google.leads, receita: round2(bySource.google.receita), cpl: null, investimento: null },
+    // CPL e ROAS do Google ficam null: nao ha integracao com Google Ads (sem dado de investimento).
+    google: { leads: bySource.google.leads, receita: round2(bySource.google.receita), cpl: null, roas: null, investimento: null },
     meta: {
       leads: bySource.meta.leads,
       receita: round2(bySource.meta.receita),
       cpl: bySource.meta.leads > 0 && investimentoMeta > 0 ? round2(investimentoMeta / bySource.meta.leads) : null,
+      roas: investimentoMeta > 0 ? round2(bySource.meta.receita / investimentoMeta) : null,
       investimento: round2(investimentoMeta)
     },
     indicacao: { leads: bySource.indicacao.leads, receita: round2(bySource.indicacao.receita) },

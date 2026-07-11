@@ -118,6 +118,7 @@ export function HomePage() {
               label="Google"
               leads={data.leadSources.google.leads}
               cpl={data.leadSources.google.cpl}
+              roas={data.leadSources.google.roas}
               receita={data.leadSources.google.receita}
             />
             <SourceCard
@@ -125,6 +126,7 @@ export function HomePage() {
               label="Instagram / Meta"
               leads={data.leadSources.meta.leads}
               cpl={data.leadSources.meta.cpl}
+              roas={data.leadSources.meta.roas}
               receita={data.leadSources.meta.receita}
             />
             <SourceCard
@@ -178,11 +180,12 @@ export function HomePage() {
   )
 }
 
-function SourceCard({ icon, label, leads, cpl, receita }: {
+function SourceCard({ icon, label, leads, cpl, roas, receita }: {
   icon: React.ReactNode
   label: string
   leads: number
   cpl?: number | null
+  roas?: number | null
   receita: number
 }) {
   return (
@@ -196,6 +199,9 @@ function SourceCard({ icon, label, leads, cpl, receita }: {
         <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           {cpl !== undefined && (
             <span>CPL: <span className="font-semibold text-foreground">{cpl === null ? '—' : formatBRL(cpl)}</span></span>
+          )}
+          {roas !== undefined && (
+            <span>ROAS: <span className="font-semibold text-foreground">{roas === null ? '—' : `${roas.toFixed(2)}x`}</span></span>
           )}
           <span>Receita: <span className="font-semibold text-foreground">{formatBRL(receita)}</span></span>
         </div>

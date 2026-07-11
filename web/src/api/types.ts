@@ -276,6 +276,7 @@ export interface LeadSourceStat {
   leads: number
   receita: number
   cpl?: number | null
+  roas?: number | null
   investimento?: number | null
 }
 
