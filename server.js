@@ -165,7 +165,8 @@ async function getMetaAds(since, until) {
     `creative{thumbnail_url,object_story_spec},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
-    let url = `https://graph.facebook.com/v18.0/act_${accountId}/ads`;
+    const cleanAccountId = accountId.replace(/^act_/, '');
+    let url = `https://graph.facebook.com/v18.0/act_${cleanAccountId}/ads`;
     let params = { access_token: FB_ACCESS_TOKEN, fields, limit: 200 };
     let page = 0;
     const MAX_PAGES = 10;
