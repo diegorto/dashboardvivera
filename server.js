@@ -719,6 +719,65 @@ function buildFunnel(deals, rankFn = rankOf) {
     return { count: lostHere.length, objecoes, motivosPerdas };
   }
 
+  // Dimensoes usadas nos breakdowns por origem (criativo / campanha / conjunto).
+  const originDims = {
+    criativos: d => d.palavraChave || 'sem_palavra_chave',
+    campanhas: d => d.campanha || 'sem_campanha',
+    conjuntos: d => d.conjunto || 'sem_conjunto'
+  };
+
+  // Mesmo criterio cumulativo dos contadores principais: "chegou nessa etapa".
+  function reachedStage(deal, key) {
+    if (key === 'compraram') return deal.status === 'won';
+    const minRank = stageMinRank[key];
+    if (minRank === 0) return true;
+    return rankFn(deal) >= minRank || deal.status === 'won';
+  }
+
+  // % de evolucao pra proxima etapa, por criativo/campanha/conjunto: de todos que chegaram
+  // na etapa `key`, quantos avancaram pra `nextKey`.
+  function breakdownEvolucao(key, nextKey) {
+    if (!nextKey) return null;
+    const out = {};
+    Object.entries(originDims).forEach(([dim, getter]) => {
+      const groups = {};
+      deals.forEach(d => {
+        if (!reachedStage(d, key)) return;
+        const nome = getter(d);
+        if (!groups[nome]) groups[nome] = { total: 0, evoluiu: 0 };
+        groups[nome].total++;
+        if (reachedStage(d, nextKey)) groups[nome].evoluiu++;
+      });
+      out[dim] = Object.entries(groups)
+        .map(([nome, v]) => ({ nome, total: v.total, evoluiu: v.evoluiu, pct: v.total > 0 ? round2((v.evoluiu / v.total) * 100) : 0 }))
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 8);
+    });
+    return out;
+  }
+
+  // De onde vem as perdas da etapa: participacao de cada criativo/campanha/conjunto no
+  // total de perdidos que tinham chegado nessa etapa.
+  function breakdownPerdas(minRank) {
+    const empty = { criativos: [], campanhas: [], conjuntos: [] };
+    if (minRank === null) return empty;
+    const lostHere = lostDeals.filter(d => rankFn(d) >= minRank);
+    if (lostHere.length === 0) return empty;
+    const out = {};
+    Object.entries(originDims).forEach(([dim, getter]) => {
+      const groups = {};
+      lostHere.forEach(d => {
+        const nome = getter(d);
+        groups[nome] = (groups[nome] || 0) + 1;
+      });
+      out[dim] = Object.entries(groups)
+        .map(([nome, count]) => ({ nome, count, pct: round2((count / lostHere.length) * 100) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
+    });
+    return out;
+  }
+
   const stageOrder = ['leads', 'qualificados', 'agendados', 'compareceram', 'compraram'];
   const labels = { leads: 'Leads', qualificados: 'Qualificados', agendados: 'Agendados', compareceram: 'Compareceram', compraram: 'Compraram' };
   const stages = stageOrder.map((key, i) => {
@@ -730,7 +789,9 @@ function buildFunnel(deals, rankFn = rankOf) {
     return {
       key, label: labels[key], count, pctFromStart: round2(pctFromStart),
       pctLossFromPrev: pctLossFromPrev === null ? null : round2(pctLossFromPrev),
-      perdidos: perdidos.count, objecoes: perdidos.objecoes, motivosPerdas: perdidos.motivosPerdas
+      perdidos: perdidos.count, objecoes: perdidos.objecoes, motivosPerdas: perdidos.motivosPerdas,
+      evolucao: breakdownEvolucao(key, stageOrder[i + 1] || null),
+      perdasPorOrigem: breakdownPerdas(stageMinRank[key])
     };
   });
 
