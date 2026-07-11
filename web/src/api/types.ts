@@ -169,6 +169,8 @@ export interface RevenueAtRiskDeal {
   campanha: string
   criativo: string
   pipedriveUrl: string
+  dataEntrada: string | null
+  dataUltimaMudanca: string | null
 }
 
 export interface RevenueAtRiskGroup {

@@ -344,6 +344,7 @@ async function fetchAllDeals() {
             stageId: deal.stage_id,
             addDate: (deal.add_time || '').slice(0, 10),
             wonDate: deal.won_time ? deal.won_time.slice(0, 10) : null,
+            updateDate: (deal.update_time || '').slice(0, 10),
             value: deal.value || 0,
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
@@ -854,7 +855,9 @@ function buildRevenueAtRisk(deals, ticketMedio = 0) {
       telefone: d.telefone || '',
       campanha: d.campanha || 'sem_campanha',
       criativo: d.palavraChave || 'sem_palavra_chave',
-      pipedriveUrl: pipedriveDealUrl(d.id)
+      pipedriveUrl: pipedriveDealUrl(d.id),
+      dataEntrada: d.addDate || null,
+      dataUltimaMudanca: d.updateDate || null
     }));
     const comValor = items.filter(d => d.value > 0);
     const semValor = items.filter(d => d.value === 0);

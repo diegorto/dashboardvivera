@@ -1,7 +1,22 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, MessageCircle } from 'lucide-react'
 import { formatBRL, whatsappUrl } from '@/lib/utils'
-import type { RevenueAtRiskGroup } from '@/api/types'
+import type { RevenueAtRiskGroup, RevenueAtRiskDeal } from '@/api/types'
+
+function daysAgo(dateStr: string | null): number | null {
+  if (!dateStr) return null
+  const date = new Date(dateStr);
+  const today = new Date();
+  const diffMs = today.getTime() - date.getTime();
+  return Math.floor(diffMs / 86400000);
+}
+
+function formatDays(days: number | null): string {
+  if (days === null) return '—';
+  if (days === 0) return 'hoje';
+  if (days === 1) return '1 dia';
+  return `${days}d`;
+}
 
 export function StuckDealsGroup({ label, group }: { label: string; group: RevenueAtRiskGroup }) {
   const [open, setOpen] = useState(false)
@@ -23,6 +38,8 @@ export function StuckDealsGroup({ label, group }: { label: string; group: Revenu
         <div className="ml-1 mt-0.5 flex flex-col gap-2 border-l border-border pl-3">
           {group.deals.map(d => {
             const wa = whatsappUrl(d.telefone)
+            const diasEntrada = daysAgo(d.dataEntrada);
+            const diasParado = daysAgo(d.dataUltimaMudanca);
             return (
               <div key={d.id} className="flex flex-col gap-0.5">
                 <div className="flex items-center gap-2">
@@ -47,6 +64,9 @@ export function StuckDealsGroup({ label, group }: { label: string; group: Revenu
                     'sem telefone'
                   )}
                   {' · '}{d.campanha} · {d.criativo}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  Entrada: {formatDays(diasEntrada)} · Parado: {formatDays(diasParado)}
                 </span>
               </div>
             )
