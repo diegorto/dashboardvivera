@@ -572,7 +572,9 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     investimento: metric(cur.investimento, prev.investimento),
     roas: metric(curRoas, prevRoas),
     cac: metric(curCac, prevCac),
-    tempoMedioFechamento: metric(cur.tempoMedioFechamento, prev.tempoMedioFechamento)
+    tempoMedioFechamento: metric(cur.tempoMedioFechamento, prev.tempoMedioFechamento),
+    tempoLeadParaVenda: metric(cur.tempoLeadParaVenda, prev.tempoLeadParaVenda),
+    tempoOrcamentoParaVenda: metric(cur.tempoOrcamentoParaVenda, prev.tempoOrcamentoParaVenda)
   };
 }
 
