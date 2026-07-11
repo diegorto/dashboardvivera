@@ -920,6 +920,13 @@ function formatBRL(v) {
 }
 
 // Endpoint principal do Vivera Insights: um unico payload com tudo que as 6 paginas precisam.
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms))
+  ]);
+}
+
 app.get('/api/dashboard', async (req, res) => {
   try {
     const defaults = defaultDateRange();
@@ -927,9 +934,9 @@ app.get('/api/dashboard', async (req, res) => {
     const prevRange = previousRange(range.since, range.until);
 
     const [currentAds, previousAds, allDeals] = await Promise.all([
-      getMetaAds(range.since, range.until),
-      getMetaAds(prevRange.since, prevRange.until),
-      fetchAllDeals()
+      withTimeout(getMetaAds(range.since, range.until), 10000).catch(() => ({ ads: [], accounts: [] })),
+      withTimeout(getMetaAds(prevRange.since, prevRange.until), 10000).catch(() => ({ ads: [], accounts: [] })),
+      withTimeout(fetchAllDeals(), 10000).catch(() => [])
     ]);
 
     const inboundDealsAll = allDeals.filter(d => d.pipelineId === INBOUND_PIPELINE_ID);
@@ -1132,10 +1139,10 @@ if (fs.existsSync(WEB_DIST)) {
 const PORT = process.env.PORT || 3000;
 
 if (require.main === module) {
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`
-Servidor rodando em http://localhost:${PORT}
-API: http://localhost:${PORT}/api/dashboard
+Servidor rodando em http://0.0.0.0:${PORT}
+API: http://0.0.0.0:${PORT}/api/dashboard
 
 Configuracoes:
    - Meta Accounts: ${FB_AD_ACCOUNT_IDS.length}
