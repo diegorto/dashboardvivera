@@ -535,6 +535,8 @@ function metric(curVal, prevVal) {
 
 function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
   function totals(ads, deals) {
+    if (!Array.isArray(ads)) ads = [];
+    if (!Array.isArray(deals)) deals = [];
     const attributed = deals.filter(isMetaAttributed);
     const won = attributed.filter(d => d.status === 'won');
     const receita = won.reduce((s, d) => s + d.value, 0);
@@ -950,8 +952,8 @@ app.get('/api/dashboard', async (req, res) => {
     const prevRange = previousRange(range.since, range.until);
 
     const [currentAds, previousAds, allDeals] = await Promise.all([
-      withTimeout(getMetaAds(range.since, range.until), 10000).catch(() => ({ ads: [], accounts: [] })),
-      withTimeout(getMetaAds(prevRange.since, prevRange.until), 10000).catch(() => ({ ads: [], accounts: [] })),
+      withTimeout(getMetaAds(range.since, range.until), 10000).catch(() => []),
+      withTimeout(getMetaAds(prevRange.since, prevRange.until), 10000).catch(() => []),
       withTimeout(fetchAllDeals(), 10000).catch(() => [])
     ]);
 
