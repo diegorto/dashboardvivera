@@ -326,11 +326,6 @@ app.get('/api/pipedrive/:resource', async (req, res) => {
 
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Dashboard API (serve a página completa)
-app.get('/dashboard/api', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
 });
 
