@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, MessageCircle } from 'lucide-react'
 import { formatBRL, whatsappUrl } from '@/lib/utils'
-import type { RevenueAtRiskGroup, RevenueAtRiskDeal } from '@/api/types'
+import type { RevenueAtRiskGroup } from '@/api/types'
 
 function daysAgo(dateStr: string | null): number | null {
   if (!dateStr) return null
@@ -15,7 +15,9 @@ function formatDays(days: number | null): string {
   if (days === null) return '—';
   if (days === 0) return 'hoje';
   if (days === 1) return '1 dia';
-  return `${days}d`;
+  if (days < 7) return `${days}d`;
+  if (days < 30) return `${Math.floor(days / 7)}s`;
+  return `${Math.floor(days / 30)}m`;
 }
 
 export function StuckDealsGroup({ label, group }: { label: string; group: RevenueAtRiskGroup }) {
@@ -65,8 +67,8 @@ export function StuckDealsGroup({ label, group }: { label: string; group: Revenu
                   )}
                   {' · '}{d.campanha} · {d.criativo}
                 </span>
-                <span className="text-[10px] text-muted-foreground">
-                  Entrada: {formatDays(diasEntrada)} · Parado: {formatDays(diasParado)}
+                <span className="text-[11px] text-muted-foreground">
+                  Entrada: {formatDays(daysAgo(d.dataEntrada))} · Parado: {formatDays(daysAgo(d.dataUltimaMudanca))}
                 </span>
               </div>
             )

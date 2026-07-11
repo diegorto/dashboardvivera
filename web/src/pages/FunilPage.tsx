@@ -149,6 +149,31 @@ export function FunilPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Motivos de Perda</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!funnel || funnel.stages.every(s => s.objecoes.length === 0) ? (
+            <p className="text-xs text-muted-foreground">Sem motivos de perda registrados neste período.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {funnel.stages.flatMap(s => s.objecoes).reduce((acc, obj) => {
+                const existing = acc.find(o => o.tag === obj.tag)
+                if (existing) existing.count += obj.count
+                else acc.push({ ...obj })
+                return acc
+              }, [] as typeof funnel.stages[0]['objecoes']).sort((a, b) => b.count - a.count).map(obj => (
+                <Badge key={obj.tag} variant="neutral" className="justify-center py-1 text-xs">
+                  <span>{obj.tag}</span>
+                  <span className="ml-1 opacity-75">({obj.count})</span>
+                </Badge>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Insights do funil</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">

@@ -13,8 +13,8 @@ export interface Kpis {
   investimento: Metric
   roas: Metric
   cac: Metric
-  cpl: Metric
   tempoMedioFechamento: Metric
+  cpl: Metric
   leadsInstagram: Metric
   leadsGoogle: Metric
   leadsIndicacao: Metric
