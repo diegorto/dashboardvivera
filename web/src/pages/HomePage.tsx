@@ -91,14 +91,15 @@ export function HomePage() {
 
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-semibold">Receita proveniente do Marketing</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-7">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
           <KpiCard label="Receita" metric={data.kpis.receita} format={formatBRL} />
           <KpiCard label="Compras" metric={data.kpis.compras} format={formatNumber} />
           <KpiCard label="Ticket Médio" metric={data.kpis.ticketMedio} format={formatBRL} />
-          <KpiCard label="Tempo Médio de Fechamento" metric={data.kpis.tempoMedioFechamento} format={n => `${n.toFixed(1)}d`} invert />
           <KpiCard label="Investimento" metric={data.kpis.investimento} format={formatBRL} invert />
           <KpiCard label="ROAS" metric={data.kpis.roas} format={n => `${n.toFixed(2)}x`} />
           <KpiCard label="CAC" metric={data.kpis.cac} format={formatBRL} invert />
+          <KpiCard label="Tempo Lead → Venda" metric={data.kpis.tempoLeadParaVenda} format={n => `${n.toFixed(1)}d`} invert />
+          <KpiCard label="Tempo Orçamento → Venda" metric={data.kpis.tempoOrcamentoParaVenda} format={n => `${n.toFixed(1)}d`} invert />
         </div>
       </section>
 

@@ -14,6 +14,8 @@ export interface Kpis {
   roas: Metric
   cac: Metric
   tempoMedioFechamento: Metric
+  tempoLeadParaVenda: Metric
+  tempoOrcamentoParaVenda: Metric
 }
 
 export interface Creative {

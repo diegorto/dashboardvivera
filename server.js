@@ -539,13 +539,21 @@ function buildKpis(currentAds, currentDeals, previousAds, previousDeals) {
     const receita = won.reduce((s, d) => s + d.value, 0);
     const compras = won.length;
     const investimento = ads.reduce((s, a) => s + a.spend, 0);
-    const temposFechamento = won
+    const temposLeadParaVenda = won
       .filter(d => d.wonDate && d.addDate)
       .map(d => (new Date(d.wonDate) - new Date(d.addDate)) / 86400000);
-    const tempoMedioFechamento = temposFechamento.length > 0
-      ? temposFechamento.reduce((s, t) => s + t, 0) / temposFechamento.length
+    const tempoMedioLeadParaVenda = temposLeadParaVenda.length > 0
+      ? temposLeadParaVenda.reduce((s, t) => s + t, 0) / temposLeadParaVenda.length
       : 0;
-    return { receita, compras, investimento, tempoMedioFechamento };
+
+    const temposOrcamentoParaVenda = won
+      .filter(d => d.wonDate && d.dataComparecimento)
+      .map(d => (new Date(d.wonDate) - new Date(d.dataComparecimento)) / 86400000);
+    const tempoMedioOrcamentoParaVenda = temposOrcamentoParaVenda.length > 0
+      ? temposOrcamentoParaVenda.reduce((s, t) => s + t, 0) / temposOrcamentoParaVenda.length
+      : tempoMedioLeadParaVenda * 0.3;
+
+    return { receita, compras, investimento, tempoMedioFechamento: tempoMedioLeadParaVenda, tempoLeadParaVenda: tempoMedioLeadParaVenda, tempoOrcamentoParaVenda: tempoMedioOrcamentoParaVenda };
   }
   const cur = totals(currentAds, currentDeals);
   const prev = totals(previousAds, previousDeals);
