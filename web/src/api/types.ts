@@ -53,6 +53,11 @@ export interface FunnelObjection {
   count: number
 }
 
+export interface FunnelLossReason {
+  motivo: string
+  count: number
+}
+
 export interface FunnelStage {
   key: string
   label: string
@@ -61,6 +66,7 @@ export interface FunnelStage {
   pctLossFromPrev: number | null
   perdidos: number
   objecoes: FunnelObjection[]
+  motivosPerdas: FunnelLossReason[]
 }
 
 export interface FunnelTopCreative {

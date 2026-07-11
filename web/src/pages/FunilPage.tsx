@@ -104,8 +104,19 @@ export function FunilPage() {
                         <div className="text-center w-full">
                           <div className="text-sm font-semibold text-slate-900">{stage.label}</div>
                           {stage.perdidos > 0 && (
-                            <div className="text-xs text-red-600 font-bold mt-1">
-                              {stage.perdidos} perdidos ({lossRate}%)
+                            <div className="mt-2 space-y-1">
+                              <div className="text-xs text-red-600 font-bold">
+                                {stage.perdidos} perdidos ({lossRate}%)
+                              </div>
+                              {stage.motivosPerdas.length > 0 && (
+                                <div className="text-xs space-y-0.5">
+                                  {stage.motivosPerdas.map(m => (
+                                    <div key={m.motivo} className="text-red-500">
+                                      {m.motivo} ({m.count})
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -133,10 +144,12 @@ export function FunilPage() {
             <CardHeader className="pb-4 flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg">
-                  {selectedStage ? `Criativos — ${selectedStage.label}` : 'Detalhes por Criativo'}
+                  {selectedStage ? `Detalhes — ${selectedStage.label}` : 'Detalhes por Etapa'}
                 </CardTitle>
                 {selectedStage && (
-                  <p className="text-xs text-slate-500 mt-1">{allCreatives.length} criativos nesta etapa</p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {allCreatives.length} criativos{selectedStage.motivosPerdas.length > 0 ? ` • Perdidos: ${selectedStage.perdidos}` : ''}
+                  </p>
                 )}
               </div>
               {selected && (
@@ -151,17 +164,46 @@ export function FunilPage() {
             <CardContent>
               {!selectedStage && (
                 <div className="flex items-center justify-center py-12">
-                  <p className="text-sm text-slate-500">Clique em uma etapa do funil acima para ver os criativos</p>
+                  <p className="text-sm text-slate-500">Clique em uma etapa do funil acima para ver detalhes</p>
                 </div>
               )}
-              {selectedStage && allCreatives.length === 0 && (
+              {selectedStage && selectedStage.motivosPerdas.length > 0 && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="text-sm font-semibold text-red-900 mb-2">Motivos de Perda</div>
+                  <div className="space-y-1.5">
+                    {selectedStage.motivosPerdas.map(m => (
+                      <div key={m.motivo} className="flex items-center justify-between text-xs">
+                        <span className="text-red-700">{m.motivo}</span>
+                        <span className="font-bold text-red-600">{m.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedStage && selectedStage.objecoes.length > 0 && (
+                <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <div className="text-sm font-semibold text-yellow-900 mb-2">Tags de Objeção</div>
+                  <div className="space-y-1.5">
+                    {selectedStage.objecoes.map(o => (
+                      <div key={o.tag} className="flex items-center justify-between text-xs">
+                        <span className="text-yellow-700">{o.tag}</span>
+                        <span className="font-bold text-yellow-600">{o.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedStage && allCreatives.length === 0 && selectedStage.motivosPerdas.length === 0 && selectedStage.objecoes.length === 0 && (
                 <p className="text-sm text-slate-500">Sem dados nesta etapa no período.</p>
               )}
               {selectedStage && allCreatives.length > 0 && (
-                <div className="space-y-2">
-                  {allCreatives.map((c, idx) => (
-                    <CreativeRow key={`${c.anuncio}-${idx}`} creative={c} rank={idx + 1} />
-                  ))}
+                <div className="pt-2">
+                  <div className="text-sm font-semibold text-slate-900 mb-2">Criativos Top 5</div>
+                  <div className="space-y-2">
+                    {allCreatives.map((c, idx) => (
+                      <CreativeRow key={`${c.anuncio}-${idx}`} creative={c} rank={idx + 1} />
+                    ))}
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -56,6 +56,18 @@ const OBJECTION_LABELS = {
   '112': 'Desqualificada', '115': 'Não tem interesse no momento'
 };
 
+// Motivos de perda (loss_reason_id do Pipedrive) - para deals com status = 'lost'
+const LOSS_REASONS = {
+  '1': 'Não qualificado',
+  '2': 'Distância/Localização',
+  '3': 'Sem interesse',
+  '4': 'Objeção financeira',
+  '5': 'Medo/Insegurança',
+  '6': 'Não respondeu',
+  '7': 'Concorrência',
+  '8': 'Não compareceu'
+};
+
 // Opcoes do campo "Procedimento" (set) - confirmado via API
 const PROCEDIMENTO_OPTIONS = {
   '37': 'Método Evolution', '38': 'Toxina botulínica', '39': 'Ácido Hialurônico',
@@ -352,6 +364,7 @@ async function fetchAllDeals() {
             plataforma: deal[FIELD_PLATAFORMA] || '',
             origem: deal[FIELD_ORIGEM] || '',
             labelRaw: deal.label || '',
+            lossReasonId: deal.loss_reason_id || null,
             procedimentoRaw: deal[FIELD_PROCEDIMENTO] || '',
             telefone,
             ownerName: deal.user_id ? deal.user_id.name : '',
@@ -638,12 +651,20 @@ function buildFunnel(deals, rankFn = rankOf) {
   const lostDeals = deals.filter(d => d.status === 'lost');
 
   function perdidosNaEtapa(minRank) {
-    if (minRank === null) return { count: 0, objecoes: [] };
+    if (minRank === null) return { count: 0, objecoes: [], motivosPerdas: [] };
     const lostHere = lostDeals.filter(d => rankFn(d) >= minRank);
     const tagCounts = {};
-    lostHere.forEach(d => { objectionNames(d).forEach(tag => { tagCounts[tag] = (tagCounts[tag] || 0) + 1; }); });
+    const motivoCounts = {};
+    lostHere.forEach(d => {
+      objectionNames(d).forEach(tag => { tagCounts[tag] = (tagCounts[tag] || 0) + 1; });
+      if (d.lossReasonId && LOSS_REASONS[d.lossReasonId]) {
+        const motivo = LOSS_REASONS[d.lossReasonId];
+        motivoCounts[motivo] = (motivoCounts[motivo] || 0) + 1;
+      }
+    });
     const objecoes = Object.entries(tagCounts).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count).slice(0, 5);
-    return { count: lostHere.length, objecoes };
+    const motivosPerdas = Object.entries(motivoCounts).map(([motivo, count]) => ({ motivo, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+    return { count: lostHere.length, objecoes, motivosPerdas };
   }
 
   const stageOrder = ['leads', 'qualificados', 'agendados', 'compareceram', 'compraram'];
@@ -657,7 +678,7 @@ function buildFunnel(deals, rankFn = rankOf) {
     return {
       key, label: labels[key], count, pctFromStart: round2(pctFromStart),
       pctLossFromPrev: pctLossFromPrev === null ? null : round2(pctLossFromPrev),
-      perdidos: perdidos.count, objecoes: perdidos.objecoes
+      perdidos: perdidos.count, objecoes: perdidos.objecoes, motivosPerdas: perdidos.motivosPerdas
     };
   });
 
