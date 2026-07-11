@@ -44,6 +44,27 @@ Usa a data de comparecimento (quando entrou no estágio de Comparecimento), ou f
 
 ## Deploy no Servidor Remoto
 
+### ✅ PROCEDIMENTO OFICIAL (confirmado pelo Diego — usar SEMPRE este)
+Abrir um terminal NOVO (SSH novo no servidor) e executar os comandos UM POR VEZ, nesta ordem:
+
+```
+cd /home/user/dashboardvivera
+rm -f data/deals-cache.json
+git pull origin claude/meta-pipe-api-integration-luq1ht
+cp data/deals-cache-demo-full.json data/deals-cache.json   # (so enquanto estiver usando dados demo)
+npm run build:web                                          # esperar o "✓ built" (1-2 min)
+pkill -9 node
+npm start &
+```
+
+Depois: navegador com Ctrl+Shift+R na página alterada.
+
+Regras do procedimento:
+- **Sempre terminal novo** — evita estado sujo de sessões anteriores
+- **Um comando por vez** — nunca colar bloco inteiro
+- **Instruções numeradas passo a passo** para o Diego, sem pular etapa
+- Quando a API do Pipedrive voltar (cota renova ~4h da manhã), PULAR o passo do `cp` do demo e deixar o cache real ser recriado
+
 ### ⚠️ REGRA CRÍTICA: FRONTEND PRECISA DE BUILD
 O servidor entrega o frontend **buildado** de `web/dist`. Mudanças em `web/src/**` NÃO aparecem só com git pull + restart.
 **Todo deploy com mudança de frontend = 3 passos obrigatórios:**
