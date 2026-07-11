@@ -771,26 +771,27 @@ function buildFunnel(deals, rankFn = rankOf) {
     return rankFn(deal) >= minRank || deal.status === 'won';
   }
 
-  // % de evolucao pra proxima etapa, por criativo/campanha/conjunto: de todos que chegaram
-  // na etapa `key`, quantos avancaram pra `nextKey`.
+  // % de evolucao pra proxima etapa, por anuncio (criativo): de todos que chegaram na etapa
+  // `key`, quantos avancaram pra `nextKey`. Cada linha carrega o conjunto (publico) e a
+  // campanha de onde o anuncio veio, via originOf().
   function breakdownEvolucao(key, nextKey) {
     if (!nextKey) return null;
-    const out = {};
-    Object.entries(originDims).forEach(([dim, getter]) => {
-      const groups = {};
-      deals.forEach(d => {
-        if (!reachedStage(d, key)) return;
-        const nome = getter(d);
-        if (!groups[nome]) groups[nome] = { total: 0, evoluiu: 0 };
-        groups[nome].total++;
-        if (reachedStage(d, nextKey)) groups[nome].evoluiu++;
-      });
-      out[dim] = Object.entries(groups)
-        .map(([nome, v]) => ({ nome, total: v.total, evoluiu: v.evoluiu, pct: v.total > 0 ? round2((v.evoluiu / v.total) * 100) : 0 }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 8);
+    const groups = {};
+    deals.forEach(d => {
+      if (!reachedStage(d, key)) return;
+      const nome = d.palavraChave || 'sem_palavra_chave';
+      if (!groups[nome]) groups[nome] = { total: 0, evoluiu: 0 };
+      groups[nome].total++;
+      if (reachedStage(d, nextKey)) groups[nome].evoluiu++;
     });
-    return out;
+    return Object.entries(groups)
+      .map(([nome, v]) => ({
+        nome, ...originOf(nome),
+        total: v.total, evoluiu: v.evoluiu,
+        pct: v.total > 0 ? round2((v.evoluiu / v.total) * 100) : 0
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
   }
 
   // De onde vem as perdas da etapa: participacao de cada criativo/campanha/conjunto no

@@ -198,27 +198,24 @@ export function FunilPage() {
               )}
               {selectedStage && viewMode === 'massa' && (
                 <div>
-                  {selectedStage.evolucao && (
+                  {selectedStage.evolucao && Array.isArray(selectedStage.evolucao) && selectedStage.evolucao.length > 0 && (
                     <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <div className="text-sm font-semibold text-green-900 mb-3">Evolução para a próxima etapa — por origem</div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {([['Criativos', 'criativos'], ['Campanhas', 'campanhas'], ['Conjuntos', 'conjuntos']] as const).map(([titulo, dim]) => (
-                          <div key={dim}>
-                            <div className="text-xs font-bold text-green-800 uppercase tracking-wide mb-2">{titulo}</div>
-                            <div className="space-y-1.5">
-                              {selectedStage.evolucao![dim].length === 0 && (
-                                <p className="text-xs text-green-700/60">Sem dados</p>
+                      <div className="text-sm font-semibold text-green-900 mb-3">Evolução para a próxima etapa — por anúncio</div>
+                      <div className="space-y-2">
+                        {selectedStage.evolucao.map(e => (
+                          <div key={e.nome} className="flex items-center justify-between gap-3 text-xs">
+                            <div className="min-w-0 flex-1">
+                              <span className="font-semibold text-green-900">{e.nome}</span>
+                              {(e.conjunto !== 'sem_conjunto' || e.campanha !== 'sem_campanha') && (
+                                <span className="text-green-700/70 ml-1.5">
+                                  (Conjunto {e.conjunto} · Campanha {e.campanha})
+                                </span>
                               )}
-                              {selectedStage.evolucao![dim].map(e => (
-                                <div key={e.nome} className="flex items-center justify-between gap-2 text-xs">
-                                  <span className="text-green-800 truncate" title={e.nome}>{e.nome}</span>
-                                  <span className="shrink-0 tabular-nums">
-                                    <span className="text-green-600">{e.evoluiu}/{e.total}</span>
-                                    <span className="font-bold text-green-700 ml-1.5">({e.pct.toFixed(0)}%)</span>
-                                  </span>
-                                </div>
-                              ))}
                             </div>
+                            <span className="shrink-0 tabular-nums">
+                              <span className="text-green-600">{e.evoluiu}/{e.total}</span>
+                              <span className="font-bold text-green-700 ml-1.5 text-sm">{e.pct.toFixed(0)}%</span>
+                            </span>
                           </div>
                         ))}
                       </div>

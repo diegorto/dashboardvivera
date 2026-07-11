@@ -60,6 +60,8 @@ export interface FunnelLossReason {
 
 export interface FunnelEvolucaoItem {
   nome: string
+  campanha: string
+  conjunto: string
   total: number
   evoluiu: number
   pct: number
@@ -86,7 +88,7 @@ export interface FunnelStage {
   perdidos: number
   objecoes: FunnelObjection[]
   motivosPerdas: FunnelLossReason[]
-  evolucao: FunnelOriginBreakdown<FunnelEvolucaoItem> | null
+  evolucao: FunnelEvolucaoItem[] | null
   perdasPorOrigem: FunnelOriginBreakdown<FunnelPerdaOrigemItem>
 }
 
