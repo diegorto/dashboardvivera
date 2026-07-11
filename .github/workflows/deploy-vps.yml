@@ -1,0 +1,98 @@
+name: 🚀 Deploy to VPS
+
+on:
+  push:
+    branches:
+      - claude/meta-pipe-api-integration-luq1ht
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔑 SSH Deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            set -e
+            echo "🚀 Iniciando deploy..."
+
+            # Kill port 3000
+            echo "🔪 Limpando porta..."
+            fuser -k 3000/tcp 2>/dev/null || true
+            pkill -9 node 2>/dev/null || true
+            pkill -9 "node server.js" 2>/dev/null || true
+            sleep 2
+
+            # Navigate and update
+            cd /root/dashboardvivera
+
+            echo "📥 Puxando código..."
+            git fetch origin
+            git checkout claude/meta-pipe-api-integration-luq1ht
+            git pull origin claude/meta-pipe-api-integration-luq1ht --force
+
+            echo "📦 Instalando dependências..."
+            npm install --silent --production 2>&1 | tail -5
+
+            echo "🔄 Instalando PM2..."
+            npm install -g pm2 --silent 2>/dev/null || npm install -g pm2
+
+            # Create ecosystem config
+            cat > ecosystem.config.js << 'EOFPM2'
+            module.exports = {
+              apps: [{
+                name: 'dashboard',
+                script: 'server.js',
+                cwd: '/root/dashboardvivera',
+                instances: 1,
+                env: {
+                  NODE_ENV: 'production',
+                  PORT: 3000,
+                  PIPEDRIVE_TOKEN: '${{ secrets.PIPEDRIVE_TOKEN }}'
+                },
+                autorestart: true,
+                watch: false,
+                max_memory_restart: '500M',
+                error_file: './logs/error.log',
+                out_file: './logs/out.log',
+                ignore_watch: ['node_modules', '.git', 'logs']
+              }]
+            };
+            EOFPM2
+
+            mkdir -p logs
+
+            # Clean PM2 and restart
+            echo "🧹 Limpando PM2..."
+            pm2 stop dashboard 2>/dev/null || true
+            pm2 delete dashboard 2>/dev/null || true
+            sleep 2
+
+            echo "🚀 Iniciando servidor..."
+            pm2 start ecosystem.config.js --no-daemon &
+            sleep 5
+
+            # Health check
+            echo "🏥 Health check..."
+            for i in {1..15}; do
+              if curl -s http://localhost:3000/api/health > /dev/null 2>&1; then
+                echo "✅ Servidor online!"
+                pm2 status
+                pm2 save
+
+                # Setup auto-restart cron
+                (crontab -l 2>/dev/null | grep -v "dashboardvivera"; echo "*/5 * * * * curl -s http://localhost:3000/api/health > /dev/null 2>&1 || (cd /root/dashboardvivera && pm2 restart dashboard > /dev/null 2>&1)") | crontab -
+
+                echo "✨ Deploy concluído com sucesso!"
+                exit 0
+              fi
+              echo "⏳ Aguardando... ($i/15)"
+              sleep 1
+            done
+
+            echo "❌ Servidor não respondeu. Logs:"
+            pm2 logs --lines 50 --nostream dashboard
+            exit 1
