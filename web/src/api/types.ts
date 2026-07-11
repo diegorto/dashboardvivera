@@ -139,6 +139,7 @@ export interface Patient {
   dataVenda: string | null
   status: string
   tempoAteFechar: number | null
+  tempoOrcamentoVenda: number | null
   pipedriveUrl: string
 }
 

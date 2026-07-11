@@ -756,6 +756,10 @@ function buildPatients(deals) {
     if (deal.wonDate && deal.addDate) {
       tempoAteFechar = Math.round((new Date(deal.wonDate) - new Date(deal.addDate)) / 86400000);
     }
+    let tempoOrcamentoVenda = null;
+    if (deal.wonDate && deal.dataComparecimento) {
+      tempoOrcamentoVenda = Math.round((new Date(deal.wonDate) - new Date(deal.dataComparecimento)) / 86400000);
+    }
     const closers = closerNames(deal);
     return {
       id: deal.id,
@@ -772,6 +776,7 @@ function buildPatients(deals) {
       dataVenda: deal.wonDate,
       status: deal.status,
       tempoAteFechar,
+      tempoOrcamentoVenda,
       pipedriveUrl: pipedriveDealUrl(deal.id)
     };
   }).sort((a, b) => (b.dataVenda || '').localeCompare(a.dataVenda || ''));

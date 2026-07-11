@@ -45,11 +45,12 @@ export function PacientesPage() {
               <SortHeader label="Valor" active={sortKey === 'valor'} dir={sortKey === 'valor' ? sortDir : null} onClick={() => toggle('valor')} align="right" />
               <SortHeader label="Data venda" active={sortKey === 'dataVenda'} dir={sortKey === 'dataVenda' ? sortDir : null} onClick={() => toggle('dataVenda')} align="right" />
               <SortHeader label="Tempo até fechar" active={sortKey === 'tempoAteFechar'} dir={sortKey === 'tempoAteFechar' ? sortDir : null} onClick={() => toggle('tempoAteFechar')} align="right" />
+              <SortHeader label="Tempo orçamento → venda" active={sortKey === 'tempoOrcamentoVenda'} dir={sortKey === 'tempoOrcamentoVenda' ? sortDir : null} onClick={() => toggle('tempoOrcamentoVenda')} align="right" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="py-8 text-center text-muted-foreground">Nenhum paciente no período/filtro.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Nenhum paciente no período/filtro.</TableCell></TableRow>
             )}
             {sorted.map(p => (
               <TableRow key={p.id} className="cursor-pointer" onClick={() => setSelected(p)}>
@@ -61,6 +62,7 @@ export function PacientesPage() {
                 <TableCell className="text-right font-semibold">{formatBRL(p.valor)}</TableCell>
                 <TableCell className="text-right">{p.dataVenda ? formatDate(p.dataVenda) : '—'}</TableCell>
                 <TableCell className="text-right">{p.tempoAteFechar !== null ? `${p.tempoAteFechar}d` : '—'}</TableCell>
+                <TableCell className="text-right">{p.tempoOrcamentoVenda !== null ? `${p.tempoOrcamentoVenda}d` : '—'}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -84,6 +86,7 @@ export function PacientesPage() {
                 <dt className="text-muted-foreground">Data do lead</dt><dd>{formatDate(selected.dataLead)}</dd>
                 <dt className="text-muted-foreground">Data da venda</dt><dd>{selected.dataVenda ? formatDate(selected.dataVenda) : '—'}</dd>
                 <dt className="text-muted-foreground">Tempo até fechar</dt><dd>{selected.tempoAteFechar !== null ? `${selected.tempoAteFechar} dias` : '—'}</dd>
+                <dt className="text-muted-foreground">Tempo orçamento → venda</dt><dd>{selected.tempoOrcamentoVenda !== null ? `${selected.tempoOrcamentoVenda} dias` : '—'}</dd>
               </dl>
             )}
           </CardContent>
