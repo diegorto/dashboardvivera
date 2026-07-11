@@ -13,7 +13,11 @@ export interface Kpis {
   investimento: Metric
   roas: Metric
   cac: Metric
+  cpl: Metric
   tempoMedioFechamento: Metric
+  leadsInstagram: Metric
+  leadsGoogle: Metric
+  leadsIndicacao: Metric
 }
 
 export interface Creative {

@@ -38,6 +38,8 @@ export function CreativesTable({
           <TableRow>
             <SortHeader label="Ranking" active={false} dir={null} onClick={() => {}} />
             <SortHeader label="Criativo" active={sortKey === 'anuncio'} dir={sortKey === 'anuncio' ? sortDir : null} onClick={() => toggle('anuncio')} />
+            <SortHeader label="Conjunto" active={sortKey === 'conjunto'} dir={sortKey === 'conjunto' ? sortDir : null} onClick={() => toggle('conjunto')} />
+            <SortHeader label="Campanha" active={sortKey === 'campanha'} dir={sortKey === 'campanha' ? sortDir : null} onClick={() => toggle('campanha')} />
             <SortHeader label="Mensagens (Meta)" active={sortKey === 'mensagensMeta'} dir={sortKey === 'mensagensMeta' ? sortDir : null} onClick={() => toggle('mensagensMeta')} align="right" />
             <SortHeader label="Leads (Pipedrive)" active={sortKey === 'leads'} dir={sortKey === 'leads' ? sortDir : null} onClick={() => toggle('leads')} align="right" />
             <SortHeader label="Receita" active={sortKey === 'receita'} dir={sortKey === 'receita' ? sortDir : null} onClick={() => toggle('receita')} align="right" />
@@ -53,7 +55,7 @@ export function CreativesTable({
         </TableHeader>
         <TableBody>
           {sorted.length === 0 && (
-            <TableRow><TableCell colSpan={13} className="py-8 text-center text-muted-foreground">Nenhum criativo encontrado.</TableCell></TableRow>
+            <TableRow><TableCell colSpan={15} className="py-8 text-center text-muted-foreground">Nenhum criativo encontrado.</TableCell></TableRow>
           )}
           {sorted.map((c, i) => (
             <TableRow key={`${c.campanha}|${c.conjunto}|${c.anuncio}`} className="group relative">
@@ -61,6 +63,8 @@ export function CreativesTable({
               <TableCell className="max-w-[220px] truncate font-medium">
                 <CreativeHoverName creative={c} />
               </TableCell>
+              <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{c.conjunto}</TableCell>
+              <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">{c.campanha}</TableCell>
               <TableCell className="text-right">{formatNumber(c.mensagensMeta)}</TableCell>
               <TableCell className={`text-right ${c.mensagensMeta > 0 && c.leads < c.mensagensMeta * 0.5 ? 'font-semibold text-warn' : ''}`} title={c.mensagensMeta > 0 && c.leads < c.mensagensMeta * 0.5 ? 'Meta reporta bem mais mensagens do que o Pipedrive captura - pode indicar leads que não estão virando negócio no CRM.' : undefined}>
                 {formatNumber(c.leads)}
