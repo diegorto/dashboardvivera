@@ -91,6 +91,32 @@ const FUNNEL_STAGES = [
   { key: 'compraram', label: 'Compraram', rank: 5 } // tratado a parte (status === won)
 ];
 
+// Cache de deals em arquivo - evita gastar orçamento da API
+const CACHE_FILE = path.join(__dirname, 'data', 'deals-cache.json');
+const CACHE_TTL = 3600 * 1000; // 1 hora em ms
+
+function readCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf-8'));
+      return data;
+    }
+  } catch (e) {
+    console.log('Cache inválido, ignorando');
+  }
+  return { deals: [], lastUpdate: 0 };
+}
+
+function writeCache(deals) {
+  try {
+    const dir = path.dirname(CACHE_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(CACHE_FILE, JSON.stringify({ deals, lastUpdate: Date.now() }, null, 2));
+  } catch (e) {
+    console.error('Erro ao salvar cache:', e.message);
+  }
+}
+
 // Nomes reais das etapas no Pipedrive (stage_id -> nome), confirmado via API.
 const STAGE_NAMES = {
   1: 'Entrada', 2: 'Contato Realizado', 25: 'Dia seguinte',
@@ -314,6 +340,16 @@ function tintimToSuggestion(tintimLead) {
 // periodo/pipeline sao aplicados em memoria depois). Uma unica passada pela API do Pipedrive,
 // reaproveitada tanto pro pipeline Inbound (marketing) quanto pro Recepcao (fechamentos locais).
 async function fetchAllDeals() {
+  const cache = readCache();
+  const agora = Date.now();
+
+  // Se cache ainda é válido (menos de 1 hora), usa cache
+  if (cache.deals.length > 0 && (agora - cache.lastUpdate) < CACHE_TTL) {
+    console.log(`[CACHE] Usando deals em cache (${cache.deals.length} deals, ${Math.round((agora - cache.lastUpdate) / 1000)}s atrás)`);
+    return cache.deals;
+  }
+
+  console.log('[API] Buscando deals do Pipedrive...');
   const deals = [];
   let start = 0;
   let hasMore = true;
@@ -375,6 +411,17 @@ async function fetchAllDeals() {
     }
   } catch (error) {
     console.error('Erro ao buscar deals Pipedrive:', error.response?.data?.error || error.message);
+    // Se der erro, tenta usar cache antigo
+    if (cache.deals.length > 0) {
+      console.log(`[CACHE] Usando cache antigo por erro na API (${cache.deals.length} deals)`);
+      return cache.deals;
+    }
+  }
+
+  // Salva novo cache se conseguiu buscar
+  if (deals.length > 0) {
+    writeCache(deals);
+    console.log(`[CACHE] Salvou ${deals.length} deals em cache`);
   }
 
   return deals;
@@ -382,13 +429,19 @@ async function fetchAllDeals() {
 
 // Historico real de mudancas do deal (Pipedrive guarda isso, mas so devolve por deal - sem
 // endpoint em lote). Usado pra montar o funil "real" (chegou a etapa X em algum momento),
-// em vez da aproximacao pela posicao atual.
+// em vez da aproximacao pela posicao atual. NOTA: fetchDealFlowsBatch ja faz cache por deal.
+const flowCache = new Map(); // Cache em memória de flows por dealId
+
 async function fetchDealFlow(dealId) {
+  if (flowCache.has(dealId)) return flowCache.get(dealId);
+
   try {
     const response = await axios.get(`https://api.pipedrive.com/v1/deals/${dealId}/flow`, {
       params: { api_token: PIPEDRIVE_TOKEN, limit: 200 }, timeout: 10000
     });
-    return (response.data && response.data.data) || [];
+    const flow = (response.data && response.data.data) || [];
+    flowCache.set(dealId, flow);
+    return flow;
   } catch (error) {
     return [];
   }
