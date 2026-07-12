@@ -282,12 +282,18 @@ export interface LeadSourceStat {
   investimento?: number | null
 }
 
+export interface OtherLeadSource {
+  fonte: string
+  leads: number
+  receita: number
+}
+
 export interface LeadSources {
   total: LeadSourceStat
   google: LeadSourceStat
   meta: LeadSourceStat
   indicacao: LeadSourceStat
-  outros: LeadSourceStat
+  outros: LeadSourceStat & { breakdown?: OtherLeadSource[] }
 }
 
 export interface DashboardResponse {

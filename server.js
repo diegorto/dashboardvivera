@@ -523,15 +523,25 @@ function buildLeadSources(deals, ads) {
   const investimentoMeta = ads.reduce((s, a) => s + a.spend, 0);
   const mk = () => ({ leads: 0, receita: 0 });
   const bySource = { google: mk(), meta: mk(), indicacao: mk(), outros: mk() };
+  const outrosDetalhado = {};
   let receitaTotal = 0;
   deals.forEach(d => {
-    const src = bySource[classifyLeadSource(d)];
+    const classified = classifyLeadSource(d);
+    const src = bySource[classified];
     src.leads++;
     if (d.status === 'won') { src.receita += d.value || 0; receitaTotal += d.value || 0; }
+    if (classified === 'outros') {
+      const fonte = d.origem || d.plataforma || 'Sem fonte';
+      if (!outrosDetalhado[fonte]) outrosDetalhado[fonte] = { leads: 0, receita: 0 };
+      outrosDetalhado[fonte].leads++;
+      if (d.status === 'won') outrosDetalhado[fonte].receita += d.value || 0;
+    }
   });
+  const outrosBreakdown = Object.entries(outrosDetalhado)
+    .map(([fonte, stats]) => ({ fonte, leads: stats.leads, receita: round2(stats.receita) }))
+    .sort((a, b) => b.leads - a.leads);
   return {
     total: { leads: deals.length, receita: round2(receitaTotal) },
-    // CPL e ROAS do Google ficam null: nao ha integracao com Google Ads (sem dado de investimento).
     google: { leads: bySource.google.leads, receita: round2(bySource.google.receita), cpl: null, roas: null, investimento: null },
     meta: {
       leads: bySource.meta.leads,
@@ -541,7 +551,7 @@ function buildLeadSources(deals, ads) {
       investimento: round2(investimentoMeta)
     },
     indicacao: { leads: bySource.indicacao.leads, receita: round2(bySource.indicacao.receita) },
-    outros: { leads: bySource.outros.leads, receita: round2(bySource.outros.receita) }
+    outros: { leads: bySource.outros.leads, receita: round2(bySource.outros.receita), breakdown: outrosBreakdown }
   };
 }
 

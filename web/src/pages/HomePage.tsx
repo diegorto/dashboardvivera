@@ -1,4 +1,5 @@
-import { AlertTriangle, UserX, Landmark, Users, HeartHandshake, HelpCircle } from 'lucide-react'
+import { AlertTriangle, UserX, Landmark, Users, HeartHandshake, HelpCircle, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { useFilters } from '@/lib/FilterContext'
 import { KpiCard } from '@/components/KpiCard'
 import { CreativesTable } from '@/components/CreativesTable'
@@ -140,6 +141,7 @@ export function HomePage() {
               label="Outras Fontes"
               leads={data.leadSources.outros.leads}
               receita={data.leadSources.outros.receita}
+              breakdown={data.leadSources.outros.breakdown}
             />
           </div>
         </section>
@@ -180,21 +182,32 @@ export function HomePage() {
   )
 }
 
-function SourceCard({ icon, label, leads, cpl, roas, receita }: {
+function SourceCard({ icon, label, leads, cpl, roas, receita, breakdown }: {
   icon: React.ReactNode
   label: string
   leads: number
   cpl?: number | null
   roas?: number | null
   receita: number
+  breakdown?: Array<{ fonte: string; leads: number; receita: number }>
 }) {
+  const [expanded, setExpanded] = useState(false);
   return (
     <Card>
       <CardContent className="flex flex-col gap-1.5 p-3.5">
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-        </div>
+        <button
+          onClick={() => breakdown && setExpanded(!expanded)}
+          className="text-left flex items-center justify-between gap-2 hover:opacity-70 transition-opacity"
+          disabled={!breakdown}
+        >
+          <div className="flex items-center gap-2 flex-1">
+            {icon}
+            <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+          </div>
+          {breakdown && (
+            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          )}
+        </button>
         <span className="text-2xl font-bold tabular-nums">{formatNumber(leads)}</span>
         <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
           {cpl !== undefined && (
@@ -205,6 +218,19 @@ function SourceCard({ icon, label, leads, cpl, roas, receita }: {
           )}
           <span>Receita: <span className="font-semibold text-foreground">{formatBRL(receita)}</span></span>
         </div>
+        {expanded && breakdown && (
+          <div className="mt-3 border-t pt-3 text-[11px] flex flex-col gap-2">
+            {breakdown.map(item => (
+              <div key={item.fonte} className="flex justify-between items-center">
+                <span className="text-muted-foreground">{item.fonte}</span>
+                <div className="flex gap-2 text-foreground font-medium">
+                  <span>{formatNumber(item.leads)} leads</span>
+                  <span className="text-green-600">{formatBRL(item.receita)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
