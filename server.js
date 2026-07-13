@@ -511,6 +511,10 @@ function isMetaAttributed(deal) {
 // Classifica a fonte do lead pelos campos Origem/Plataforma do Pipedrive.
 // Origem tem prioridade sobre a inferencia por campanha preenchida.
 function classifyLeadSource(deal) {
+  // Verifica origem customizada por ID
+  if (deal.origem === '87') return 'indicacao'; // Indicação de paciente
+  if (deal.origem === '88') return 'meta'; // Instagram
+
   const txt = `${deal.origem || ''} ${deal.plataforma || ''}`.toLowerCase();
   if (/google|adwords|pesquisa/.test(txt)) return 'google';
   if (/indica/.test(txt)) return 'indicacao';
