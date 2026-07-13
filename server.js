@@ -1404,7 +1404,7 @@ app.get('/api/leads-outras-fontes', async (req, res) => {
     const filtered = deals.data.data
       .filter(deal => {
         const origem = deal.origin;
-        return ['88', '87', 'Não rastreado', 'Sem fonte'].includes(origem) ||
+        return ['Não rastreado', 'Sem fonte'].includes(origem) ||
                !origem || origem === null;
       })
       .map(deal => ({
