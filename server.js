@@ -1075,7 +1075,7 @@ function buildLeadsSemOrigem(deals) {
 
 function buildLeadsOutrasFontes(deals) {
   return deals.filter(d => {
-    const origem = d.origin;
+    const origem = d.origem;
     return ['Não rastreado', 'Sem fonte'].includes(origem) || !origem || origem === null;
   }).map(deal => ({
     id: deal.id,
@@ -1083,7 +1083,7 @@ function buildLeadsOutrasFontes(deals) {
     telefone: deal.cc_phone || deal.phone || '',
     proprietario: deal.ownerName || 'Sem atribuição',
     dataCriacao: deal.addDate,
-    origem: deal.origin || 'Não rastreado',
+    origem: deal.origem || 'Não rastreado',
     tags: (deal.labelRaw || '').split(',').filter(Boolean),
     linkPipedrive: pipedriveDealUrl(deal.id),
     linkWhatsapp: (deal.cc_phone || deal.phone) ? `https://wa.me/${(deal.cc_phone || deal.phone).replace(/\D/g, '')}` : null
@@ -1425,7 +1425,7 @@ app.get('/api/leads-outras-fontes', async (req, res) => {
 
     const filtered = deals.data.data
       .filter(deal => {
-        const origem = deal.origin;
+        const origem = deal.origem;
         return ['Não rastreado', 'Sem fonte'].includes(origem) ||
                !origem || origem === null;
       })
@@ -1435,7 +1435,7 @@ app.get('/api/leads-outras-fontes', async (req, res) => {
         telefone: deal.cc_phone || deal.phone || '',
         proprietario: deal.owner_id ? deal.owner_id.name : 'Sem atribuição',
         dataCriacao: deal.add_time,
-        origem: deal.origin || 'Não rastreado',
+        origem: deal.origem || 'Não rastreado',
         tags: deal.label || [],
         linkPipedrive: `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com/deal/${deal.id}`,
         linkWhatsapp: deal.cc_phone || deal.phone ? `https://wa.me/${(deal.cc_phone || deal.phone).replace(/\D/g, '')}` : null
