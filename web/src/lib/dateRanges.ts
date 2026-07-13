@@ -9,9 +9,8 @@ function fmt(d: Date): string {
 
 function startOfWeek(d: Date): Date {
   const day = d.getDay() // 0=domingo
-  const diff = day === 0 ? 6 : day - 1 // segunda como inicio
   const s = new Date(d)
-  s.setDate(d.getDate() - diff)
+  s.setDate(d.getDate() - day) // domingo como inicio
   return s
 }
 
