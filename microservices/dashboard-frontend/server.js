@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: __dirname + '/.env' })
 const express = require('express')
 const axios = require('axios')
 const cors = require('cors')
@@ -241,6 +241,7 @@ app.get('/api/integration/meta-pipedrive', async (req, res) => {
 // Servir interface web
 const webDistPath = path.join(__dirname, '../../web/dist')
 const webPublicPath = path.join(__dirname, '../../web')
+const dashboardPublicPath = path.join(__dirname, './public')
 
 // Verificar se existe build React
 if (fs.existsSync(webDistPath)) {
@@ -252,6 +253,11 @@ if (fs.existsSync(webDistPath)) {
   app.use(express.static(webPublicPath))
   app.get('/', (req, res) => {
     res.sendFile(path.join(webPublicPath, 'index.html'))
+  })
+} else if (fs.existsSync(dashboardPublicPath)) {
+  app.use(express.static(dashboardPublicPath))
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(dashboardPublicPath, 'dashboard.html'))
   })
 } else {
   // Página de boas-vindas simplificada
