@@ -64,41 +64,36 @@ export function OutrasFontesPage() {
       <div className="overflow-x-auto rounded-lg border border-border">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50">
+            <TableRow>
               <SortHeader
                 label="Nome"
                 active={sortKey === 'nome'}
                 dir={sortKey === 'nome' ? sortDir : null}
                 onClick={() => toggle('nome')}
-                className="min-w-40"
               />
               <SortHeader
                 label="Telefone"
                 active={sortKey === 'telefone'}
                 dir={sortKey === 'telefone' ? sortDir : null}
                 onClick={() => toggle('telefone')}
-                className="min-w-32"
               />
               <SortHeader
                 label="Proprietário"
                 active={sortKey === 'proprietario'}
                 dir={sortKey === 'proprietario' ? sortDir : null}
                 onClick={() => toggle('proprietario')}
-                className="min-w-32"
               />
               <SortHeader
                 label="Origem"
                 active={sortKey === 'origem'}
                 dir={sortKey === 'origem' ? sortDir : null}
                 onClick={() => toggle('origem')}
-                className="min-w-24"
               />
               <SortHeader
                 label="Tags"
                 active={sortKey === 'tags'}
                 dir={sortKey === 'tags' ? sortDir : null}
                 onClick={() => toggle('tags')}
-                className="min-w-32"
               />
               <SortHeader
                 label="Data"
@@ -106,9 +101,8 @@ export function OutrasFontesPage() {
                 dir={sortKey === 'dataCriacao' ? sortDir : null}
                 onClick={() => toggle('dataCriacao')}
                 align="right"
-                className="min-w-24"
               />
-              <TableCell className="w-16 text-center">Links</TableCell>
+              <TableCell className="text-center">Links</TableCell>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -148,13 +142,13 @@ export function OutrasFontesPage() {
                 </TableCell>
                 <TableCell>{lead.proprietario}</TableCell>
                 <TableCell>
-                  <Badge variant="outline">{lead.origem}</Badge>
+                  <Badge variant="neutral">{lead.origem}</Badge>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {lead.tags.length > 0 ? (
                       lead.tags.map(tag => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
+                        <Badge key={tag} variant="accent">
                           {tag}
                         </Badge>
                       ))
