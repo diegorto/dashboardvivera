@@ -1386,6 +1386,46 @@ app.get('/api/ad-preview/:adId', async (req, res) => {
   }
 });
 
+// API: Listar leads de "Outras Fontes" com detalhes completos
+app.get('/api/leads-outras-fontes', async (req, res) => {
+  try {
+    const deals = await axios.get(`https://api.pipedrive.com/v1/deals`, {
+      params: {
+        api_token: PIPEDRIVE_TOKEN,
+        limit: 500,
+        status: 'open'
+      }
+    });
+
+    if (!deals.data.success) {
+      return res.json({ success: false, error: 'Erro ao buscar deals' });
+    }
+
+    const filtered = deals.data.data
+      .filter(deal => {
+        const origem = deal.origin;
+        return ['88', '87', 'Não rastreado', 'Sem fonte'].includes(origem) ||
+               !origem || origem === null;
+      })
+      .map(deal => ({
+        id: deal.id,
+        nome: deal.title,
+        telefone: deal.cc_phone || deal.phone || '',
+        proprietario: deal.owner_id ? deal.owner_id.name : 'Sem atribuição',
+        dataCriacao: deal.add_time,
+        origem: deal.origin || 'Não rastreado',
+        tags: deal.label || [],
+        linkPipedrive: `https://${PIPEDRIVE_COMPANY_DOMAIN}.pipedrive.com/deal/${deal.id}`,
+        linkWhatsapp: deal.cc_phone || deal.phone ? `https://wa.me/${(deal.cc_phone || deal.phone).replace(/\D/g, '')}` : null
+      }));
+
+    res.json({ success: true, total: filtered.length, leads: filtered });
+  } catch (error) {
+    console.error('Erro ao buscar leads de outras fontes:', error.message);
+    res.json({ success: false, error: error.message });
+  }
+});
+
 // Servir o frontend React buildado (web/dist). Fallback pra SPA em qualquer rota nao-API.
 const WEB_DIST = path.join(__dirname, 'web', 'dist');
 if (fs.existsSync(WEB_DIST)) {
