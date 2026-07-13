@@ -22,7 +22,7 @@ if (!CLIENT_ID || !CLIENT_SECRET) {
   process.exit(1);
 }
 
-const REDIRECT_URL = 'http://localhost:4000/auth/callback';
+const REDIRECT_URL = process.env.GOOGLE_ADS_REDIRECT_URI || 'http://localhost:4000/auth/callback';
 
 const oauth2Client = new google.auth.OAuth2(
   CLIENT_ID,
