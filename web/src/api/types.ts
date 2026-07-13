@@ -242,6 +242,18 @@ export interface LeadSemOrigem {
   status: string
 }
 
+export interface LeadOutrasFontes {
+  id: number
+  nome: string
+  telefone: string
+  proprietario: string
+  dataCriacao: string
+  origem: string
+  tags: string[]
+  linkPipedrive: string
+  linkWhatsapp: string | null
+}
+
 export interface TintimSuggestion {
   found: boolean
   hasAdData?: boolean
@@ -310,6 +322,7 @@ export interface DashboardResponse {
   revenueAtRiskRange: { since: string; until: string }
   insights: Insight[]
   leadsSemOrigem: LeadSemOrigem[]
+  leadsOutrasFontes: LeadOutrasFontes[]
   leadSources: LeadSources
   recepcao: Recepcao
   faturamentoTotal: Metric

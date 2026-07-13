@@ -1069,6 +1069,23 @@ function buildLeadsSemOrigem(deals) {
   })).sort((a, b) => (b.dataEntrada || '').localeCompare(a.dataEntrada || ''));
 }
 
+function buildLeadsOutrasFontes(deals) {
+  return deals.filter(d => {
+    const origem = d.origin;
+    return ['Não rastreado', 'Sem fonte'].includes(origem) || !origem || origem === null;
+  }).map(deal => ({
+    id: deal.id,
+    nome: deal.personName || deal.title || 'Sem nome',
+    telefone: deal.cc_phone || deal.phone || '',
+    proprietario: deal.ownerName || 'Sem atribuição',
+    dataCriacao: deal.addDate,
+    origem: deal.origin || 'Não rastreado',
+    tags: (deal.labelRaw || '').split(',').filter(Boolean),
+    linkPipedrive: pipedriveDealUrl(deal.id),
+    linkWhatsapp: (deal.cc_phone || deal.phone) ? `https://wa.me/${(deal.cc_phone || deal.phone).replace(/\D/g, '')}` : null
+  })).sort((a, b) => (b.dataCriacao || '').localeCompare(a.dataCriacao || ''));
+}
+
 function buildGovernance(deals) {
   const won = deals.filter(d => d.status === 'won');
   const semResponsavel = won.filter(d => closerNames(d).length === 0);
@@ -1218,6 +1235,7 @@ app.get('/api/dashboard', async (req, res) => {
     const governance = buildGovernance(deals);
     const insights = buildInsights(creatives, funnel, governance, pipeline);
     const leadsSemOrigem = buildLeadsSemOrigem(deals);
+    const leadsOutrasFontes = buildLeadsOutrasFontes(deals);
     const leadSources = buildLeadSources(deals, currentAds);
 
     // "Oportunidades Paradas" usa uma janela fixa de 3 meses, independente do filtro de
@@ -1245,7 +1263,7 @@ app.get('/api/dashboard', async (req, res) => {
     res.json({
       success: true,
       range, previousRange: prevRange,
-      kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem,
+      kpis, creatives, funnel, pipeline, patients, governance, revenueAtRisk, insights, leadsSemOrigem, leadsOutrasFontes,
       leadSources,
       revenueAtRiskRange,
       ticketMedio3M: round2(ticketMedio3M),

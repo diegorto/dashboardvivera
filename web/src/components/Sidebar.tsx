@@ -6,6 +6,7 @@ import { NAV_ITEMS } from '@/lib/nav'
 export function Sidebar() {
   const { data } = useFilters()
   const semOrigemCount = data?.leadsSemOrigem.length ?? 0
+  const outrasFromCount = data?.leadsOutrasFontes.length ?? 0
 
   return (
     <aside className="hidden w-52 shrink-0 border-r border-border md:block">
@@ -29,6 +30,9 @@ export function Sidebar() {
             <span className="flex-1">{item.label}</span>
             {item.to === '/sem-origem' && semOrigemCount > 0 && (
               <span className="rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn">{semOrigemCount}</span>
+            )}
+            {item.to === '/outras-fontes' && outrasFromCount > 0 && (
+              <span className="rounded-full bg-warn-soft px-1.5 py-0.5 text-[10px] font-bold text-warn">{outrasFromCount}</span>
             )}
           </NavLink>
         ))}
