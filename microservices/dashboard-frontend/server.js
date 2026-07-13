@@ -172,9 +172,68 @@ app.get('/api/pipedrive/outras-fontes', async (req, res) => {
   res.json(data)
 })
 
+app.get('/api/pipedrive/meta-leads', async (req, res) => {
+  const data = await callService('pipedrive', `/api/meta-leads?since=${req.query.since}&until=${req.query.until}`)
+  res.json(data)
+})
+
 app.get('/api/tintim/audit', async (req, res) => {
   const data = await callService('tintim', '/api/audit')
   res.json(data)
+})
+
+// Meta-Pipedrive integration endpoint
+app.get('/api/integration/meta-pipedrive', async (req, res) => {
+  try {
+    const { since, until } = req.query
+
+    if (!since || !until) {
+      return res.status(400).json({ error: 'Parâmetros since e until obrigatórios' })
+    }
+
+    // Fetch data from both services in parallel
+    const [metaData, pipedriveOutrasFontes] = await Promise.all([
+      callService('meta', `/api/ads?since=${since}&until=${until}`),
+      callService('pipedrive', `/api/outras-fontes?since=${since}&until=${until}`)
+    ])
+
+    // Extract Meta leads (origin 88)
+    const metaLeads = pipedriveOutrasFontes.leads?.meta || []
+
+    // Calculate integration metrics
+    const integration = {
+      period: { since, until },
+
+      meta: {
+        spend: metaData.totalSpend || 0,
+        impressions: metaData.impressions || 0,
+        clicks: metaData.clicks || 0,
+        ctr: metaData.ctr || 0,
+        cpc: metaData.cpc || 0,
+        leads: metaData.totalLeads || 0,
+        cpl: metaData.cpl || 0,
+        error: metaData.error
+      },
+
+      pipedrive: {
+        leadsFromMeta: metaLeads.length,
+        metaLeads: metaLeads,
+        error: pipedriveOutrasFontes.error
+      },
+
+      correlation: {
+        metaAdLeads: metaData.totalLeads || 0,
+        pipedriveMetaLeads: metaLeads.length,
+        effectiveCPL: metaLeads.length > 0 ? ((metaData.totalSpend || 0) / metaLeads.length).toFixed(2) : 0,
+        conversionRate: (metaData.totalLeads || 0) > 0 ? ((metaLeads.length / (metaData.totalLeads || 1)) * 100).toFixed(2) : 0
+      }
+    }
+
+    res.json(integration)
+  } catch (error) {
+    console.error('Erro em /api/integration/meta-pipedrive:', error.message)
+    res.status(500).json({ error: error.message })
+  }
 })
 
 const PORT = process.env.PORT || 3000
@@ -187,4 +246,5 @@ app.listen(PORT, () => {
   console.log('\nEndpoints disponíveis:')
   console.log('  GET /api/health - Health check de todos os serviços')
   console.log('  GET /api/dashboard?since=YYYY-MM-DD&until=YYYY-MM-DD - Dashboard agregado')
+  console.log('  GET /api/integration/meta-pipedrive?since=YYYY-MM-DD&until=YYYY-MM-DD - Meta-Pipedrive integration')
 })

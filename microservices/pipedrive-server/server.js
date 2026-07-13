@@ -418,6 +418,83 @@ app.get('/api/outras-fontes', async (req, res) => {
   }
 })
 
+// Get Meta leads with metrics endpoint
+app.get('/api/meta-leads', async (req, res) => {
+  try {
+    const { since, until } = req.query
+
+    if (!since || !until) {
+      return res.status(400).json({ error: 'Parameters since and until are required' })
+    }
+
+    const now = Date.now()
+    let deals = cache.deals
+
+    if (!deals || now - cache.timestamp >= CACHE_TTL) {
+      deals = await fetchAllDeals()
+      cache.deals = deals
+      cache.timestamp = now
+    }
+
+    // Get all deals from Meta source (origin 88)
+    const allDealsInRange = deals.filter(deal => inRange(deal, since, until))
+    const metaLeads = allDealsInRange.filter(deal => deal[FIELD_IDS.origem] === 88)
+
+    // Calculate metrics
+    const metrics = {
+      totalMetaLeads: metaLeads.length,
+      byPipeline: {
+        inbound: 0,
+        recepcao: 0,
+        agendado: 0,
+        other: 0
+      },
+      byStatus: {
+        open: 0,
+        won: 0,
+        lost: 0
+      },
+      revenue: {
+        total: 0,
+        won: 0,
+        wonCount: 0
+      }
+    }
+
+    metaLeads.forEach(deal => {
+      // Count by pipeline
+      if (deal.pipeline_id === PIPELINE_IDS.inbound) metrics.byPipeline.inbound++
+      else if (deal.pipeline_id === PIPELINE_IDS.recepcao) metrics.byPipeline.recepcao++
+      else if (deal.pipeline_id === PIPELINE_IDS.agendado) metrics.byPipeline.agendado++
+      else metrics.byPipeline.other++
+
+      // Count by status
+      if (deal.status === 'open') metrics.byStatus.open++
+      else if (deal.status === 'won') metrics.byStatus.won++
+      else if (deal.status === 'lost') metrics.byStatus.lost++
+
+      // Calculate revenue
+      const value = deal.value || 0
+      metrics.revenue.total += value
+      if (deal.status === 'won') {
+        metrics.revenue.won += value
+        metrics.revenue.wonCount++
+      }
+    })
+
+    metrics.revenue.averageValue = metaLeads.length > 0 ? (metrics.revenue.total / metaLeads.length).toFixed(2) : 0
+
+    res.json({
+      leads: metaLeads,
+      metrics,
+      count: metaLeads.length
+    })
+  } catch (error) {
+    console.error('Error in /api/meta-leads:', error.message)
+    res.status(500).json({ error: error.message })
+  }
+})
+
 const PORT = process.env.PORT || 3004
 app.listen(PORT, () => {
   console.log(`Pipedrive Server running on port ${PORT}`)
@@ -431,4 +508,5 @@ app.listen(PORT, () => {
   console.log('  GET /api/revenue?since=YYYY-MM-DD&until=YYYY-MM-DD - Get revenue')
   console.log('  GET /api/leads-sem-origem?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads without origin')
   console.log('  GET /api/outras-fontes?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads by source')
+  console.log('  GET /api/meta-leads?since=YYYY-MM-DD&until=YYYY-MM-DD - Meta leads with metrics')
 })
