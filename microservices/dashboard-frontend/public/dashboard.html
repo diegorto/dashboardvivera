@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vivera Dashboard - Meta & Pipedrive</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 14px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .metric:last-child {
+            border-bottom: none;
+        }
+        .metric-label {
+            color: #666;
+            font-size: 14px;
+        }
+        .metric-value {
+            color: #333;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.up {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.down {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .loading {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .btn:hover {
+            background: #764ba2;
+        }
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        .section-title {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 20px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🚀 Vivera Dashboard</h1>
+            <p>Meta Ads & Pipedrive Integration</p>
+            <button class="btn" onclick="loadData()">🔄 Atualizar Dados</button>
+        </div>
+
+        <!-- Health Status -->
+        <div class="section-title">📊 Status dos Serviços</div>
+        <div id="health-container" class="grid">
+            <div class="loading">Carregando...</div>
+        </div>
+
+        <!-- Meta-Pipedrive Integration -->
+        <div class="section-title">🔥 Meta & Pipedrive Integration</div>
+        <div class="grid">
+            <div class="card full-width">
+                <h2>Correlação: Gasto vs Leads Convertidos</h2>
+                <div id="integration-container">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Meta Leads -->
+        <div class="section-title">📈 Leads do Meta</div>
+        <div class="grid">
+            <div class="card">
+                <h2>Métricas</h2>
+                <div id="meta-leads-container">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Pipeline Distribution</h2>
+                <div id="pipeline-container">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Status Distribution</h2>
+                <div id="status-container">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Revenue Metrics</h2>
+                <div id="revenue-container">
+                    <div class="loading">Carregando...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        const today = new Date();
+        const since = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const until = today.toISOString().split('T')[0];
+
+        async function loadData() {
+            console.log(`📅 Período: ${since} até ${until}`);
+            loadHealth();
+            loadIntegration();
+            loadMetaLeads();
+        }
+
+        async function loadHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+
+                let html = '';
+                for (const [service, status] of Object.entries(data.services)) {
+                    const statusClass = status.status === 'up' ? 'up' : 'down';
+                    html += `
+                        <div class="card">
+                            <h2>${service.toUpperCase()}</h2>
+                            <div class="metric">
+                                <span class="metric-label">Status</span>
+                                <span class="status ${statusClass}">${status.status.toUpperCase()}</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">URL</span>
+                                <span class="metric-value" style="font-size: 12px;">${status.url}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                document.getElementById('health-container').innerHTML = html;
+            } catch (err) {
+                document.getElementById('health-container').innerHTML = `<div class="error">Erro ao carregar status: ${err.message}</div>`;
+            }
+        }
+
+        async function loadIntegration() {
+            try {
+                const response = await fetch(`${API_BASE}/integration/meta-pipedrive?since=${since}&until=${until}`);
+                const data = await response.json();
+
+                const cpl = data.meta.cpl || 0;
+                const effectiveCPL = data.correlation.effectiveCPL || 0;
+                const conversionRate = data.correlation.conversionRate || 0;
+
+                let html = `
+                    <div class="metric">
+                        <span class="metric-label">💰 Gasto Total em Meta</span>
+                        <span class="metric-value">R$ ${parseFloat(data.meta.spend).toFixed(2)}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">👁️ Impressões</span>
+                        <span class="metric-value">${data.meta.impressions.toLocaleString()}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">🖱️ Cliques</span>
+                        <span class="metric-value">${data.meta.clicks.toLocaleString()}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">📊 CTR (Click Through Rate)</span>
+                        <span class="metric-value">${data.meta.ctr}%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">💸 CPC (Custo por Clique)</span>
+                        <span class="metric-value">R$ ${data.meta.cpc}</span>
+                    </div>
+                    <hr style="margin: 15px 0;">
+                    <div class="metric">
+                        <span class="metric-label">📱 Leads Gerados (Meta Ads)</span>
+                        <span class="metric-value">${data.correlation.metaAdLeads}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">📊 Leads no Pipedrive</span>
+                        <span class="metric-value">${data.correlation.pipedriveMetaLeads}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">💵 CPL Efetivo</span>
+                        <span class="metric-value">R$ ${effectiveCPL}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">📈 Taxa de Conversão</span>
+                        <span class="metric-value">${conversionRate}%</span>
+                    </div>
+                `;
+                document.getElementById('integration-container').innerHTML = html;
+            } catch (err) {
+                document.getElementById('integration-container').innerHTML = `<div class="error">Erro ao carregar integração: ${err.message}</div>`;
+            }
+        }
+
+        async function loadMetaLeads() {
+            try {
+                const response = await fetch(`${API_BASE}/pipedrive/meta-leads?since=${since}&until=${until}`);
+                const data = await response.json();
+                const m = data.metrics;
+
+                // Meta Leads
+                document.getElementById('meta-leads-container').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Total de Leads</span>
+                        <span class="metric-value">${data.count}</span>
+                    </div>
+                `;
+
+                // Pipeline
+                document.getElementById('pipeline-container').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Inbound</span>
+                        <span class="metric-value">${m.byPipeline.inbound}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Recepção</span>
+                        <span class="metric-value">${m.byPipeline.recepcao}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Agendado</span>
+                        <span class="metric-value">${m.byPipeline.agendado}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Outros</span>
+                        <span class="metric-value">${m.byPipeline.other}</span>
+                    </div>
+                `;
+
+                // Status
+                document.getElementById('status-container').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Abertos</span>
+                        <span class="metric-value">${m.byStatus.open}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Ganhos</span>
+                        <span class="metric-value">${m.byStatus.won}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Perdidos</span>
+                        <span class="metric-value">${m.byStatus.lost}</span>
+                    </div>
+                `;
+
+                // Revenue
+                document.getElementById('revenue-container').innerHTML = `
+                    <div class="metric">
+                        <span class="metric-label">Receita Total</span>
+                        <span class="metric-value">R$ ${parseFloat(m.revenue.total).toFixed(2)}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Receita Ganha</span>
+                        <span class="metric-value">R$ ${parseFloat(m.revenue.won).toFixed(2)}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Deals Ganhos</span>
+                        <span class="metric-value">${m.revenue.wonCount}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Valor Médio</span>
+                        <span class="metric-value">R$ ${parseFloat(m.revenue.averageValue).toFixed(2)}</span>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById('meta-leads-container').innerHTML = `<div class="error">Erro: ${err.message}</div>`;
+            }
+        }
+
+        // Carregar dados ao iniciar
+        loadData();
+        // Atualizar a cada 5 minutos
+        setInterval(loadData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
