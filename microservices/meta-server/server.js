@@ -41,25 +41,26 @@ async function getMetaAds(since, until) {
     // Iterate through each ad account
     for (const accountId of FB_AD_ACCOUNT_IDS) {
       try {
-        const fields = 'id,name,status,created_time,updated_time'
-        const url = `https://graph.facebook.com/v18.0/${accountId}/ads?fields=${fields}&access_token=${FB_ACCESS_TOKEN}`
+        const cleanAccountId = accountId.replace(/^act_/, '')
+        const fields = 'id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},creative{thumbnail_url,object_story_spec}'
+        const timeRangeParam = JSON.stringify({ since, until })
 
-        const response = await axios.get(url, { timeout: 10000 })
-
-        if (response.data.data) {
-          allAds.push(...response.data.data)
+        const url = `https://graph.facebook.com/v18.0/act_${cleanAccountId}/ads`
+        const params = {
+          access_token: FB_ACCESS_TOKEN,
+          fields: `${fields},insights.time_range(${timeRangeParam}){spend,actions,impressions,clicks}`,
+          limit: 200
         }
 
-        // Get insights (spend, clicks, impressions, actions)
-        const insightsFields = 'spend,clicks,impressions,actions,action_values'
-        const dateRange = `&time_range={"since":"${since}","until":"${until}"}`
-        const insightsUrl = `https://graph.facebook.com/v18.0/${accountId}/insights?fields=${insightsFields}${dateRange}&access_token=${FB_ACCESS_TOKEN}`
+        const response = await axios.get(url, { params, timeout: 10000 })
 
-        const insightsResponse = await axios.get(insightsUrl, { timeout: 10000 })
+        if (response.data.data) {
+          response.data.data.forEach(ad => {
+            const insight = ad.insights && ad.insights.data && ad.insights.data[0]
+            if (!insight) return
 
-        if (insightsResponse.data.data) {
-          insightsResponse.data.data.forEach(insight => {
-            insights.totalSpend += parseFloat(insight.spend || 0)
+            const spend = parseFloat(insight.spend || 0)
+            insights.totalSpend += spend
             insights.clicks += parseInt(insight.clicks || 0)
             insights.impressions += parseInt(insight.impressions || 0)
 
@@ -70,6 +71,8 @@ async function getMetaAds(since, until) {
                 }
               })
             }
+
+            allAds.push(ad)
           })
         }
       } catch (error) {
