@@ -4,11 +4,12 @@
 
 ```
 microservices/
+├── dashboard-frontend/    (Porta 3000) - Agregador / Frontend
 ├── meta-server/           (Porta 3001) - Meta Ads API
 ├── google-server/         (Porta 3002) - Google Ads API
 ├── tintim-server/         (Porta 3003) - Tintim API
 ├── pipedrive-server/      (Porta 3004) - Pipedrive API
-└── dashboard-frontend/    (Porta 3000) - Agregador / Frontend
+└── whatsapp-server/       (Porta 3005) - WhatsApp API (futuro)
 ```
 
 ## Setup Inicial
@@ -53,13 +54,33 @@ cp .env.example .env
 npm run dev
 ```
 
-### 5. Dashboard Frontend
+### 5. Pipedrive Server
+
+```bash
+cd pipedrive-server
+npm install
+cp .env.example .env
+# Editar .env com credenciais
+npm run dev
+```
+
+### 6. Dashboard Frontend
 
 ```bash
 cd dashboard-frontend
 npm install
 cp .env.example .env
 # .env já está configurado com URLs padrão dos serviços
+npm run dev
+```
+
+### 7. WhatsApp Server (Futuro)
+
+```bash
+cd whatsapp-server
+npm install
+cp .env.example .env
+# Editar .env com credenciais
 npm run dev
 ```
 
@@ -151,7 +172,8 @@ Dashboard Frontend (Porta 3000)
     ├─→ Meta Server (3001)
     ├─→ Google Server (3002)
     ├─→ Tintim Server (3003)
-    └─→ Pipedrive Server (3004)
+    ├─→ Pipedrive Server (3004)
+    └─→ WhatsApp Server (3005) [Futuro]
 ```
 
 ---
