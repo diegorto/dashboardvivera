@@ -2,6 +2,8 @@ require('dotenv').config()
 const express = require('express')
 const axios = require('axios')
 const cors = require('cors')
+const path = require('path')
+const fs = require('fs')
 
 const app = express()
 app.use(cors())
@@ -235,6 +237,100 @@ app.get('/api/integration/meta-pipedrive', async (req, res) => {
     res.status(500).json({ error: error.message })
   }
 })
+
+// Servir interface web
+const webDistPath = path.join(__dirname, '../../web/dist')
+const webPublicPath = path.join(__dirname, '../../web')
+
+// Verificar se existe build React
+if (fs.existsSync(webDistPath)) {
+  app.use(express.static(webDistPath))
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(webDistPath, 'index.html'))
+  })
+} else if (fs.existsSync(webPublicPath)) {
+  app.use(express.static(webPublicPath))
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(webPublicPath, 'index.html'))
+  })
+} else {
+  // Página de boas-vindas simplificada
+  app.get('/', (req, res) => {
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Vivera Dashboard - Meta & Pipedrive Integration</title>
+        <style>
+          body { font-family: Arial; margin: 40px; background: #f5f5f5; }
+          .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          h1 { color: #333; }
+          .status { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+          .status-box { padding: 15px; border-radius: 4px; background: #f9f9f9; border-left: 4px solid #4CAF50; }
+          .status-box h3 { margin: 0 0 10px 0; }
+          .endpoint { background: #f0f0f0; padding: 10px; margin: 5px 0; border-radius: 3px; font-family: monospace; }
+          a { color: #2196F3; text-decoration: none; }
+          a:hover { text-decoration: underline; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h1>🚀 Vivera Dashboard - Meta & Pipedrive Integration</h1>
+
+          <h2>✅ Status dos Serviços</h2>
+          <div class="status">
+            <div class="status-box">
+              <h3>Meta Server</h3>
+              <p>Port: 3001</p>
+              <p>Status: <strong>✅ Online</strong></p>
+            </div>
+            <div class="status-box">
+              <h3>Pipedrive Server</h3>
+              <p>Port: 3004</p>
+              <p>Status: <strong>✅ Online</strong></p>
+            </div>
+            <div class="status-box">
+              <h3>Google Server</h3>
+              <p>Port: 3002</p>
+              <p>Status: <strong>✅ Online</strong></p>
+            </div>
+            <div class="status-box">
+              <h3>Tintim Server</h3>
+              <p>Port: 3003</p>
+              <p>Status: <strong>✅ Online</strong></p>
+            </div>
+          </div>
+
+          <h2>📊 Endpoints Disponíveis</h2>
+
+          <h3>Health Check</h3>
+          <div class="endpoint"><a href="/api/health">/api/health</a></div>
+
+          <h3>Dashboard Agregado</h3>
+          <div class="endpoint"><a href="/api/dashboard?since=2026-07-01&until=2026-07-13">/api/dashboard?since=2026-07-01&until=2026-07-13</a></div>
+
+          <h3>Meta-Pipedrive Integration 🔥</h3>
+          <div class="endpoint"><a href="/api/integration/meta-pipedrive?since=2026-07-01&until=2026-07-13">/api/integration/meta-pipedrive?since=2026-07-01&until=2026-07-13</a></div>
+          <p>Correlação entre gasto em Meta e leads gerados no Pipedrive</p>
+
+          <h3>Meta Leads Details</h3>
+          <div class="endpoint"><a href="/api/pipedrive/meta-leads?since=2026-07-01&until=2026-07-13">/api/pipedrive/meta-leads?since=2026-07-01&until=2026-07-13</a></div>
+
+          <h3>Outros Endpoints</h3>
+          <div class="endpoint">/api/pipedrive/deals?since=YYYY-MM-DD&until=YYYY-MM-DD</div>
+          <div class="endpoint">/api/pipedrive/funnel?since=YYYY-MM-DD&until=YYYY-MM-DD</div>
+          <div class="endpoint">/api/pipedrive/revenue?since=YYYY-MM-DD&until=YYYY-MM-DD</div>
+          <div class="endpoint">/api/pipedrive/outras-fontes?since=YYYY-MM-DD&until=YYYY-MM-DD</div>
+
+          <hr>
+          <p><strong>Porta:</strong> 3010</p>
+          <p><strong>Versão:</strong> 1.0.0 - Meta-Pipe API Integration</p>
+        </div>
+      </body>
+      </html>
+    `)
+  })
+}
 
 const PORT = process.env.PORT || 3000
 app.listen(PORT, () => {
