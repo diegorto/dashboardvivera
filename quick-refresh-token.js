@@ -3,7 +3,7 @@ const { google } = require('googleapis');
 
 const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
 const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
-const REDIRECT_URL = 'http://localhost:3000/auth/callback';
+const REDIRECT_URL = process.env.GOOGLE_ADS_REDIRECT_URI || 'http://localhost:3000/auth/callback';
 
 if (!CLIENT_ID || !CLIENT_SECRET) {
   console.error('❌ Erro: CLIENT_ID ou CLIENT_SECRET não configurados no .env');
