@@ -1217,6 +1217,9 @@ app.get('/api/dashboard', async (req, res) => {
     const deals = inboundDealsAll.filter(d => inRange(d, range.since, range.until));
     const previousDeals = inboundDealsAll.filter(d => inRange(d, prevRange.since, prevRange.until));
     const openDealsAllTime = inboundDealsAll.filter(d => d.status === 'open');
+    // Para calcular leadSources com indicacao, incluir deals de TODOS os pipelines no período
+    const allDealsInRange = allDeals.filter(d => inRange(d, range.since, range.until));
+    const allPreviousDeals = allDeals.filter(d => inRange(d, prevRange.since, prevRange.until));
 
     const recepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, range.since, range.until));
     const previousRecepcaoDeals = recepcaoDealsAll.filter(d => inRange(d, prevRange.since, prevRange.until));
@@ -1238,9 +1241,9 @@ app.get('/api/dashboard', async (req, res) => {
     const patients = buildPatients(deals);
     const governance = buildGovernance(deals);
     const insights = buildInsights(creatives, funnel, governance, pipeline);
-    const leadsSemOrigem = buildLeadsSemOrigem(deals);
-    const leadsOutrasFontes = buildLeadsOutrasFontes(deals);
-    const leadSources = buildLeadSources(deals, currentAds);
+    const leadsSemOrigem = buildLeadsSemOrigem(allDealsInRange);
+    const leadsOutrasFontes = buildLeadsOutrasFontes(allDealsInRange);
+    const leadSources = buildLeadSources(allDealsInRange, currentAds);
 
     // "Oportunidades Paradas" usa uma janela fixa de 3 meses, independente do filtro de
     // data selecionado - negocio parado importa mesmo que o usuario esteja olhando "Mes atual".
