@@ -1,0 +1,37 @@
+Pipedrive Server running on port 3004
+Token configured: true
+Company domain: viveraorofacialavanada
+
+Endpoints available:
+  GET /api/health - Health check
+  GET /api/deals?since=YYYY-MM-DD&until=YYYY-MM-DD - Get deals
+  GET /api/funnel?since=YYYY-MM-DD&until=YYYY-MM-DD - Get funnel data
+  GET /api/pipeline?since=YYYY-MM-DD&until=YYYY-MM-DD - Get pipeline data
+  GET /api/revenue?since=YYYY-MM-DD&until=YYYY-MM-DD - Get revenue
+  GET /api/leads-sem-origem?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads without origin
+  GET /api/outras-fontes?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads by source
+Fetching deals from Pipedrive...
+Fetching deals from Pipedrive...
+Fetching deals from Pipedrive...
+Fetching deals from Pipedrive...
+Fetching deals from Pipedrive...
+Total deals fetched: 0
+Total deals fetched: 0
+Total deals fetched: 0
+Total deals fetched: 0
+Total deals fetched: 0
+Pipedrive Server running on port 3004
+Token configured: true
+Company domain: viveraorofacialavanada
+
+Endpoints available:
+  GET /api/health - Health check
+  GET /api/deals?since=YYYY-MM-DD&until=YYYY-MM-DD - Get deals
+  GET /api/funnel?since=YYYY-MM-DD&until=YYYY-MM-DD - Get funnel data
+  GET /api/pipeline?since=YYYY-MM-DD&until=YYYY-MM-DD - Get pipeline data
+  GET /api/revenue?since=YYYY-MM-DD&until=YYYY-MM-DD - Get revenue
+  GET /api/leads-sem-origem?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads without origin
+  GET /api/outras-fontes?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads by source
+  GET /api/meta-leads?since=YYYY-MM-DD&until=YYYY-MM-DD - Meta leads with metrics
+Fetching deals from Pipedrive...
+Total deals fetched: 0

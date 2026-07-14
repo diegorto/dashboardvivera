@@ -1,0 +1,35 @@
+Dashboard Frontend rodando em porta 3010
+
+Microserviços configurados:
+  meta: http://localhost:3001
+  google: http://localhost:3002
+  tintim: http://localhost:3003
+  pipedrive: http://localhost:3004
+
+Endpoints disponíveis:
+  GET /api/health - Health check de todos os serviços
+  GET /api/dashboard?since=YYYY-MM-DD&until=YYYY-MM-DD - Dashboard agregado
+Dashboard Frontend rodando em porta 3010
+
+Microserviços configurados:
+  meta: http://localhost:3001
+  google: http://localhost:3002
+  tintim: http://localhost:3003
+  pipedrive: http://localhost:3004
+
+Endpoints disponíveis:
+  GET /api/health - Health check de todos os serviços
+  GET /api/dashboard?since=YYYY-MM-DD&until=YYYY-MM-DD - Dashboard agregado
+  GET /api/integration/meta-pipedrive?since=YYYY-MM-DD&until=YYYY-MM-DD - Meta-Pipedrive integration
+Dashboard Frontend rodando em porta 3010
+
+Microserviços configurados:
+  meta: http://localhost:3001
+  google: http://localhost:3002
+  tintim: http://localhost:3003
+  pipedrive: http://localhost:3004
+
+Endpoints disponíveis:
+  GET /api/health - Health check de todos os serviços
+  GET /api/dashboard?since=YYYY-MM-DD&until=YYYY-MM-DD - Dashboard agregado
+  GET /api/integration/meta-pipedrive?since=YYYY-MM-DD&until=YYYY-MM-DD - Meta-Pipedrive integration

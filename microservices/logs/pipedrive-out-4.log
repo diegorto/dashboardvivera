@@ -1,0 +1,12 @@
+Pipedrive Server running on port 3004
+Token configured: false
+Company domain: undefined
+
+Endpoints available:
+  GET /api/health - Health check
+  GET /api/deals?since=YYYY-MM-DD&until=YYYY-MM-DD - Get deals
+  GET /api/funnel?since=YYYY-MM-DD&until=YYYY-MM-DD - Get funnel data
+  GET /api/pipeline?since=YYYY-MM-DD&until=YYYY-MM-DD - Get pipeline data
+  GET /api/revenue?since=YYYY-MM-DD&until=YYYY-MM-DD - Get revenue
+  GET /api/leads-sem-origem?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads without origin
+  GET /api/outras-fontes?since=YYYY-MM-DD&until=YYYY-MM-DD - Leads by source
