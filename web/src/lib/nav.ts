@@ -1,4 +1,4 @@
-import { LayoutDashboard, Megaphone, Filter as FunnelIcon, GitBranch, Users, Lightbulb, SearchX, ShieldCheck, Building2, type LucideIcon } from 'lucide-react'
+import { LayoutDashboard, Megaphone, Filter as FunnelIcon, GitBranch, Users, Lightbulb, SearchX, ShieldCheck, Building2, Clock, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   to: string
@@ -9,6 +9,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
+  { to: '/hoje', label: 'Hoje', icon: Clock },
   { to: '/campanhas', label: 'Campanhas', icon: Megaphone },
   { to: '/funil', label: 'Funil', icon: FunnelIcon },
   { to: '/pipeline', label: 'Pipeline', icon: GitBranch },

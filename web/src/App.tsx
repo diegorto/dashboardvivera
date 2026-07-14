@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { FilterProvider } from '@/lib/FilterContext'
 import { Layout } from '@/components/Layout'
 import { HomePage } from '@/pages/HomePage'
+import { HojePage } from '@/pages/HojePage'
 import { CampanhasPage } from '@/pages/CampanhasPage'
 import { FunilPage } from '@/pages/FunilPage'
 import { PipelinePage } from '@/pages/PipelinePage'
@@ -20,6 +21,7 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<HomePage />} />
+            <Route path="/hoje" element={<HojePage />} />
             <Route path="/campanhas" element={<CampanhasPage />} />
             <Route path="/funil" element={<FunilPage />} />
             <Route path="/pipeline" element={<PipelinePage />} />
