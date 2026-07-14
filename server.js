@@ -296,9 +296,111 @@ app.get('/api/audit', async (req, res) => {
 
 const PIPEDRIVE_ALLOWED_RESOURCES = new Set(['users', 'deals', 'activities']);
 
-// Endpoint: Dashboard (alias para /api/audit)
+// Endpoint: Dashboard (transforma dados de /api/audit na estrutura esperada pelo React)
 app.get('/api/dashboard', async (req, res) => {
-  res.redirect(307, `/api/audit?since=${req.query.since || ''}&until=${req.query.until || ''}`);
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, dealsLeads] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    const metaAgg = aggregateMetaAds(ads);
+    const auditByKey = {};
+
+    metaAgg.forEach(c => {
+      const key = joinKey(c.campanha, c.conjunto, c.anuncio);
+      auditByKey[key] = {
+        campanha: c.campanha,
+        conjunto: c.conjunto,
+        anuncio: c.anuncio,
+        gasto_meta: c.gasto_meta,
+        leads_meta: c.leads_meta,
+        leads_pipedrive: 0,
+        revenue_total: 0,
+        leads_details: []
+      };
+    });
+
+    dealsLeads.forEach(deal => {
+      const campanha = deal.campanha || 'sem_campanha';
+      const conjunto = deal.conjunto || 'sem_conjunto';
+      const anuncio = deal.palavraChave || 'sem_palavra_chave';
+      const key = joinKey(campanha, conjunto, anuncio);
+      if (!auditByKey[key]) {
+        auditByKey[key] = { campanha, conjunto, anuncio, gasto_meta: 0, leads_meta: 0, leads_pipedrive: 0, revenue_total: 0, leads_details: [] };
+      }
+      auditByKey[key].leads_pipedrive++;
+      auditByKey[key].revenue_total += deal.value;
+      auditByKey[key].leads_details.push({
+        nome: deal.personName,
+        email: deal.email,
+        anuncio,
+        conjunto,
+        status: deal.status,
+        data: deal.addDate,
+        revenue: deal.value
+      });
+    });
+
+    const result = Object.values(auditByKey).map(c => {
+      const roas = c.gasto_meta > 0 ? (c.revenue_total / c.gasto_meta).toFixed(2) : 0;
+      return { ...c, roas, discrepancia: c.leads_meta - c.leads_pipedrive };
+    });
+
+    const creatives = result.map(c => ({
+      campanha: c.campanha,
+      conjunto: c.conjunto,
+      anuncio: c.anuncio,
+      leads: c.leads_pipedrive,
+      gasto: c.gasto_meta,
+      qualificados: 0,
+      agendados: 0,
+      compareceram: 0,
+      receita: c.revenue_total
+    }));
+
+    const patients = result.flatMap(c => c.leads_details.map(d => ({
+      id: d.nome,
+      nome: d.nome,
+      email: d.email,
+      telefone: '',
+      campanha: c.campanha,
+      conjunto: c.conjunto,
+      criativo: c.anuncio,
+      closer: '',
+      sdr: '',
+      procedimento: d.status,
+      valor: d.revenue,
+      pipedriveUrl: ''
+    })));
+
+    res.json({
+      success: true,
+      range,
+      previousRange: range,
+      kpis: { receita: { current: 0 } },
+      creatives: creatives || [],
+      funnel: { etapas: [] },
+      pipeline: { etapas: [] },
+      patients: patients || [],
+      governance: {},
+      revenueAtRisk: {},
+      revenueAtRiskRange: range,
+      insights: [],
+      leadsSemOrigem: [],
+      recepcao: { kpis: { receita: { current: 0 } }, fechamentos: [] },
+      faturamentoTotal: { current: 0 },
+      meta: { adsAccounts: 2, totalAdsComGasto: creatives.length, totalDealsNoPeriodo: patients.length }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // Proxy generico para o Pipedrive usado pelo painel /sdr: o token nunca chega ao navegador.
