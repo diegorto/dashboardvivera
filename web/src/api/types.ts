@@ -2,8 +2,7 @@ export type CreativeStatus = 'escalar' | 'observar' | 'desligar'
 
 export interface Metric {
   current: number
-  previous: number
-  deltaPct: number | null
+  deltaPct: number
 }
 
 export interface Kpis {
@@ -71,8 +70,9 @@ export interface FunnelTopCreative {
 
 export interface Funnel {
   stages: FunnelStage[]
-  topCreativesByStage: Record<string, FunnelTopCreative[]>
-  insights: Insight[]
+  etapas?: unknown[]
+  topCreativesByStage?: Record<string, FunnelTopCreative[]>
+  insights?: Insight[]
 }
 
 export interface PipelineDealRef {
@@ -95,8 +95,9 @@ export interface PipelineBucket {
 
 export interface Pipeline {
   buckets: PipelineBucket[]
-  stuckCreatives: { anuncio: string; count: number }[]
-  slowestCampaigns: { campanha: string; avgDays: number; count: number }[]
+  etapas?: unknown[]
+  stuckCreatives?: { anuncio: string; count: number }[]
+  slowestCampaigns?: { campanha: string; avgDays: number; count: number }[]
 }
 
 export interface FechamentoRecepcao {
@@ -141,12 +142,9 @@ export interface Patient {
 }
 
 export interface Governance {
-  totalVendas: number
-  comResponsavel: number
   semResponsavel: {
     count: number
     value: number
-    deals: { id: number; title: string; value: number; data: string | null }[]
   }
 }
 
@@ -169,9 +167,9 @@ export interface RevenueAtRiskDeal {
 
 export interface RevenueAtRiskGroup {
   count: number
-  value: number
   semOrcamento: number
-  deals: RevenueAtRiskDeal[]
+  value?: number
+  deals?: RevenueAtRiskDeal[]
 }
 
 export interface RevenueAtRisk {
@@ -241,5 +239,25 @@ export interface DashboardResponse {
   recepcao: Recepcao
   faturamentoTotal: Metric
   meta: { adsAccounts: number; totalAdsComGasto: number; totalDealsNoPeriodo: number }
+  summary: {
+    leads_entrada: number
+    leads_qualificados: number
+    agendamentos: number
+    comparecimentos: number
+    fechamentos: number
+    revenue: number
+    ligacoes: number
+    orcamentos: number
+    perdidos: number
+  }
+  origens: unknown[]
+  detalhesPorEtapa: {
+    leads: unknown[]
+    qualificados: unknown[]
+    agendados: unknown[]
+    compareceram: unknown[]
+    vendas: unknown[]
+    perdidos: unknown[]
+  }
   error?: string
 }

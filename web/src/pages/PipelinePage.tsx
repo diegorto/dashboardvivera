@@ -57,8 +57,8 @@ export function PipelinePage() {
           <CardHeader><CardTitle>Criativos com mais leads parados (15+ dias)</CardTitle></CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-2">
-              {pipeline.stuckCreatives.length === 0 && <li className="text-xs text-muted-foreground">Nada parado — bom sinal.</li>}
-              {pipeline.stuckCreatives.map(c => (
+              {(pipeline.stuckCreatives?.length ?? 0) === 0 && <li className="text-xs text-muted-foreground">Nada parado — bom sinal.</li>}
+              {pipeline.stuckCreatives?.map(c => (
                 <li key={c.anuncio} className="flex items-center justify-between text-sm">
                   <span className="truncate">{c.anuncio}</span>
                   <span className="tabular-nums font-semibold">{c.count}</span>
@@ -71,7 +71,8 @@ export function PipelinePage() {
           <CardHeader><CardTitle>Campanhas com maior tempo médio</CardTitle></CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-2">
-              {pipeline.slowestCampaigns.map(c => (
+              {(pipeline.slowestCampaigns?.length ?? 0) === 0 && <li className="text-xs text-muted-foreground">Nenhuma campanha.</li>}
+              {pipeline.slowestCampaigns?.map(c => (
                 <li key={c.campanha} className="flex items-center justify-between text-sm">
                   <span className="truncate">{c.campanha}</span>
                   <span className="tabular-nums font-semibold">{c.avgDays.toFixed(0)}d</span>

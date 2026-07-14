@@ -28,7 +28,7 @@ export function FunilPage() {
 
   const max = funnel?.stages[0]?.count || 1
   const selectedStage = funnel?.stages.find(s => s.key === selected)
-  const topCreatives = (funnel && selected) ? funnel.topCreativesByStage[selected] || [] : []
+  const topCreatives = (funnel && selected && funnel.topCreativesByStage) ? funnel.topCreativesByStage[selected] || [] : []
 
   return (
     <div className="flex flex-col gap-4">
@@ -132,8 +132,8 @@ export function FunilPage() {
           <CardTitle>Insights do funil</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
-          {funnel.insights.length === 0 && <p className="text-xs text-muted-foreground">Sem insights suficientes pro período selecionado.</p>}
-          {funnel.insights.map(i => <FunnelInsightRow key={i.id} insight={i} />)}
+          {(funnel.insights?.length ?? 0) === 0 && <p className="text-xs text-muted-foreground">Sem insights suficientes pro período selecionado.</p>}
+          {funnel.insights?.map(i => <FunnelInsightRow key={i.id} insight={i} />)}
         </CardContent>
       </Card>
         </>

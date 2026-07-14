@@ -8,10 +8,10 @@ export function StuckDealsGroup({ label, group }: { label: string; group: Revenu
 
   return (
     <div className="flex flex-col gap-1">
-      <button onClick={() => setOpen(o => !o)} className="flex flex-col items-start text-left hover:opacity-80" disabled={group.count === 0}>
+      <button onClick={() => setOpen(o => !o)} className="flex flex-col items-start text-left hover:opacity-80" disabled={group.count === 0 || !group.deals?.length}>
         <span className="inline-flex items-center gap-1 font-semibold tabular-nums">
-          {group.count > 0 && (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)}
-          {group.count} <span className="font-normal text-muted-foreground">· {formatBRL(group.value)}</span>
+          {group.count > 0 && group.deals?.length && (open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />)}
+          {group.count} {group.value !== undefined && <span className="font-normal text-muted-foreground">· {formatBRL(group.value)}</span>}
         </span>
         <span className="text-muted-foreground">
           {label}
@@ -19,7 +19,7 @@ export function StuckDealsGroup({ label, group }: { label: string; group: Revenu
         </span>
       </button>
 
-      {open && group.deals.length > 0 && (
+      {open && group.deals && group.deals.length > 0 && (
         <div className="ml-1 mt-0.5 flex flex-col gap-2 border-l border-border pl-3">
           {group.deals.map(d => {
             const wa = whatsappUrl(d.telefone)
