@@ -63,7 +63,7 @@ export function ReuniaoPage() {
               <KpiCard label="Compras" metric={data.kpis.compras} format={formatNumber} />
               <KpiCard label="Ticket Médio" metric={data.kpis.ticketMedio} format={formatBRL} />
               <KpiCard label="Investimento" metric={data.kpis.investimento} format={formatBRL} invert />
-              <KpiCard label="ROAS" metric={data.kpis.roas} format={n => `${n.toFixed(2)}x`} />
+              <KpiCard label="ROAS" metric={data.kpis.roas} format={n => n !== undefined && n !== null ? `${n.toFixed(2)}x` : '—'} />
               <KpiCard label="CAC" metric={data.kpis.cac} format={formatBRL} invert />
             </div>
           )}

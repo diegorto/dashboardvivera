@@ -95,9 +95,9 @@ export function HomePage() {
           <KpiCard label="Receita" metric={data.kpis.receita} format={formatBRL} />
           <KpiCard label="Compras" metric={data.kpis.compras} format={formatNumber} />
           <KpiCard label="Ticket Médio" metric={data.kpis.ticketMedio} format={formatBRL} />
-          <KpiCard label="Tempo Médio de Fechamento" metric={data.kpis.tempoMedioFechamento} format={n => `${n.toFixed(1)}d`} invert />
+          <KpiCard label="Tempo Médio de Fechamento" metric={data.kpis.tempoMedioFechamento} format={n => n !== undefined && n !== null ? `${n.toFixed(1)}d` : '—'} invert />
           <KpiCard label="Investimento" metric={data.kpis.investimento} format={formatBRL} invert />
-          <KpiCard label="ROAS" metric={data.kpis.roas} format={n => `${n.toFixed(2)}x`} />
+          <KpiCard label="ROAS" metric={data.kpis.roas} format={n => n !== undefined && n !== null ? `${n.toFixed(2)}x` : '—'} />
           <KpiCard label="CAC" metric={data.kpis.cac} format={formatBRL} invert />
         </div>
       </section>
