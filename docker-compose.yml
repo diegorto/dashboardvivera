@@ -1,7 +1,72 @@
 services:
+  # ==========================================
+  # VIVERA INSIGHTS - Banco de Dados
+  # ==========================================
+  vivera-insights-db:
+    image: postgres:15-alpine
+    container_name: vivera-insights-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vivera}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vivera_secure_2024}
+      POSTGRES_DB: ${POSTGRES_DB:-vivera_insights}
+    volumes:
+      - vivera-insights-db-vol:/var/lib/postgresql/data
+    networks:
+      - n8n_default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vivera}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    labels:
+      - com.example.description="Banco de dados PostgreSQL para Vivera Insights"
+
+  # ==========================================
+  # VIVERA INSIGHTS - Aplicação Principal
+  # ==========================================
+  vivera-insights-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vivera-insights-app
+    restart: unless-stopped
+    depends_on:
+      vivera-insights-db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgres://${POSTGRES_USER:-vivera}:${POSTGRES_PASSWORD:-vivera_secure_2024}@vivera-insights-db:5432/${POSTGRES_DB:-vivera_insights}
+    volumes:
+      - ./web/dist:/app/web/dist:ro
+      - vivera-insights-app-vol:/app/data
+    networks:
+      - n8n_default
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.vivera-insights.rule=Host(`app.viveraorofacial.com.br`)
+      - traefik.http.routers.vivera-insights.tls=true
+      - traefik.http.routers.vivera-insights.entrypoints=web,websecure
+      - traefik.http.routers.vivera-insights.tls.certresolver=mytlschallenge
+      - traefik.http.services.vivera-insights.loadbalancer.server.port=3000
+      - com.example.description="Vivera Insights - Dashboard em tempo real"
+
+  # ==========================================
+  # VIVERA FOTOS - Galeria de Fotos
+  # ==========================================
   vivera-fotos:
     build: ./vivera-fotos
-    restart: always
+    container_name: vivera-fotos
+    restart: unless-stopped
     env_file:
       - ./vivera-fotos/.env
     volumes:
@@ -16,6 +81,13 @@ services:
       - traefik.http.routers.vivera-fotos.entrypoints=web,websecure
       - traefik.http.routers.vivera-fotos.tls.certresolver=mytlschallenge
       - traefik.http.services.vivera-fotos.loadbalancer.server.port=4000
+      - com.example.description="Galeria de fotos do pacientes"
+
+volumes:
+  vivera-insights-db-vol:
+    driver: local
+  vivera-insights-app-vol:
+    driver: local
 
 networks:
   n8n_default:

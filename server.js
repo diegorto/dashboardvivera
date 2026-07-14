@@ -191,6 +191,11 @@ async function getPipedriveDeals(since, until) {
   }
 }
 
+// Health check endpoint para Docker/Kubernetes
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Endpoint: Audit completo (aceita ?since=YYYY-MM-DD&until=YYYY-MM-DD)
 app.get('/api/audit', async (req, res) => {
   try {
