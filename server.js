@@ -398,9 +398,7 @@ app.get('/api/dashboard', async (req, res) => {
       funnel: { stages: [], etapas: [] },
       pipeline: { buckets: [], etapas: [] },
       patients: patients || [],
-      governance: {
-        semResponsavel: { count: 0, value: 0 }
-      },
+      governance: { semResponsavel: { count: 0, value: 0 } },
       revenueAtRisk: {
         total: 0,
         qualificadosSemAgendamento: { count: 0, semOrcamento: 0 },
@@ -415,7 +413,27 @@ app.get('/api/dashboard', async (req, res) => {
         fechamentos: []
       },
       faturamentoTotal: emptyMetric,
-      meta: { adsAccounts: 2, totalAdsComGasto: creatives.length, totalDealsNoPeriodo: patients.length }
+      meta: { adsAccounts: 2, totalAdsComGasto: creatives.length, totalDealsNoPeriodo: patients.length },
+      summary: {
+        leads_entrada: 0,
+        leads_qualificados: 0,
+        agendamentos: 0,
+        comparecimentos: 0,
+        fechamentos: 0,
+        revenue: 0,
+        ligacoes: 0,
+        orcamentos: 0,
+        perdidos: 0
+      },
+      origens: [],
+      detalhesPorEtapa: {
+        leads: [],
+        qualificados: [],
+        agendados: [],
+        compareceram: [],
+        vendas: [],
+        perdidos: []
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
