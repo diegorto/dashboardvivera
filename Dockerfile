@@ -15,6 +15,7 @@ RUN npm ci --only=production
 COPY server.js /app/
 COPY dashboard*.html /app/
 COPY debug-pipedrive.js /app/
+COPY web/dist /app/web/dist
 
 # Criar diretórios necessários
 RUN mkdir -p /app/data /app/logs
