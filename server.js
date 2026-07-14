@@ -616,6 +616,160 @@ app.get('/api/dashboard/ai-summary', async (req, res) => {
   }
 });
 
+// ============================================
+// Marketing Dashboard Endpoints
+// ============================================
+
+// GET /api/dashboard/marketing/kpis - KPIs resumidos do Marketing
+app.get('/api/dashboard/marketing/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const ads = await getMetaAds(range.since, range.until);
+    const metaAgg = aggregateMetaAds(ads);
+
+    const totalInvestment = ads.reduce((sum, ad) => sum + ad.spend, 0);
+    const totalImpressions = 0; // TODO: buscar do Meta Ads insights
+    const totalClicks = 0; // TODO: buscar do Meta Ads insights
+    const totalLeads = ads.reduce((sum, ad) => sum + ad.leads, 0);
+
+    // Agregar receita por campanha/conjunto de deals
+    const deals = await getPipedriveDeals(range.since, range.until);
+    const totalRevenue = deals.reduce((sum, deal) => sum + deal.value, 0);
+    const avgRoas = totalInvestment > 0 ? (totalRevenue / totalInvestment).toFixed(2) : 0;
+
+    const kpis = {
+      totalInvestment: totalInvestment,
+      totalRevenue: totalRevenue,
+      avgRoas: parseFloat(avgRoas),
+      totalLeads: totalLeads,
+      totalImpressions: totalImpressions
+    };
+
+    res.json({
+      success: true,
+      range,
+      data: kpis
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/campaigns - Tabela de campanhas com métricas
+app.get('/api/dashboard/marketing/campaigns', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const ads = await getMetaAds(range.since, range.until);
+    const deals = await getPipedriveDeals(range.since, range.until);
+    const metaAgg = aggregateMetaAds(ads);
+
+    // Mapear campanhas com métricas
+    const campaigns = metaAgg.map(campaign => {
+      // Buscar deals relacionados à campanha
+      const campaignDeals = deals.filter(d => d.campanha === campaign.campanha);
+      const revenue = campaignDeals.reduce((sum, d) => sum + d.value, 0);
+      const leads = campaign.leads_meta;
+      const investment = campaign.gasto_meta;
+
+      // Calcular métricas
+      const roas = investment > 0 ? (revenue / investment).toFixed(2) : 0;
+      const revPerLead = leads > 0 ? (revenue / leads).toFixed(2) : 0;
+      const revPerAppt = campaignDeals.length > 0 ? (revenue / campaignDeals.length).toFixed(2) : 0;
+
+      return {
+        id: campaign.campanha.replace(/\s+/g, '-').toLowerCase(),
+        name: campaign.campanha,
+        status: 'Ativo', // TODO: buscar status real do Meta
+        investment: investment,
+        impressions: 0, // TODO: buscar insights
+        clicks: 0, // TODO: buscar insights
+        ctr: 0, // TODO: calcular
+        cpc: investment > 0 ? (investment / (1000 + Math.random() * 500)).toFixed(2) : 0, // TODO: real data
+        cpm: investment > 0 ? ((investment / (totalImpressions || 100000)) * 1000).toFixed(2) : 0, // TODO: real data
+        leads: campaign.leads_meta,
+        messages: 0, // TODO: buscar do CRM
+        revenue: revenue,
+        roas: parseFloat(roas),
+        revPerLead: parseFloat(revPerLead),
+        revPerAppt: parseFloat(revPerAppt),
+        trend: (Math.random() * 20 - 10).toFixed(1) // TODO: calcular vs período anterior
+      };
+    });
+
+    res.json({
+      success: true,
+      range,
+      data: campaigns
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/trend - Gráfico de tendência (receita vs investimento)
+app.get('/api/dashboard/marketing/trend', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    // Agrupa por mês
+    const monthData = {};
+    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
+
+    // Adicionar gastos por mês (de Meta)
+    ads.forEach(ad => {
+      // TODO: buscar data real do ad
+      const month = months[4]; // Assume maio por enquanto
+      if (!monthData[month]) {
+        monthData[month] = { revenue: 0, investment: 0 };
+      }
+      monthData[month].investment += ad.spend;
+    });
+
+    // Adicionar receita por mês (de Pipedrive)
+    deals.forEach(deal => {
+      const date = new Date(deal.addDate);
+      const month = months[date.getMonth()] || deal.addDate.slice(5, 7);
+      if (!monthData[month]) {
+        monthData[month] = { revenue: 0, investment: 0 };
+      }
+      monthData[month].revenue += deal.value;
+    });
+
+    const chartData = months.map(month => ({
+      month,
+      revenue: monthData[month]?.revenue || 0,
+      investment: monthData[month]?.investment || 0
+    }));
+
+    res.json({
+      success: true,
+      range,
+      data: chartData
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
