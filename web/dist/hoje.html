@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vivera Insights - Hoje</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .header h1 {
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    .header .data-hoje {
+      font-size: 14px;
+      color: #666;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      border-left: 4px solid;
+    }
+
+    .stat-card.leads {
+      border-left-color: #667eea;
+    }
+
+    .stat-card.qualificados {
+      border-left-color: #0ea5e9;
+    }
+
+    .stat-card.agendados {
+      border-left-color: #f59e0b;
+    }
+
+    .stat-card.comparecimentos {
+      border-left-color: #10b981;
+    }
+
+    .stat-card.vendas {
+      border-left-color: #06b6d4;
+    }
+
+    .stat-card.perdidos {
+      border-left-color: #ef4444;
+    }
+
+    .stat-card .label {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .valor {
+      font-size: 32px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .stat-card .sublabel {
+      font-size: 12px;
+      color: #999;
+      margin-top: 5px;
+    }
+
+    .section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .section h2 {
+      color: #667eea;
+      font-size: 18px;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 10px;
+    }
+
+    .origem-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .origem-badge {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .origem-badge .count {
+      background: rgba(255,255,255,0.3);
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    table th {
+      background: #f5f5f5;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #666;
+      border-bottom: 2px solid #ddd;
+    }
+
+    table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+    }
+
+    table tr:hover {
+      background: #fafafa;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+    }
+
+    .refresh-btn {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .refresh-btn:hover {
+      background: #764ba2;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+    }
+
+    .erro {
+      background: #fee;
+      color: #c00;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    .revenue {
+      color: #10b981;
+      font-weight: bold;
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stat-card .valor {
+        font-size: 24px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      table th, table td {
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📊 Vivera Insights - Hoje</h1>
+      <p class="data-hoje" id="data-hoje"></p>
+    </div>
+
+    <button class="refresh-btn" onclick="carregarDados()">🔄 Atualizar</button>
+
+    <div id="erro" class="erro" style="display: none;"></div>
+
+    <div id="loading" class="loading">Carregando dados...</div>
+
+    <div id="conteudo" style="display: none;">
+      <div class="stats-grid" id="stats-grid"></div>
+
+      <div class="section">
+        <h2>📍 Canal de Origem</h2>
+        <div class="origem-list" id="origens-list"></div>
+      </div>
+
+      <div class="section">
+        <h2>📞 Ligações de Hoje</h2>
+        <div id="ligacoes-section"></div>
+      </div>
+
+      <div class="section">
+        <h2>✨ Leads Novos</h2>
+        <div id="leads-section"></div>
+      </div>
+
+      <div class="section">
+        <h2>✅ Qualificados</h2>
+        <div id="qualificados-section"></div>
+      </div>
+
+      <div class="section">
+        <h2>📅 Agendados</h2>
+        <div id="agendados-section"></div>
+      </div>
+
+      <div class="section">
+        <h2>👥 Compareceram</h2>
+        <div id="compareceram-section"></div>
+      </div>
+
+      <div class="section">
+        <h2>💰 Vendas de Hoje</h2>
+        <div id="vendas-section"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin + '/api/today';
+
+    function formatData(data) {
+      return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+    function formatMoney(value) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(value);
+    }
+
+    function criarTabela(dados) {
+      if (!dados || dados.length === 0) {
+        return '<p class="empty">Nenhum registro</p>';
+      }
+
+      let html = '<table><thead><tr>';
+      const campos = Object.keys(dados[0]);
+      campos.forEach(campo => {
+        html += `<th>${campo}</th>`;
+      });
+      html += '</tr></thead><tbody>';
+
+      dados.forEach(item => {
+        html += '<tr>';
+        campos.forEach(campo => {
+          let valor = item[campo];
+          if (campo === 'valor') {
+            valor = `<span class="revenue">${formatMoney(valor)}</span>`;
+          }
+          html += `<td>${valor || '-'}</td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    async function carregarDados() {
+      const loading = document.getElementById('loading');
+      const conteudo = document.getElementById('conteudo');
+      const erro = document.getElementById('erro');
+
+      loading.style.display = 'block';
+      conteudo.style.display = 'none';
+      erro.style.display = 'none';
+
+      try {
+        const response = await fetch(API_URL);
+        const dados = await response.json();
+
+        if (!dados.success) {
+          throw new Error(dados.error || 'Erro ao carregar dados');
+        }
+
+        // Atualizar data
+        document.getElementById('data-hoje').textContent = 'Dados de: ' + formatData(dados.data);
+
+        // Estatísticas
+        const stats = dados.summary;
+        const statsHtml = `
+          <div class="stat-card leads">
+            <div class="label">Leads Entrada</div>
+            <div class="valor">${stats.leads_entrada}</div>
+          </div>
+          <div class="stat-card qualificados">
+            <div class="label">Qualificados</div>
+            <div class="valor">${stats.leads_qualificados}</div>
+          </div>
+          <div class="stat-card agendados">
+            <div class="label">Agendamentos</div>
+            <div class="valor">${stats.agendamentos}</div>
+          </div>
+          <div class="stat-card comparecimentos">
+            <div class="label">Comparecimentos</div>
+            <div class="valor">${stats.comparecimentos}</div>
+          </div>
+          <div class="stat-card vendas">
+            <div class="label">Fechamentos</div>
+            <div class="valor">${stats.fechamentos}</div>
+            <div class="sublabel">${formatMoney(stats.revenue)}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">☎️ Ligações</div>
+            <div class="valor">${stats.ligacoes}</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">💼 Orçamentos</div>
+            <div class="valor">${stats.orcamentos}</div>
+          </div>
+          <div class="stat-card perdidos">
+            <div class="label">Perdidos</div>
+            <div class="valor">${stats.perdidos}</div>
+          </div>
+        `;
+        document.getElementById('stats-grid').innerHTML = statsHtml;
+
+        // Origens
+        const origensHtml = dados.origens
+          .map(o => `<div class="origem-badge">${o.origem}<span class="count">${o.count}</span></div>`)
+          .join('');
+        document.getElementById('origens-list').innerHTML = origensHtml || '<p class="empty">Sem dados</p>';
+
+        // Ligações
+        if (dados.activities.length > 0) {
+          const ligacoesData = dados.activities.map(a => ({
+            tipo: a.type,
+            descricao: a.subject || '-',
+            hora: a.due_date || '-'
+          }));
+          document.getElementById('ligacoes-section').innerHTML = criarTabela(ligacoesData);
+        } else {
+          document.getElementById('ligacoes-section').innerHTML = '<p class="empty">Nenhuma ligação registrada</p>';
+        }
+
+        // Leads novos
+        document.getElementById('leads-section').innerHTML = criarTabela(dados.detalhesPorEtapa.leads);
+
+        // Qualificados
+        document.getElementById('qualificados-section').innerHTML = criarTabela(dados.detalhesPorEtapa.qualificados);
+
+        // Agendados
+        document.getElementById('agendados-section').innerHTML = criarTabela(dados.detalhesPorEtapa.agendados);
+
+        // Compareceram
+        document.getElementById('compareceram-section').innerHTML = criarTabela(dados.detalhesPorEtapa.compareceram);
+
+        // Vendas
+        document.getElementById('vendas-section').innerHTML = criarTabela(dados.detalhesPorEtapa.vendas);
+
+        loading.style.display = 'none';
+        conteudo.style.display = 'block';
+      } catch (e) {
+        erro.textContent = '❌ ' + e.message;
+        erro.style.display = 'block';
+        loading.style.display = 'none';
+      }
+    }
+
+    // Carregar ao abrir a página
+    carregarDados();
+
+    // Atualizar a cada 30 segundos
+    setInterval(carregarDados, 30000);
+  </script>
+</body>
+</html>
