@@ -8,7 +8,7 @@ const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'web/dist')));
 
 // Credenciais (carregadas do .env, nao ficam hardcoded no codigo)
 const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
@@ -317,14 +317,9 @@ app.get('/api/pipedrive/:resource', async (req, res) => {
   }
 });
 
-// Servir o dashboard HTML
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard-api.html'));
-});
-
-// Painel Vivera Orofacial - Corrida das SDRs
-app.get('/sdr', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
+// Catch-all: serve React index.html for unknown routes (enables client-side routing)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'web/dist/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
