@@ -384,18 +384,26 @@ app.get('/api/dashboard', async (req, res) => {
       success: true,
       range,
       previousRange: range,
-      kpis: { receita: { current: 0 } },
+      kpis: { receita: { current: 0, deltaPct: 0 } },
       creatives: creatives || [],
       funnel: { etapas: [] },
       pipeline: { etapas: [] },
       patients: patients || [],
       governance: {},
-      revenueAtRisk: {},
+      revenueAtRisk: {
+        total: 0,
+        qualificadosSemAgendamento: { count: 0, semOrcamento: 0 },
+        agendadosFaltaram: { count: 0, semOrcamento: 0 },
+        propostasSemFechamento: { count: 0, semOrcamento: 0 }
+      },
       revenueAtRiskRange: range,
       insights: [],
       leadsSemOrigem: [],
-      recepcao: { kpis: { receita: { current: 0 } }, fechamentos: [] },
-      faturamentoTotal: { current: 0 },
+      recepcao: {
+        kpis: { receita: { current: 0, deltaPct: 0 } },
+        fechamentos: []
+      },
+      faturamentoTotal: { current: 0, deltaPct: 0 },
       meta: { adsAccounts: 2, totalAdsComGasto: creatives.length, totalDealsNoPeriodo: patients.length }
     });
   } catch (error) {
