@@ -380,16 +380,27 @@ app.get('/api/dashboard', async (req, res) => {
       pipedriveUrl: ''
     })));
 
+    const emptyMetric = { current: 0, deltaPct: 0 };
     res.json({
       success: true,
       range,
       previousRange: range,
-      kpis: { receita: { current: 0, deltaPct: 0 } },
+      kpis: {
+        receita: emptyMetric,
+        compras: emptyMetric,
+        ticketMedio: emptyMetric,
+        tempoMedioFechamento: emptyMetric,
+        investimento: emptyMetric,
+        roas: emptyMetric,
+        cac: emptyMetric
+      },
       creatives: creatives || [],
-      funnel: { etapas: [] },
-      pipeline: { etapas: [] },
+      funnel: { stages: [], etapas: [] },
+      pipeline: { buckets: [], etapas: [] },
       patients: patients || [],
-      governance: {},
+      governance: {
+        semResponsavel: { count: 0, value: 0 }
+      },
       revenueAtRisk: {
         total: 0,
         qualificadosSemAgendamento: { count: 0, semOrcamento: 0 },
@@ -400,10 +411,10 @@ app.get('/api/dashboard', async (req, res) => {
       insights: [],
       leadsSemOrigem: [],
       recepcao: {
-        kpis: { receita: { current: 0, deltaPct: 0 } },
+        kpis: { receita: emptyMetric, compras: emptyMetric, ticketMedio: emptyMetric },
         fechamentos: []
       },
-      faturamentoTotal: { current: 0, deltaPct: 0 },
+      faturamentoTotal: emptyMetric,
       meta: { adsAccounts: 2, totalAdsComGasto: creatives.length, totalDealsNoPeriodo: patients.length }
     });
   } catch (error) {
