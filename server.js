@@ -365,18 +365,21 @@ app.get('/api/dashboard', async (req, res) => {
       receita: c.revenue_total
     }));
 
-    const patients = result.flatMap(c => c.leads_details.map(d => ({
-      id: d.nome,
+    const patients = result.flatMap(c => c.leads_details.map((d, idx) => ({
+      id: idx,
       nome: d.nome,
-      email: d.email,
-      telefone: '',
+      telefone: d.email || '',
+      criativo: c.anuncio,
       campanha: c.campanha,
       conjunto: c.conjunto,
-      criativo: c.anuncio,
-      closer: '',
+      closer: null,
       sdr: '',
       procedimento: d.status,
       valor: d.revenue,
+      dataLead: d.data || new Date().toISOString().split('T')[0],
+      dataVenda: null,
+      status: d.status,
+      tempoAteFechar: null,
       pipedriveUrl: ''
     })));
 

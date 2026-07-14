@@ -21,9 +21,9 @@ export function FilterBar() {
       campanha: uniq(data.creatives.map(c => c.campanha)),
       conjunto: uniq(data.creatives.map(c => c.conjunto)),
       criativo: uniq(data.creatives.map(c => c.anuncio)),
-      closer: uniq(data.patients.map(p => p.closer)),
-      sdr: uniq(data.patients.map(p => p.sdr)),
-      procedimento: uniq(data.patients.flatMap(p => p.procedimento.split(', '))),
+      closer: uniq(data.patients.map(p => p.closer || '')),
+      sdr: uniq(data.patients.map(p => p.sdr || '')),
+      procedimento: uniq(data.patients.map(p => p.procedimento || '')),
     }
   }, [data])
 
