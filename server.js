@@ -296,6 +296,11 @@ app.get('/api/audit', async (req, res) => {
 
 const PIPEDRIVE_ALLOWED_RESOURCES = new Set(['users', 'deals', 'activities']);
 
+// Endpoint: Dashboard (alias para /api/audit)
+app.get('/api/dashboard', async (req, res) => {
+  res.redirect(307, `/api/audit?since=${req.query.since || ''}&until=${req.query.until || ''}`);
+});
+
 // Proxy generico para o Pipedrive usado pelo painel /sdr: o token nunca chega ao navegador.
 app.get('/api/pipedrive/:resource', async (req, res) => {
   const { resource } = req.params;
