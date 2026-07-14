@@ -1201,7 +1201,7 @@ app.get('/api/today', async (req, res) => {
 const WEB_DIST = path.join(__dirname, 'web', 'dist');
 if (fs.existsSync(WEB_DIST)) {
   app.use(express.static(WEB_DIST));
-  app.get(/^(?!\/api).*/, (req, res) => {
+  app.get(/^(?!\/api|\/assets).*/, (req, res) => {
     res.sendFile(path.join(WEB_DIST, 'index.html'));
   });
 } else {
