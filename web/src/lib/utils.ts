@@ -5,19 +5,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatBRL(value: number): string {
+export function formatBRL(value?: number | null): string {
+  if (value === undefined || value === null) return 'R$ —'
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 }
 
-export function formatBRLPrecise(value: number): string {
+export function formatBRLPrecise(value?: number | null): string {
+  if (value === undefined || value === null) return 'R$ —'
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-export function formatNumber(value: number): string {
+export function formatNumber(value?: number | null): string {
+  if (value === undefined || value === null) return '—'
   return value.toLocaleString('pt-BR')
 }
 
-export function formatPercent(value: number, digits = 1): string {
+export function formatPercent(value?: number | null, digits = 1): string {
+  if (value === undefined || value === null) return '—'
   return `${value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}%`
 }
 
