@@ -1,68 +1,92 @@
-import React, { ReactNode, useState } from 'react';
-import { Menu, X, Search, Settings } from 'lucide-react';
+import React, { ReactNode } from 'react';
+import { Menu, X, Search, Settings, Sun, Moon, Bell } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { COLORS, SPACING, BORDER_RADIUS } from '../styles/tokens';
+import { useAppStore } from '../stores/appStore';
+import { useTheme } from '../contexts/ThemeContext';
+import { useFilters } from '../contexts/FilterContext';
+import { routes } from '../router/routes';
 
 interface LayoutProps {
   children: ReactNode;
-  currentPage: string;
-  onNavigate: (page: string) => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+const Layout: React.FC<LayoutProps> = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { sidebarOpen, toggleSidebar, setCurrentPage, searchQuery, setSearchQuery, notifications } =
+    useAppStore();
+  const { mode, toggleTheme } = useTheme();
+  const { filters, setFilter, getPeriodLabel } = useFilters();
+  const themeColors = useTheme();
 
-  const menuItems = [
-    { id: 'executive', label: 'Executive', icon: '📊' },
-    { id: 'marketing', label: 'Marketing', icon: '📈' },
-    { id: 'comercial', label: 'Comercial', icon: '🤝' },
-    { id: 'crm', label: 'CRM', icon: '👥' },
-    { id: 'agenda', label: 'Agenda', icon: '📅' },
-    { id: 'campanhas', label: 'Campanhas', icon: '📢' },
-    { id: 'conjuntos', label: 'Conjuntos', icon: '🎯' },
-    { id: 'criativos', label: 'Criativos', icon: '🎨' },
-    { id: 'pacientes', label: 'Pacientes', icon: '👤' },
-    { id: 'profissionais', label: 'Profissionais', icon: '👨‍⚕️' },
-    { id: 'sdrs', label: 'SDRs', icon: '📞' },
-    { id: 'whatsapp', label: 'WhatsApp', icon: '💬' },
-    { id: 'financeiro', label: 'Financeiro', icon: '💰' },
-    { id: 'ia', label: 'IA', icon: '🤖' },
-    { id: 'configuracoes', label: 'Configurações', icon: '⚙️' },
-  ];
+  const mainRoutes = routes.filter((r) => r.category !== 'detail');
+  const currentRoute = routes.find((r) => r.path === location.pathname);
+
+  const bgColor = mode === 'dark' ? COLORS.neutral[900] : COLORS.neutral[0];
+  const sidebarBgColor = mode === 'dark' ? COLORS.neutral[800] : COLORS.neutral[50];
+  const textColor = mode === 'dark' ? COLORS.neutral[0] : COLORS.neutral[900];
+  const borderColor = mode === 'dark' ? COLORS.neutral[700] : COLORS.neutral[200];
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: COLORS.neutral[50] }}>
+    <div
+      style={{
+        display: 'flex',
+        height: '100vh',
+        backgroundColor: bgColor,
+        color: textColor,
+        transition: 'background-color 200ms',
+      }}
+    >
       {/* Sidebar */}
       <aside
         style={{
           width: sidebarOpen ? '280px' : '0',
-          backgroundColor: COLORS.neutral[900],
-          color: COLORS.neutral[0],
+          backgroundColor: mode === 'dark' ? COLORS.neutral[900] : COLORS.neutral[0],
+          borderRight: `1px solid ${borderColor}`,
           overflow: 'hidden',
           transition: 'width 200ms ease-in-out',
           display: 'flex',
           flexDirection: 'column',
+          boxShadow: mode === 'dark' ? '0 0 20px rgba(0,0,0,0.3)' : 'none',
         }}
       >
         {/* Logo */}
-        <div style={{ padding: SPACING.lg, borderBottom: `1px solid ${COLORS.neutral[800]}` }}>
-          <h1 style={{ fontSize: '18px', fontWeight: '700' }}>Vivera</h1>
-          <p style={{ fontSize: '12px', color: COLORS.neutral[400], marginTop: '4px' }}>
+        <div
+          style={{
+            padding: SPACING.lg,
+            borderBottom: `1px solid ${borderColor}`,
+          }}
+        >
+          <h1 style={{ fontSize: '18px', fontWeight: '700', color: COLORS.primary[600] }}>
+            Vivera
+          </h1>
+          <p
+            style={{
+              fontSize: '12px',
+              color: mode === 'dark' ? COLORS.neutral[400] : COLORS.neutral[500],
+              marginTop: '4px',
+            }}
+          >
             Command Center
           </p>
         </div>
 
         {/* Menu */}
         <nav style={{ flex: 1, overflowY: 'auto', padding: SPACING.md }}>
-          {menuItems.map((item) => (
+          {mainRoutes.map((item) => (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => {
+                setCurrentPage(item.id);
+                navigate(item.path);
+              }}
               style={{
                 width: '100%',
                 padding: `${SPACING.md} ${SPACING.lg}`,
                 marginBottom: SPACING.sm,
-                backgroundColor: currentPage === item.id ? COLORS.primary[600] : 'transparent',
+                backgroundColor:
+                  location.pathname === item.path ? COLORS.primary[600] : 'transparent',
                 color: COLORS.neutral[0],
                 border: 'none',
                 borderRadius: BORDER_RADIUS.md,
@@ -73,12 +97,13 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
                 transition: 'background-color 200ms ease-in-out',
               }}
               onMouseEnter={(e) => {
-                if (currentPage !== item.id) {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = COLORS.neutral[700];
+                if (location.pathname !== item.path) {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                    mode === 'dark' ? COLORS.neutral[700] : COLORS.neutral[100];
                 }
               }}
               onMouseLeave={(e) => {
-                if (currentPage !== item.id) {
+                if (location.pathname !== item.path) {
                   (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
                 }
               }}
@@ -93,13 +118,13 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
         <div
           style={{
             padding: SPACING.lg,
-            borderTop: `1px solid ${COLORS.neutral[800]}`,
+            borderTop: `1px solid ${borderColor}`,
             fontSize: '12px',
-            color: COLORS.neutral[400],
+            color: mode === 'dark' ? COLORS.neutral[400] : COLORS.neutral[500],
           }}
         >
           <p>© 2024 Vivera</p>
-          <p>v1.0.0</p>
+          <p style={{ marginTop: '4px' }}>v1.0.0-beta</p>
         </div>
       </aside>
 
@@ -108,71 +133,82 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
         {/* Header */}
         <header
           style={{
-            backgroundColor: COLORS.neutral[0],
-            borderBottom: `1px solid ${COLORS.neutral[200]}`,
+            backgroundColor: bgColor,
+            borderBottom: `1px solid ${borderColor}`,
             padding: SPACING.lg,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: SPACING.lg,
+            boxShadow: mode === 'dark' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+            zIndex: 10,
           }}
         >
-          {/* Menu Toggle */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: COLORS.neutral[700],
-            }}
-          >
-            {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
+          {/* Left: Menu Toggle + Search */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.lg, flex: 1 }}>
+            {/* Menu Toggle */}
+            <button
+              onClick={toggleSidebar}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: textColor,
+                padding: '4px',
+              }}
+              title={sidebarOpen ? 'Fechar sidebar' : 'Abrir sidebar'}
+            >
+              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
 
-          {/* Search */}
-          <div
-            style={{
-              flex: 1,
-              position: 'relative',
-              maxWidth: '400px',
-            }}
-          >
-            <Search
-              size={16}
+            {/* Search */}
+            <div
               style={{
-                position: 'absolute',
-                left: SPACING.md,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: COLORS.neutral[400],
+                position: 'relative',
+                maxWidth: '400px',
+                flex: 1,
               }}
-            />
-            <input
-              type="text"
-              placeholder="Pesquisa global..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: `${SPACING.md} ${SPACING.md} ${SPACING.md} ${SPACING.xl}`,
-                borderRadius: BORDER_RADIUS.md,
-                border: `1px solid ${COLORS.neutral[200]}`,
-                backgroundColor: COLORS.neutral[50],
-                fontSize: '14px',
-              }}
-            />
+            >
+              <Search
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: SPACING.md,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: mode === 'dark' ? COLORS.neutral[400] : COLORS.neutral[400],
+                }}
+              />
+              <input
+                type="text"
+                placeholder="Pesquisa global..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: `${SPACING.md} ${SPACING.md} ${SPACING.md} ${SPACING.xl}`,
+                  borderRadius: BORDER_RADIUS.md,
+                  border: `1px solid ${borderColor}`,
+                  backgroundColor: mode === 'dark' ? COLORS.neutral[800] : COLORS.neutral[50],
+                  fontSize: '14px',
+                  color: textColor,
+                }}
+              />
+            </div>
           </div>
 
-          {/* Global Filters */}
-          <div style={{ display: 'flex', gap: SPACING.md }}>
+          {/* Right: Filters + Theme + Notifications + Settings */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: SPACING.md }}>
+            {/* Period Filter */}
             <select
-              defaultValue="month"
+              value={filters.period}
+              onChange={(e) => setFilter('period', e.target.value as any)}
               style={{
                 padding: `${SPACING.md} ${SPACING.lg}`,
                 borderRadius: BORDER_RADIUS.md,
-                border: `1px solid ${COLORS.neutral[200]}`,
-                backgroundColor: COLORS.neutral[0],
+                border: `1px solid ${borderColor}`,
+                backgroundColor: bgColor,
+                color: textColor,
                 fontSize: '14px',
                 cursor: 'pointer',
               }}
@@ -183,15 +219,71 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
               <option value="year">Ano</option>
             </select>
 
+            {/* Notifications */}
             <button
               style={{
-                padding: `${SPACING.md} ${SPACING.lg}`,
+                padding: `${SPACING.md} ${SPACING.md}`,
                 borderRadius: BORDER_RADIUS.md,
-                border: `1px solid ${COLORS.neutral[200]}`,
-                backgroundColor: COLORS.neutral[0],
+                border: `1px solid ${borderColor}`,
+                backgroundColor: bgColor,
                 cursor: 'pointer',
-                color: COLORS.neutral[700],
+                color: textColor,
+                position: 'relative',
               }}
+              title={`${notifications.length} notificações`}
+            >
+              <Bell size={18} />
+              {notifications.length > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-2px',
+                    right: '-2px',
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    backgroundColor: COLORS.critical[500],
+                    color: COLORS.neutral[0],
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {Math.min(notifications.length, 9)}
+                </span>
+              )}
+            </button>
+
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              style={{
+                padding: `${SPACING.md} ${SPACING.md}`,
+                borderRadius: BORDER_RADIUS.md,
+                border: `1px solid ${borderColor}`,
+                backgroundColor: bgColor,
+                cursor: 'pointer',
+                color: textColor,
+              }}
+              title={`Mudar para ${mode === 'light' ? 'dark' : 'light'} mode`}
+            >
+              {mode === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+
+            {/* Settings */}
+            <button
+              style={{
+                padding: `${SPACING.md} ${SPACING.md}`,
+                borderRadius: BORDER_RADIUS.md,
+                border: `1px solid ${borderColor}`,
+                backgroundColor: bgColor,
+                cursor: 'pointer',
+                color: textColor,
+              }}
+              onClick={() => navigate('/configuracoes')}
+              title="Configurações"
             >
               <Settings size={18} />
             </button>
@@ -204,6 +296,7 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
             flex: 1,
             overflow: 'auto',
             padding: SPACING.xl,
+            backgroundColor: sidebarBgColor,
           }}
         >
           {children}
@@ -212,15 +305,15 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
         {/* Footer */}
         <footer
           style={{
-            backgroundColor: COLORS.neutral[100],
-            borderTop: `1px solid ${COLORS.neutral[200]}`,
+            backgroundColor: bgColor,
+            borderTop: `1px solid ${borderColor}`,
             padding: SPACING.md,
             fontSize: '12px',
-            color: COLORS.neutral[500],
+            color: mode === 'dark' ? COLORS.neutral[400] : COLORS.neutral[500],
             textAlign: 'center',
           }}
         >
-          Vivera Command Center | Dados atualizados em tempo real
+          Vivera Command Center | {getPeriodLabel()} | Dados atualizados em tempo real
         </footer>
       </div>
     </div>

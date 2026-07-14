@@ -1,10 +1,10 @@
 import React from 'react';
 
-const ExecutiveDashboard: React.FC = () => {
+const GoalsDashboard: React.FC = () => {
   return (
     <div style={{ padding: '32px' }}>
       <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '16px' }}>
-        Executive Dashboard
+        Metas Dashboard
       </h1>
       <p style={{ color: '#666', marginBottom: '24px', fontSize: '14px' }}>
         Este dashboard será implementado nas próximas fases do projeto.
@@ -53,4 +53,4 @@ const ExecutiveDashboard: React.FC = () => {
   );
 };
 
-export default ExecutiveDashboard;
+export default GoalsDashboard;
