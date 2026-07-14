@@ -1,139 +1,56 @@
-import React, { ReactNode } from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../styles/tokens';
+import React from 'react';
 
 interface KPICardProps {
-  title: string;
-  value: number | string;
-  comparison?: number;
-  comparisonText?: string;
-  icon?: ReactNode;
-  trend?: 'up' | 'down' | 'stable';
-  status?: 'ok' | 'warning' | 'critical';
-  tooltip?: string;
+  label: string;
+  value: string | number;
+  change?: number;
+  sub?: string;
+  accent?: string;
   onClick?: () => void;
-  format?: 'currency' | 'percentage' | 'number';
-  sparkline?: number[];
-  loading?: boolean;
 }
 
 const KPICard: React.FC<KPICardProps> = ({
-  title,
+  label,
   value,
-  comparison = 0,
-  comparisonText = 'vs mês anterior',
-  icon,
-  trend = 'stable',
-  status = 'ok',
-  tooltip,
+  change,
+  sub,
+  accent = '#6366f1',
   onClick,
-  format = 'number',
-  sparkline,
-  loading = false,
 }) => {
-  const statusColors = {
-    ok: COLORS.success[500],
-    warning: COLORS.alert[500],
-    critical: COLORS.critical[500],
-  };
-
-  const formatValue = (val: number | string): string => {
-    if (typeof val === 'string') return val;
-    switch (format) {
-      case 'currency':
-        return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
-      case 'percentage':
-        return `${val.toFixed(1)}%`;
-      default:
-        return val.toLocaleString('pt-BR');
-    }
-  };
-
-  const trendIcon = {
-    up: <TrendingUp size={16} color={COLORS.success[500]} />,
-    down: <TrendingDown size={16} color={COLORS.critical[500]} />,
-    stable: <Minus size={16} color={COLORS.neutral[400]} />,
-  }[trend];
-
-  const comparisonColor = comparison > 0 ? COLORS.success[500] : COLORS.critical[500];
+  const positive = change !== undefined && change >= 0;
+  const changeColor = positive ? '#10b981' : '#ef4444';
+  const changePrefix = positive ? '+' : '';
 
   return (
-    <div
+    <button
       onClick={onClick}
-      className={`p-4 rounded-lg bg-white border border-gray-200 transition-all duration-200 ${
-        onClick ? 'cursor-pointer hover:shadow-lg hover:border-blue-300' : ''
-      }`}
-      style={{
-        boxShadow: SHADOWS.sm,
-        borderRadius: BORDER_RADIUS.lg,
-      }}
-      title={tooltip}
+      className="bg-white border border-[#e2e8f0] rounded-xl p-4 flex flex-col gap-2 text-left hover:shadow-md hover:border-[#c7d2fe] transition-all group w-full"
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          {icon && <div className="text-gray-400">{icon}</div>}
-          <h3 className="text-sm font-medium text-gray-600">{title}</h3>
-        </div>
-        <div
-          style={{
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            backgroundColor: statusColors[status],
-          }}
-        />
+      <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8]">
+        {label}
       </div>
-
-      {/* Main Value */}
-      <div className="mb-3">
-        {loading ? (
-          <div className="h-8 bg-gray-200 rounded animate-pulse" />
-        ) : (
-          <p className="text-2xl font-bold text-gray-900">{formatValue(value)}</p>
-        )}
+      <div
+        className="text-[22px] font-bold tracking-tight text-[#0f172a] leading-none"
+        style={{ fontVariantNumeric: 'tabular-nums' }}
+      >
+        {value}
       </div>
-
-      {/* Comparison */}
-      <div className="flex items-center gap-2 mb-3">
-        <div className="flex items-center gap-1">
-          {trendIcon}
-          <span style={{ color: comparisonColor }} className="text-sm font-semibold">
-            {comparison > 0 ? '+' : ''}{comparison}%
+      <div className="flex items-center gap-2">
+        {change !== undefined && (
+          <span
+            className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md"
+            style={{ color: changeColor, backgroundColor: changeColor + '18' }}
+          >
+            {changePrefix}{change}%
           </span>
-        </div>
-        <span className="text-xs text-gray-500">{comparisonText}</span>
+        )}
+        {sub && <span className="text-[11px] text-[#94a3b8]">{sub}</span>}
       </div>
-
-      {/* Sparkline */}
-      {sparkline && sparkline.length > 0 && (
-        <div className="h-8 flex items-end gap-0.5">
-          {sparkline.map((val, idx) => {
-            const maxVal = Math.max(...sparkline);
-            const percentage = (val / maxVal) * 100;
-            return (
-              <div
-                key={idx}
-                style={{
-                  flex: 1,
-                  height: `${percentage}%`,
-                  backgroundColor: COLORS.primary[400],
-                  borderRadius: BORDER_RADIUS.sm,
-                  minHeight: '2px',
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-
-      {/* Drill-down Indicator */}
-      {onClick && (
-        <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-blue-600 font-medium">
-          Clique para detalhe →
-        </div>
-      )}
-    </div>
+      <div
+        className="h-0.5 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+        style={{ backgroundColor: accent }}
+      />
+    </button>
   );
 };
 

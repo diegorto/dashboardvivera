@@ -13,6 +13,8 @@ Transformar o dashboard atual em um sistema completo de BI mantendo 100% das fun
 3. **Drill-down obrigatório** - Todo número é clicável e permite exploração em detalhe
 4. **Filtros globais** - Todos os filtros afetam todas as páginas
 5. **IA nunca substitui** - IA apenas explica os dados, nunca remove visualizações
+6. **Implementação Sequencial (CRÍTICO)** - NÃO implementar nenhuma tela cuja estrutura ainda não tenha sido aprovada. Cada tela deve ser concluída, revisada e aprovada antes da próxima. Nunca implementar múltiplos dashboards simultaneamente. Isso evita correções em cascata quando um componente é alterado.
+7. **Documentação de Screens** - Para cada dashboard implementado, gerar um arquivo markdown em `/docs/screens/` registrando: componentes usados, componentes novos criados, dependências, TODOs pendentes, pontos que precisam integração futura
 
 ## 🏗️ Arquitetura
 

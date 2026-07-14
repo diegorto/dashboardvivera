@@ -1,6 +1,8 @@
 // Export all components from here
 
 export { default as KPICard } from './KPICard';
+export { default as Sidebar } from './Sidebar';
+export { default as TopBar } from './TopBar';
 export { default as Layout } from './Layout';
 export { default as AnalyticalTable } from './AnalyticalTable';
 export { default as Funnel } from './Funnel';
