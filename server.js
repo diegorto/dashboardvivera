@@ -1080,6 +1080,123 @@ app.post('/api/tintim-audit/apply', async (req, res) => {
   }
 });
 
+// Dashboard em tempo real - Dados de hoje
+app.get('/api/today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const allDeals = await fetchAllDeals();
+
+    // Filtrar deals de hoje
+    const todayDeals = allDeals.filter(d => (d.addDate || '').slice(0, 10) === today);
+
+    // Contar por status/etapa
+    const stats = {
+      leads_entrada: 0,
+      leads_contato: 0,
+      leads_qualificados: 0,
+      agendamentos: 0,
+      comparecimentos: 0,
+      fechamentos: 0,
+      perdidos: 0,
+      orcamentos: 0,
+      revenue: 0,
+      ligacoes: 0
+    };
+
+    const origens = {};
+    const detalhesPorEtapa = {
+      leads: [],
+      qualificados: [],
+      agendados: [],
+      compareceram: [],
+      vendas: [],
+      perdidos: []
+    };
+
+    todayDeals.forEach(deal => {
+      const rank = rankOf(deal);
+      const origem = deal.origem || deal.plataforma || 'sem origem';
+
+      // Contar origem
+      origens[origem] = (origens[origem] || 0) + 1;
+
+      // Status e etapa
+      stats.leads_entrada++;
+      if (rank >= 1) stats.leads_contato++;
+      if (rank >= 2) stats.leads_qualificados++;
+      if (rank >= 3) stats.agendamentos++;
+      if (rank >= 4) stats.comparecimentos++;
+      if (deal.status === 'won') {
+        stats.fechamentos++;
+        stats.revenue += deal.value || 0;
+      }
+      if (deal.status === 'lost') stats.perdidos++;
+
+      // Detalhe
+      const detalhe = {
+        id: deal.id,
+        nome: deal.personName || deal.title || 'Sem nome',
+        telefone: deal.telefone || '',
+        origem,
+        etapa: stageName(deal),
+        status: deal.status,
+        valor: deal.value || 0
+      };
+
+      if (rank === 0) detalhesPorEtapa.leads.push(detalhe);
+      else if (rank === 2) detalhesPorEtapa.qualificados.push(detalhe);
+      else if (rank === 3) detalhesPorEtapa.agendados.push(detalhe);
+      else if (rank === 4) detalhesPorEtapa.compareceram.push(detalhe);
+
+      if (deal.status === 'won') detalhesPorEtapa.vendas.push(detalhe);
+      if (deal.status === 'lost') detalhesPorEtapa.perdidos.push(detalhe);
+    });
+
+    // Buscar atividades (ligações, etc) de hoje via Pipedrive
+    let activities = [];
+    try {
+      const activitiesResponse = await axios.get('https://api.pipedrive.com/v1/activities', {
+        params: {
+          api_token: PIPEDRIVE_TOKEN,
+          limit: 500,
+          start: 0
+        }
+      });
+
+      if (activitiesResponse.data.success && activitiesResponse.data.data) {
+        activities = activitiesResponse.data.data.filter(a => {
+          const actDate = (a.due_date || '').slice(0, 10);
+          return actDate === today && a.type === 'call';
+        });
+        stats.ligacoes = activities.length;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar atividades:', error.message);
+    }
+
+    // Contar orçamentos (deals com value preenchido mas ainda abertos)
+    const comOrcamento = todayDeals.filter(d => d.value > 0 && d.status === 'open');
+    stats.orcamentos = comOrcamento.length;
+
+    const origensArray = Object.entries(origens)
+      .map(([origem, count]) => ({ origem, count }))
+      .sort((a, b) => b.count - a.count);
+
+    res.json({
+      success: true,
+      data: today,
+      summary: stats,
+      origens: origensArray,
+      detalhesPorEtapa,
+      totalDeals: todayDeals.length,
+      activities: activities.slice(0, 50)
+    });
+  } catch (error) {
+    console.error('Erro no /api/today:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Servir o frontend React buildado (web/dist). Fallback pra SPA em qualquer rota nao-API.
 const WEB_DIST = path.join(__dirname, 'web', 'dist');
 if (fs.existsSync(WEB_DIST)) {
