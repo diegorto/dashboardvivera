@@ -53,7 +53,7 @@ function applySettings(s) {
   if (s.fbAdAccountIds) {
     FB_AD_ACCOUNT_IDS = String(s.fbAdAccountIds).split(',').map(id => id.trim()).filter(Boolean);
   }
-  if (s.anthropicApiKey) process.env.ANTHROPIC_API_KEY = s.anthropicApiKey;
+  if (s.openaiApiKey) process.env.OPENAI_API_KEY = s.openaiApiKey;
   if (s.inboundPipelineId) INBOUND_PIPELINE_ID = parseInt(s.inboundPipelineId, 10) || 1;
   if (s.monthlyGoal !== undefined) MONTHLY_GOAL = parseFloat(s.monthlyGoal) || 0;
 }
@@ -1840,8 +1840,8 @@ app.get('/api/dashboard/ai/insights', async (req, res) => {
   }
 });
 
-// GET /api/dashboard/ai/narrative - Resumo executivo em linguagem natural via Claude
-// Requer ANTHROPIC_API_KEY no .env; sem a chave retorna available: false
+// GET /api/dashboard/ai/narrative - Resumo executivo em linguagem natural via OpenAI (Platform ChatGPT)
+// Requer OPENAI_API_KEY no .env ou em Configuracoes; sem a chave retorna available: false
 app.get('/api/dashboard/ai/narrative', async (req, res) => {
   try {
     const defaults = defaultDateRange();
@@ -1850,14 +1850,14 @@ app.get('/api/dashboard/ai/narrative', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.OPENAI_API_KEY) {
       return res.json({
         success: true,
         range,
         data: {
           available: false,
           narrative: null,
-          reason: 'ANTHROPIC_API_KEY não configurada'
+          reason: 'OPENAI_API_KEY não configurada'
         }
       });
     }
@@ -1870,35 +1870,44 @@ app.get('/api/dashboard/ai/narrative', async (req, res) => {
 
     const insights = generateInsights({ ads, deals, stages });
 
-    const Anthropic = require('@anthropic-ai/sdk');
-    const anthropic = new Anthropic();
-
     const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
     const totalRevenue = deals.filter(d => d.status === 'won').reduce((sum, d) => sum + d.value, 0);
 
-    const response = await anthropic.messages.create({
-      model: 'claude-opus-4-8',
-      max_tokens: 1024,
-      system: 'Você é um analista de BI da clínica Vivera. Escreva um resumo executivo curto (3-5 frases) em português brasileiro, direto e acionável, baseado APENAS nos dados fornecidos. Não invente números.',
-      messages: [{
-        role: 'user',
-        content: `Período: ${range.since} a ${range.until}\nInvestimento em ads: R$ ${totalSpend.toFixed(2)}\nReceita: R$ ${totalRevenue.toFixed(2)}\nLeads: ${deals.length}\nVendas: ${deals.filter(d => d.status === 'won').length}\n\nInsights detectados:\n${insights.map(i => `- ${i.title}: ${i.description}`).join('\n')}\n\nEscreva o resumo executivo.`
-      }]
-    });
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        max_tokens: 1024,
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um analista de BI da clínica Vivera. Escreva um resumo executivo curto (3-5 frases) em português brasileiro, direto e acionável, baseado APENAS nos dados fornecidos. Não invente números.'
+          },
+          {
+            role: 'user',
+            content: `Período: ${range.since} a ${range.until}\nInvestimento em ads: R$ ${totalSpend.toFixed(2)}\nReceita: R$ ${totalRevenue.toFixed(2)}\nLeads: ${deals.length}\nVendas: ${deals.filter(d => d.status === 'won').length}\n\nInsights detectados:\n${insights.map(i => `- ${i.title}: ${i.description}`).join('\n')}\n\nEscreva o resumo executivo.`
+          }
+        ]
+      },
+      {
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        timeout: 30000
+      }
+    );
 
-    const textBlock = response.content.find(b => b.type === 'text');
+    const narrative = response.data.choices?.[0]?.message?.content || null;
 
     res.json({
       success: true,
       range,
       data: {
         available: true,
-        narrative: textBlock ? textBlock.text : null,
-        model: response.model
+        narrative,
+        model: response.data.model
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: error.response?.data?.error?.message || error.message });
   }
 });
 
@@ -2041,13 +2050,13 @@ app.get('/api/settings', (req, res) => {
       pipedriveToken: maskSecret(s.pipedriveToken || process.env.PIPEDRIVE_TOKEN),
       fbAccessToken: maskSecret(s.fbAccessToken || process.env.FB_ACCESS_TOKEN),
       fbAdAccountIds: s.fbAdAccountIds || process.env.FB_AD_ACCOUNT_IDS || '',
-      anthropicApiKey: maskSecret(s.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
+      openaiApiKey: maskSecret(s.openaiApiKey || process.env.OPENAI_API_KEY),
       inboundPipelineId: INBOUND_PIPELINE_ID,
       monthlyGoal: MONTHLY_GOAL,
       configured: {
         pipedrive: !!PIPEDRIVE_TOKEN,
         meta: !!FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0,
-        anthropic: !!process.env.ANTHROPIC_API_KEY
+        openai: !!process.env.OPENAI_API_KEY
       }
     }
   });
@@ -2057,7 +2066,7 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     const current = loadSettingsFile();
-    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'anthropicApiKey', 'inboundPipelineId', 'monthlyGoal'];
+    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
     const updates = {};
 
     allowed.forEach(key => {
@@ -2081,7 +2090,11 @@ app.post('/api/settings', (req, res) => {
 
 // POST /api/settings/test - testa conexoes com as credenciais atuais
 app.post('/api/settings/test', async (req, res) => {
-  const results = { pipedrive: { ok: false, message: '' }, meta: { ok: false, message: '' } };
+  const results = {
+    pipedrive: { ok: false, message: '' },
+    meta: { ok: false, message: '' },
+    openai: { ok: false, message: '' }
+  };
 
   if (PIPEDRIVE_TOKEN) {
     try {
@@ -2111,6 +2124,20 @@ app.post('/api/settings/test', async (req, res) => {
     }
   } else {
     results.meta.message = 'Token ou conta de anúncio não configurados';
+  }
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const r = await axios.get('https://api.openai.com/v1/models', {
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` }, timeout: 8000
+      });
+      results.openai.ok = Array.isArray(r.data.data);
+      results.openai.message = results.openai.ok ? 'Chave OpenAI válida' : 'Resposta inesperada';
+    } catch (e) {
+      results.openai.message = e.response?.data?.error?.message || e.message;
+    }
+  } else {
+    results.openai.message = 'Chave não configurada';
   }
 
   res.json({ success: true, data: results });

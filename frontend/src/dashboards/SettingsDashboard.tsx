@@ -16,7 +16,7 @@ const SettingsDashboard: React.FC = () => {
     pipedriveToken: '',
     fbAccessToken: '',
     fbAdAccountIds: '',
-    anthropicApiKey: '',
+    openaiApiKey: '',
     inboundPipelineId: 1,
     monthlyGoal: 0
   });
@@ -34,7 +34,7 @@ const SettingsDashboard: React.FC = () => {
         pipedriveToken: data.pipedriveToken,
         fbAccessToken: data.fbAccessToken,
         fbAdAccountIds: data.fbAdAccountIds,
-        anthropicApiKey: data.anthropicApiKey,
+        openaiApiKey: data.openaiApiKey,
         inboundPipelineId: data.inboundPipelineId,
         monthlyGoal: data.monthlyGoal
       });
@@ -108,8 +108,8 @@ const SettingsDashboard: React.FC = () => {
             {statusBadge(!!settings?.configured.meta)}
           </div>
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">IA (Anthropic)</div>
-            {statusBadge(!!settings?.configured.anthropic)}
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">IA (OpenAI)</div>
+            {statusBadge(!!settings?.configured.openai)}
           </div>
         </div>
 
@@ -163,13 +163,13 @@ const SettingsDashboard: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
-                Anthropic API Key <span className="normal-case font-normal">(opcional — habilita o resumo narrativo da IA)</span>
+                OpenAI API Key <span className="normal-case font-normal">(opcional — habilita o resumo narrativo da IA · platform.openai.com)</span>
               </label>
               <input
                 type="text"
-                value={form.anthropicApiKey}
-                onChange={(e) => setField('anthropicApiKey', e.target.value)}
-                placeholder="sk-ant-..."
+                value={form.openaiApiKey}
+                onChange={(e) => setField('openaiApiKey', e.target.value)}
+                placeholder="sk-..."
                 className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
               />
             </div>
@@ -232,7 +232,7 @@ const SettingsDashboard: React.FC = () => {
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
             <h3 className="text-[13px] font-semibold text-[#0f172a] mb-3">Resultado do Teste</h3>
             <div className="space-y-2">
-              {(['pipedrive', 'meta'] as const).map(service => (
+              {(['pipedrive', 'meta', 'openai'] as const).map(service => (
                 <div key={service} className="flex items-center gap-2">
                   <span className="text-[14px]">{testResult[service].ok ? '✅' : '❌'}</span>
                   <span className="text-[12px] font-semibold text-[#0f172a] capitalize w-20">{service}</span>
