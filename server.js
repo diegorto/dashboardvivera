@@ -199,6 +199,58 @@ async function getPipedriveDeals(since, until) {
   }
 }
 
+// Busca atividades do Pipedrive (agenda, ligacoes, whatsapp) no periodo
+async function getPipedriveActivities(since, until) {
+  try {
+    const activities = [];
+    let start = 0;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await axios.get('https://api.pipedrive.com/v1/activities', {
+        params: {
+          api_token: PIPEDRIVE_TOKEN,
+          user_id: 0, // todos os usuarios
+          start_date: since,
+          end_date: until,
+          limit: 500,
+          start
+        }
+      });
+
+      if (response.data.success && response.data.data) {
+        response.data.data.forEach(act => {
+          activities.push({
+            id: act.id,
+            subject: act.subject || '',
+            type: act.type || '',
+            dueDate: act.due_date || '',
+            dueTime: act.due_time || '',
+            duration: act.duration || '',
+            done: !!act.done,
+            userId: act.user_id,
+            userName: act.owner_name || '',
+            personName: act.person_name || '',
+            dealId: act.deal_id,
+            dealTitle: act.deal_title || ''
+          });
+        });
+
+        hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
+        start = response.data.additional_data?.pagination?.next_start || 0;
+      } else {
+        hasMore = false;
+      }
+    }
+
+    console.log(`Total de atividades Pipedrive no periodo: ${activities.length}`);
+    return activities;
+  } catch (error) {
+    console.error('Erro ao buscar atividades Pipedrive:', error.response?.data?.error || error.message);
+    return [];
+  }
+}
+
 // Busca as etapas (stages) do pipeline Inbound no Pipedrive
 async function getPipedriveStages() {
   try {
@@ -1088,6 +1140,356 @@ app.get('/api/dashboard/crm/recovery', async (req, res) => {
       success: true,
       range,
       data: lostDeals
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// Agenda Dashboard
+// ============================================
+
+// GET /api/dashboard/agenda/kpis - KPIs da agenda (hoje, amanha, semana, conclusao)
+app.get('/api/dashboard/agenda/kpis', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrow = tomorrowDate.toISOString().slice(0, 10);
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const activities = await getPipedriveActivities(today, weekEnd.toISOString().slice(0, 10));
+
+    const todayActs = activities.filter(a => a.dueDate === today);
+    const tomorrowActs = activities.filter(a => a.dueDate === tomorrow);
+    const doneToday = todayActs.filter(a => a.done).length;
+
+    res.json({
+      success: true,
+      range: { since: today, until: weekEnd.toISOString().slice(0, 10) },
+      data: {
+        today: todayActs.length,
+        tomorrow: tomorrowActs.length,
+        week: activities.length,
+        doneToday,
+        completionRate: todayActs.length > 0
+          ? parseFloat(((doneToday / todayActs.length) * 100).toFixed(1))
+          : 0,
+        noShow: 0 // TODO: integrar com sistema de presenca real
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/agenda/appointments - Lista de compromissos do periodo
+app.get('/api/dashboard/agenda/appointments', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const defaultEnd = new Date();
+    defaultEnd.setDate(defaultEnd.getDate() + 7);
+
+    const range = {
+      since: req.query.since || today,
+      until: req.query.until || defaultEnd.toISOString().slice(0, 10)
+    };
+
+    const activities = await getPipedriveActivities(range.since, range.until);
+
+    const appointments = activities
+      .sort((a, b) => `${a.dueDate} ${a.dueTime}`.localeCompare(`${b.dueDate} ${b.dueTime}`))
+      .map(a => ({
+        id: a.id,
+        subject: a.subject,
+        type: a.type,
+        date: a.dueDate,
+        time: a.dueTime,
+        duration: a.duration,
+        done: a.done,
+        professional: a.userName,
+        patient: a.personName,
+        dealTitle: a.dealTitle
+      }));
+
+    res.json({
+      success: true,
+      range,
+      data: appointments
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// Profissionais Dashboard
+// ============================================
+
+// GET /api/dashboard/professionals/kpis - Resumo geral dos profissionais
+app.get('/api/dashboard/professionals/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    const professionals = new Set(deals.map(d => d.userId).filter(Boolean));
+    const wonDeals = deals.filter(d => d.status === 'won');
+    const totalRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0);
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        totalProfessionals: professionals.size,
+        totalDeals: deals.length,
+        totalWon: wonDeals.length,
+        totalRevenue,
+        avgRevenuePerProfessional: professionals.size > 0
+          ? parseFloat((totalRevenue / professionals.size).toFixed(2))
+          : 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/professionals/ranking - Ranking de profissionais por receita
+app.get('/api/dashboard/professionals/ranking', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    const byUser = {};
+    deals.forEach(deal => {
+      const key = deal.userId || 'unknown';
+      if (!byUser[key]) {
+        byUser[key] = {
+          id: key,
+          name: deal.userName || 'Sem responsável',
+          deals: 0,
+          won: 0,
+          lost: 0,
+          open: 0,
+          revenue: 0
+        };
+      }
+      byUser[key].deals += 1;
+      if (deal.status === 'won') {
+        byUser[key].won += 1;
+        byUser[key].revenue += deal.value;
+      } else if (deal.status === 'lost') {
+        byUser[key].lost += 1;
+      } else {
+        byUser[key].open += 1;
+      }
+    });
+
+    const ranking = Object.values(byUser)
+      .map(p => ({
+        ...p,
+        conversionRate: p.deals > 0 ? parseFloat(((p.won / p.deals) * 100).toFixed(1)) : 0,
+        avgTicket: p.won > 0 ? parseFloat((p.revenue / p.won).toFixed(2)) : 0
+      }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    res.json({
+      success: true,
+      range,
+      data: ranking
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// Financeiro Dashboard
+// ============================================
+
+// GET /api/dashboard/financial/kpis - Receita, investimento, lucro e margem
+app.get('/api/dashboard/financial/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    const revenue = deals.reduce((sum, d) => sum + d.value, 0);
+    const adSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
+    const wonDeals = deals.filter(d => d.status === 'won');
+
+    // TODO: incluir custos operacionais reais (hoje considera apenas investimento em ads)
+    const grossProfit = revenue - adSpend;
+    const margin = revenue > 0 ? parseFloat(((grossProfit / revenue) * 100).toFixed(1)) : 0;
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        revenue,
+        adSpend,
+        grossProfit,
+        margin,
+        avgTicket: wonDeals.length > 0 ? parseFloat((revenue / wonDeals.length).toFixed(2)) : 0,
+        salesCount: wonDeals.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/financial/monthly - Receita vs investimento vs lucro por mes
+app.get('/api/dashboard/financial/monthly', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const monthData = {};
+
+    deals.forEach(deal => {
+      if (!deal.addDate) return;
+      const key = deal.addDate.slice(0, 7); // YYYY-MM
+      if (!monthData[key]) monthData[key] = { revenue: 0, investment: 0 };
+      monthData[key].revenue += deal.value;
+    });
+
+    // Investimento total distribuido no mes do periodo (Meta nao retorna por dia aqui)
+    // TODO: quebrar spend por mes via time_increment na API do Meta
+    const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
+    const untilKey = range.until.slice(0, 7);
+    if (!monthData[untilKey]) monthData[untilKey] = { revenue: 0, investment: 0 };
+    monthData[untilKey].investment += totalSpend;
+
+    const chartData = Object.keys(monthData)
+      .sort()
+      .map(key => {
+        const [, monthNum] = key.split('-');
+        return {
+          month: monthNames[parseInt(monthNum, 10) - 1] || key,
+          revenue: monthData[key].revenue,
+          investment: monthData[key].investment,
+          profit: monthData[key].revenue - monthData[key].investment
+        };
+      });
+
+    res.json({
+      success: true,
+      range,
+      data: chartData
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// WhatsApp Dashboard
+// ============================================
+
+// GET /api/dashboard/whatsapp/kpis - Mensagens, ligacoes e tempos de resposta
+// NOTA: sem integracao Tintim/WhatsApp ainda; ligacoes vem de activities do Pipedrive
+app.get('/api/dashboard/whatsapp/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const activities = await getPipedriveActivities(range.since, range.until);
+
+    const calls = activities.filter(a => a.type === 'call');
+    const missedCalls = calls.filter(a => !a.done);
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        messagesSent: 0, // TODO: integrar com Tintim/WhatsApp Business API
+        messagesReceived: 0, // TODO: integrar com Tintim/WhatsApp Business API
+        calls: calls.length,
+        missedCalls: missedCalls.length,
+        avgFirstResponseTime: 0, // TODO: integrar com Tintim (minutos)
+        avgResponseTime: 0, // TODO: integrar com Tintim (minutos)
+        conversionRate: 0 // TODO: mensagens que viraram deals
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/whatsapp/ranking - Ranking de atendentes por atividades
+app.get('/api/dashboard/whatsapp/ranking', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const activities = await getPipedriveActivities(range.since, range.until);
+
+    const byUser = {};
+    activities.forEach(act => {
+      const key = act.userId || 'unknown';
+      if (!byUser[key]) {
+        byUser[key] = {
+          id: key,
+          name: act.userName || 'Sem responsável',
+          totalActivities: 0,
+          calls: 0,
+          done: 0
+        };
+      }
+      byUser[key].totalActivities += 1;
+      if (act.type === 'call') byUser[key].calls += 1;
+      if (act.done) byUser[key].done += 1;
+    });
+
+    const ranking = Object.values(byUser)
+      .map(u => ({
+        ...u,
+        completionRate: u.totalActivities > 0
+          ? parseFloat(((u.done / u.totalActivities) * 100).toFixed(1))
+          : 0,
+        messages: 0 // TODO: integrar com Tintim
+      }))
+      .sort((a, b) => b.totalActivities - a.totalActivities);
+
+    res.json({
+      success: true,
+      range,
+      data: ranking
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
