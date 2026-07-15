@@ -9,9 +9,8 @@ COPY backend/package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source (no build needed for Node.js, but we compile TypeScript if needed)
+# Copy source
 COPY backend/src ./src
-COPY backend/tsconfig.json ./
 
 # Production Stage
 FROM node:18-alpine
@@ -26,7 +25,6 @@ RUN npm ci --production
 
 # Copy source from builder
 COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./
 
 # Create data directory for any local storage
 RUN mkdir -p /app/data

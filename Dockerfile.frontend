@@ -11,30 +11,30 @@ RUN npm ci
 
 # Copy source
 COPY frontend/src ./src
-COPY frontend/public ./public
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
 COPY frontend/tsconfig.json ./
-COPY frontend/.env.example ./.env.production
 
 # Build
 RUN npm run build
 
-# Production Stage
-FROM node:18-alpine
+# Production Stage - Nginx
+FROM nginx:alpine
 
-WORKDIR /app
+WORKDIR /usr/share/nginx/html
 
-# Install serve to run production build
-RUN npm install -g serve
+# Copy built app from builder (Vite outputs to dist/)
+COPY --from=builder /app/dist ./
 
-# Copy built app from builder
-COPY --from=builder /app/build ./build
+# Copy nginx config
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Expose port
 EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+  CMD wget --quiet --tries=1 --spider http://localhost:3000 || exit 1
 
-# Start app
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
