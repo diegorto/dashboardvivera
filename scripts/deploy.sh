@@ -29,13 +29,13 @@ git checkout main
 git pull origin main
 
 echo -e "${YELLOW}2/6 Building Docker images...${NC}"
-docker-compose build --no-cache
+docker compose build --no-cache
 
 echo -e "${YELLOW}3/6 Stopping old containers...${NC}"
-docker-compose down || true
+docker compose down || true
 
 echo -e "${YELLOW}4/6 Starting containers...${NC}"
-docker-compose up -d
+docker compose up -d
 
 echo -e "${YELLOW}5/6 Waiting for health checks...${NC}"
 sleep 10
@@ -43,19 +43,19 @@ sleep 10
 # Health check backend
 if ! curl -f http://localhost:3001/api/governance/health &> /dev/null; then
     echo -e "${RED}❌ Backend health check failed${NC}"
-    docker-compose logs backend
+    docker compose logs backend
     exit 1
 fi
 
 # Health check frontend
 if ! curl -f http://localhost:3000 &> /dev/null; then
     echo -e "${RED}❌ Frontend health check failed${NC}"
-    docker-compose logs frontend
+    docker compose logs frontend
     exit 1
 fi
 
 echo -e "${YELLOW}6/6 Deployment verification${NC}"
-docker-compose ps
+docker compose ps
 
 echo -e "${GREEN}✅ Deployment to $ENVIRONMENT completed successfully!${NC}"
 echo ""
