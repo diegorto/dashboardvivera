@@ -14,6 +14,9 @@ from src.comparison.engine import ComparisonEngine
 from src.audit.engine import AuditEngine
 from src.approval.queue import ApprovalQueueManager
 from src.journey.patient_analyzer import PatientJourneyAnalyzer
+from src.pipedrive.api import PipedriveAPIClient
+from src.pipedrive.updater import PipedriveUpdater
+from src.executive_os.sync import ExecutiveOSSyncEngine
 from src.models import SyncExecution, SyncLog
 
 logger = setup_logger(__name__)
@@ -196,10 +199,91 @@ class SyncOrchestrator:
         """Atualização do Pipedrive"""
         logger.info("Atualizando Pipedrive...")
         self._log_step("crm_update", "started", "Sincronizando Pipedrive")
-        
+
         try:
-            # CRM update logic here
-            self._log_step("crm_update", "success", "Pipedrive atualizado")
+            updater = PipedriveUpdater(self.db, self.batch_id)
+            stats = {"updated": 0, "created": 0, "failed": 0}
+
+            async with PipedriveAPIClient() as api_client:
+                # Verify connection first
+                if not await api_client.verify_connection():
+                    raise Exception("Falha ao conectar ao Pipedrive")
+
+                # Get all approved patient changes from approval queue
+                from src.models import ApprovalQueue
+                approved_items = self.db.query(ApprovalQueue).filter(
+                    ApprovalQueue.batch_id == self.batch_id,
+                    ApprovalQueue.status == "approved"
+                ).all()
+
+                logger.info(f"Processando {len(approved_items)} itens aprovados para Pipedrive")
+
+                for item in approved_items:
+                    try:
+                        # Get staging data for this patient
+                        from src.models import StagingPatient
+                        staging_patient = self.db.query(StagingPatient).filter(
+                            StagingPatient.clairis_id == item.entity_id
+                        ).first()
+
+                        if not staging_patient:
+                            logger.warning(f"Staging patient não encontrado: {item.entity_id}")
+                            stats["failed"] += 1
+                            continue
+
+                        # Prepare normalized data from staging
+                        clairis_data = {
+                            "name": staging_patient.name,
+                            "phone": staging_patient.phone,
+                            "email": staging_patient.email,
+                            "cpf": staging_patient.cpf,
+                            "birth_date": staging_patient.birth_date
+                        }
+
+                        # Try to find existing person in Pipedrive by phone
+                        pipedrive_person = await api_client.get_persons_by_phone(staging_patient.phone) if staging_patient.phone else None
+
+                        if pipedrive_person:
+                            # Update existing person
+                            pipedrive_data = {
+                                "name": pipedrive_person.get("name"),
+                                "phone": pipedrive_person.get("phone"),
+                                "email": pipedrive_person.get("email")
+                            }
+
+                            success, msg = await updater.update_person_safe(
+                                pipedrive_person["id"],
+                                clairis_data,
+                                pipedrive_data,
+                                api_client
+                            )
+                            if success:
+                                stats["updated"] += 1
+                            else:
+                                stats["failed"] += 1
+                        else:
+                            # Create new person
+                            person_id, msg = await updater.create_person_safe(
+                                clairis_data,
+                                api_client
+                            )
+                            if person_id:
+                                stats["created"] += 1
+                            else:
+                                stats["failed"] += 1
+
+                    except Exception as e:
+                        logger.error(f"Erro ao processar paciente {item.entity_id}: {str(e)}")
+                        stats["failed"] += 1
+                        continue
+
+                self.sync_execution.records_updated = stats["updated"]
+                self.sync_execution.records_created = stats["created"]
+
+                msg = f"Pipedrive atualizado: {stats['updated']} atualizados, {stats['created']} criados, {stats['failed']} erros"
+                self._log_step("crm_update", "success", msg)
+                logger.info(msg)
+
         except Exception as e:
             self._log_step("crm_update", "error", str(e))
             raise
@@ -208,10 +292,39 @@ class SyncOrchestrator:
         """Atualização do banco Executive OS"""
         logger.info("Atualizando Executive OS...")
         self._log_step("executive_os_update", "started", "Sincronizando banco principal")
-        
+
         try:
-            # Executive OS update logic here
-            self._log_step("executive_os_update", "success", "Executive OS atualizado")
+            sync_engine = ExecutiveOSSyncEngine(self.db, self.batch_id)
+
+            # Sync staging patients to Executive OS
+            sync_stats = await sync_engine.sync_patients()
+            logger.info(f"Sync stats: {sync_stats}")
+
+            # Sync Pipedrive snapshots
+            await sync_engine.sync_pipedrive_snapshots()
+
+            # Archive audit logs
+            await sync_engine.archive_audit_logs()
+
+            # Create data snapshot for this batch
+            await sync_engine.create_data_snapshot()
+
+            # Get final sync report
+            report = sync_engine.get_sync_report()
+
+            # Update sync execution with stats
+            self.sync_execution.records_imported = sync_stats.get("imported", 0)
+            self.sync_execution.records_updated = sync_stats.get("updated", 0)
+            self.sync_execution.records_created = sync_stats.get("created", 0)
+            self.sync_execution.records_failed = sync_stats.get("failed", 0)
+
+            msg = f"Executive OS sincronizado: {report['imported']} importados, {report['updated']} atualizados, {report['created']} criados"
+            if report['conflicts'] > 0:
+                msg += f", {report['conflicts']} conflitos em quarentena"
+
+            self._log_step("executive_os_update", "success", msg)
+            logger.info(msg)
+
         except Exception as e:
             self._log_step("executive_os_update", "error", str(e))
             raise
