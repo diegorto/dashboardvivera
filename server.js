@@ -2103,6 +2103,10 @@ if (fs.existsSync(DIST_DIR)) {
   });
 }
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   const range = defaultDateRange();
