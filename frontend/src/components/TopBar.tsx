@@ -9,11 +9,12 @@ import { routes } from '../router/routes';
 interface TopBarProps {
   title?: string;
   breadcrumb?: string[];
+  right?: React.ReactNode;
 }
 
 const filterOptions = ['Procedimento', 'Profissional', 'SDR', 'Campanha', 'Ad Set', 'Pipeline', 'Status'];
 
-const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb }) => {
+const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb, right }) => {
   const location = useLocation();
   const { notifications } = useAppStore();
   const { mode } = useTheme();
@@ -127,27 +128,29 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '8px' }}>
-        {/* Export Button */}
-        <button
-          style={{
-            padding: '6px 12px',
-            border: `1px solid ${borderColor}`,
-            borderRadius: '8px',
-            fontSize: '12px',
-            color: '#475569',
-            backgroundColor: bgColor,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            transition: 'background-color 200ms',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = hoverBg)}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgColor)}
-        >
-          <Download size={14} />
-          Export
-        </button>
+        {/* Custom right content or default Export Button */}
+        {right || (
+          <button
+            style={{
+              padding: '6px 12px',
+              border: `1px solid ${borderColor}`,
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: '#475569',
+              backgroundColor: bgColor,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'background-color 200ms',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = hoverBg)}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgColor)}
+          >
+            <Download size={14} />
+            Export
+          </button>
+        )}
 
         {/* Notifications */}
         <button

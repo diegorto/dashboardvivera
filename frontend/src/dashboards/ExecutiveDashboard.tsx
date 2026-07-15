@@ -9,6 +9,7 @@ import dashboardService, {
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ExportButton } from '../utils/dashboardHelpers';
 
 const ExecutiveDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -115,8 +116,77 @@ const ExecutiveDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    {
+      'Métrica': 'Receita',
+      'Valor': kpis.revenue.value,
+      'Mudança': kpis.revenue.change,
+      'Descrição': kpis.revenue.sub
+    },
+    {
+      'Métrica': 'Meta',
+      'Valor': kpis.goal.value,
+      'Mudança': '-',
+      'Descrição': kpis.goal.sub || 'Meta'
+    },
+    {
+      'Métrica': 'Lucro',
+      'Valor': kpis.profit.value,
+      'Mudança': kpis.profit.change,
+      'Descrição': 'Lucro líquido'
+    },
+    {
+      'Métrica': 'Margem',
+      'Valor': `${kpis.margin.value}%`,
+      'Mudança': kpis.margin.change,
+      'Descrição': 'Margem de lucro'
+    },
+    {
+      'Métrica': 'ROI',
+      'Valor': `${kpis.roi.value}%`,
+      'Mudança': kpis.roi.change,
+      'Descrição': 'Retorno sobre investimento'
+    },
+    {
+      'Métrica': 'ROAS',
+      'Valor': `${kpis.roas.value}x`,
+      'Mudança': kpis.roas.change,
+      'Descrição': 'Return on ad spend'
+    },
+    {
+      'Métrica': 'CAC',
+      'Valor': kpis.cac.value,
+      'Mudança': kpis.cac.change,
+      'Descrição': 'Custo de aquisição do cliente'
+    },
+    {
+      'Métrica': 'Ticket Médio',
+      'Valor': kpis.avgTicket.value,
+      'Mudança': kpis.avgTicket.change,
+      'Descrição': 'Ticket médio'
+    },
+    {
+      'Métrica': 'Leads',
+      'Valor': kpis.leads.value,
+      'Mudança': kpis.leads.change,
+      'Descrição': 'Total de leads'
+    },
+    {
+      'Métrica': 'Qualificados',
+      'Valor': kpis.qualified.value,
+      'Mudança': kpis.qualified.change,
+      'Descrição': 'Leads qualificados'
+    },
+    {
+      'Métrica': 'Vendas',
+      'Valor': kpis.sales.value,
+      'Mudança': kpis.sales.change,
+      'Descrição': 'Total de vendas'
+    }
+  ] : [];
+
   return (
-    <Layout title="Executive Dashboard" breadcrumb={['Dashboard', 'Executive']}>
+    <Layout title="Executive Dashboard" breadcrumb={['Dashboard', 'Executive']} right={<ExportButton filename="executive-dashboard" rows={exportData} />}>
       {/* Alertas */}
       {alerts.length > 0 && (
         <div className="mb-6 space-y-3">

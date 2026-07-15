@@ -8,9 +8,10 @@ interface LayoutProps {
   children: ReactNode;
   title?: string;
   breadcrumb?: string[];
+  right?: ReactNode;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title, breadcrumb }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title, breadcrumb, right }) => {
   const { sidebarOpen } = useAppStore();
   const { mode } = useTheme();
 
@@ -40,7 +41,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, breadcrumb }) => {
         }}
       >
         {/* TopBar */}
-        <TopBar title={title} breadcrumb={breadcrumb} />
+        <TopBar title={title} breadcrumb={breadcrumb} right={right} />
 
         {/* Content Area */}
         <main
