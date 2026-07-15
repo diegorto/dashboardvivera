@@ -1,55 +1,88 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Layout } from '../components';
+import { useFilters } from '../contexts/FilterContext';
+import { getDateRange, fmtCurrency, fmtNumber, fmtMult, LoadingScreen, ErrorScreen, MiniKpi, CardBox, Th, Td, ExportButton } from '../utils/dashboardHelpers';
+
+interface AdSet {
+  campaign: string;
+  adset: string;
+  spend: number;
+  leads: number;
+  revenue: number;
+  sales: number;
+  roas: number;
+  cpl: number;
+}
 
 const ConjuntosDashboard: React.FC = () => {
+  const { filters } = useFilters();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [adsets, setAdsets] = useState<AdSet[]>([]);
+  const [sortBy, setSortBy] = useState<keyof AdSet>('spend');
+
+  const load = async () => {
+    try {
+      setLoading(true); setError(null);
+      const { since, until } = getDateRange(filters.period);
+      const r = await axios.get('/api/dashboard/marketing/adsets', { params: { since, until } });
+      setAdsets(r.data.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [filters.period]);
+
+  if (error) return <ErrorScreen title="Conjuntos" error={error} onRetry={load} />;
+  if (loading) return <LoadingScreen title="Conjuntos" />;
+
+  const sorted = [...adsets].sort((a, b) => (Number(b[sortBy]) || 0) - (Number(a[sortBy]) || 0));
+
   return (
-    <div style={{ padding: '32px' }}>
-      <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '16px' }}>
-        Conjuntos Dashboard
-      </h1>
-      <p style={{ color: '#666', marginBottom: '24px', fontSize: '14px' }}>
-        Este dashboard será implementado nas próximas fases do projeto.
-      </p>
-
-      <div
-        style={{
-          backgroundColor: '#f0f7ff',
-          borderLeft: '4px solid #0284c7',
-          borderRadius: '8px',
-          padding: '16px',
-        }}
-      >
-        <p style={{ color: '#0284c7', fontWeight: '600', marginBottom: '8px' }}>
-          Estrutura de Dados:
-        </p>
-        <ul style={{ color: '#0284c7', marginLeft: '20px', fontSize: '14px' }}>
-          <li>API integrada e tipada</li>
-          <li>Componentes base prontos para uso</li>
-          <li>Filtros globais conectados</li>
-          <li>Estado global (Zustand) disponível</li>
-        </ul>
+    <Layout title="Conjuntos de Anúncio" breadcrumb={['Dashboard', 'Conjuntos']}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <MiniKpi label="Conjuntos" value={fmtNumber(adsets.length)} color="#0ea5e9" />
+        <MiniKpi label="Investimento" value={fmtCurrency(adsets.reduce((s, a) => s + a.spend, 0))} color="#ef4444" />
+        <MiniKpi label="Leads" value={fmtNumber(adsets.reduce((s, a) => s + a.leads, 0))} color="#6366f1" />
+        <MiniKpi label="Vendas" value={fmtNumber(adsets.reduce((s, a) => s + a.sales, 0))} color="#10b981" />
       </div>
 
-      <div
-        style={{
-          backgroundColor: '#f3f4f6',
-          borderRadius: '8px',
-          padding: '16px',
-          marginTop: '24px',
-          fontSize: '12px',
-          color: '#666',
-        }}
-      >
-        <p>
-          <strong>Layout:</strong> Sidebar + Header + Filtros Globais
-        </p>
-        <p>
-          <strong>Temas:</strong> Dark Mode / Light Mode (automático)
-        </p>
-        <p>
-          <strong>Design System:</strong> Tokens, Cores, Tipografia
-        </p>
-      </div>
-    </div>
+      <CardBox title="Conjuntos — Campanha → Conjunto" right={<ExportButton filename="conjuntos" rows={adsets as unknown as Record<string, unknown>[]} />}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#f1f5f9] bg-[#f8fafc]">
+                <Th>Campanha</Th>
+                <Th>Conjunto</Th>
+                <Th right onClick={() => setSortBy('spend')} active={sortBy === 'spend'}>Investimento</Th>
+                <Th right onClick={() => setSortBy('leads')} active={sortBy === 'leads'}>Leads</Th>
+                <Th right onClick={() => setSortBy('cpl')} active={sortBy === 'cpl'}>CPL</Th>
+                <Th right onClick={() => setSortBy('sales')} active={sortBy === 'sales'}>Vendas</Th>
+                <Th right onClick={() => setSortBy('revenue')} active={sortBy === 'revenue'}>Receita</Th>
+                <Th right onClick={() => setSortBy('roas')} active={sortBy === 'roas'}>ROAS</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((a, i) => (
+                <tr key={i} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
+                  <Td>{a.campaign}</Td>
+                  <Td bold>{a.adset}</Td>
+                  <Td right mono>{fmtCurrency(a.spend)}</Td>
+                  <Td right mono>{fmtNumber(a.leads)}</Td>
+                  <Td right mono>{fmtCurrency(a.cpl)}</Td>
+                  <Td right mono>{fmtNumber(a.sales)}</Td>
+                  <Td right mono>{fmtCurrency(a.revenue)}</Td>
+                  <Td right mono>{fmtMult(a.roas)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {adsets.length === 0 && <div className="text-center py-8 text-gray-500">Sem dados do Meta Ads no período (verifique o token em Configurações)</div>}
+      </CardBox>
+    </Layout>
   );
 };
 

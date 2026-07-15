@@ -1869,6 +1869,127 @@ app.get('/api/dashboard/ai/narrative', async (req, res) => {
 });
 
 // ============================================
+// Drill-down: Pacientes, Conjuntos, Criativos
+// ============================================
+
+// GET /api/dashboard/patients - Lista de pacientes/leads (deals com pessoa)
+app.get('/api/dashboard/patients', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    const patients = deals.map(d => ({
+      id: d.id,
+      name: d.personName || d.title,
+      email: d.email,
+      status: d.status,
+      value: d.rawValue,
+      stageId: d.stageId,
+      origem: d.origem,
+      campanha: d.campanha,
+      conjunto: d.conjunto,
+      criativo: d.palavraChave,
+      owner: d.userName,
+      addDate: d.addDate,
+      lostReason: d.lostReason
+    }));
+
+    res.json({ success: true, range, data: patients });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/adsets - Conjuntos de anuncio agregados
+app.get('/api/dashboard/marketing/adsets', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    const map = {};
+    ads.forEach(ad => {
+      const key = `${ad.campaignName}|||${ad.adsetName}`;
+      if (!map[key]) {
+        map[key] = { campaign: ad.campaignName, adset: ad.adsetName, spend: 0, leads: 0, revenue: 0, sales: 0 };
+      }
+      map[key].spend += ad.spend;
+      map[key].leads += ad.leads;
+    });
+    deals.forEach(d => {
+      const key = `${d.campanha}|||${d.conjunto}`;
+      if (map[key]) {
+        map[key].revenue += d.value;
+        if (d.status === 'won') map[key].sales += 1;
+      }
+    });
+
+    const adsets = Object.values(map).map(a => ({
+      ...a,
+      roas: a.spend > 0 ? parseFloat((a.revenue / a.spend).toFixed(2)) : 0,
+      cpl: a.leads > 0 ? parseFloat((a.spend / a.leads).toFixed(2)) : 0
+    })).sort((a, b) => b.spend - a.spend);
+
+    res.json({ success: true, range, data: adsets });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/creatives - Criativos (anuncios individuais) agregados
+app.get('/api/dashboard/marketing/creatives', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until)
+    ]);
+
+    const creatives = ads.map(ad => {
+      const relatedDeals = deals.filter(d =>
+        d.campanha === ad.campaignName && d.conjunto === ad.adsetName && d.palavraChave === ad.adName
+      );
+      const revenue = relatedDeals.reduce((s, d) => s + d.value, 0);
+      return {
+        id: ad.adId,
+        name: ad.adName,
+        campaign: ad.campaignName,
+        adset: ad.adsetName,
+        status: ad.status,
+        spend: ad.spend,
+        leads: ad.leads,
+        cpl: ad.leads > 0 ? parseFloat((ad.spend / ad.leads).toFixed(2)) : 0,
+        crmLeads: relatedDeals.length,
+        sales: relatedDeals.filter(d => d.status === 'won').length,
+        revenue,
+        roas: ad.spend > 0 ? parseFloat((revenue / ad.spend).toFixed(2)) : 0
+      };
+    }).sort((a, b) => b.spend - a.spend);
+
+    res.json({ success: true, range, data: creatives });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
 // Settings (configuracao pelo proprio SaaS)
 // ============================================
 

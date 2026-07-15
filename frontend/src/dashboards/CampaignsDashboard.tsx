@@ -1,55 +1,77 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { Layout } from '../components';
+import { useFilters } from '../contexts/FilterContext';
+import { getDateRange, fmtCurrency, fmtNumber, fmtMult, LoadingScreen, ErrorScreen, MiniKpi, CardBox, Th, Td, ExportButton } from '../utils/dashboardHelpers';
+import { Campaign } from '../services/marketingDashboardService';
 
 const CampaignsDashboard: React.FC = () => {
+  const { filters } = useFilters();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [sortBy, setSortBy] = useState<keyof Campaign>('investment');
+
+  const load = async () => {
+    try {
+      setLoading(true); setError(null);
+      const { since, until } = getDateRange(filters.period);
+      const r = await axios.get('/api/dashboard/marketing/campaigns', { params: { since, until } });
+      setCampaigns(r.data.data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [filters.period]);
+
+  if (error) return <ErrorScreen title="Campanhas" error={error} onRetry={load} />;
+  if (loading) return <LoadingScreen title="Campanhas" />;
+
+  const sorted = [...campaigns].sort((a, b) => (b[sortBy] as number) - (a[sortBy] as number));
+  const totInvest = campaigns.reduce((s, c) => s + c.investment, 0);
+  const totRevenue = campaigns.reduce((s, c) => s + c.revenue, 0);
+  const totLeads = campaigns.reduce((s, c) => s + c.leads, 0);
+
   return (
-    <div style={{ padding: '32px' }}>
-      <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '16px' }}>
-        Campanhas Dashboard
-      </h1>
-      <p style={{ color: '#666', marginBottom: '24px', fontSize: '14px' }}>
-        Este dashboard será implementado nas próximas fases do projeto.
-      </p>
-
-      <div
-        style={{
-          backgroundColor: '#f0f7ff',
-          borderLeft: '4px solid #0284c7',
-          borderRadius: '8px',
-          padding: '16px',
-        }}
-      >
-        <p style={{ color: '#0284c7', fontWeight: '600', marginBottom: '8px' }}>
-          Estrutura de Dados:
-        </p>
-        <ul style={{ color: '#0284c7', marginLeft: '20px', fontSize: '14px' }}>
-          <li>API integrada e tipada</li>
-          <li>Componentes base prontos para uso</li>
-          <li>Filtros globais conectados</li>
-          <li>Estado global (Zustand) disponível</li>
-        </ul>
+    <Layout title="Campanhas" breadcrumb={['Dashboard', 'Campanhas']}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <MiniKpi label="Campanhas Ativas" value={fmtNumber(campaigns.length)} color="#0ea5e9" />
+        <MiniKpi label="Investimento" value={fmtCurrency(totInvest)} color="#ef4444" />
+        <MiniKpi label="Receita" value={fmtCurrency(totRevenue)} color="#10b981" />
+        <MiniKpi label="Leads" value={fmtNumber(totLeads)} color="#6366f1" />
       </div>
 
-      <div
-        style={{
-          backgroundColor: '#f3f4f6',
-          borderRadius: '8px',
-          padding: '16px',
-          marginTop: '24px',
-          fontSize: '12px',
-          color: '#666',
-        }}
-      >
-        <p>
-          <strong>Layout:</strong> Sidebar + Header + Filtros Globais
-        </p>
-        <p>
-          <strong>Temas:</strong> Dark Mode / Light Mode (automático)
-        </p>
-        <p>
-          <strong>Design System:</strong> Tokens, Cores, Tipografia
-        </p>
-      </div>
-    </div>
+      <CardBox title="Todas as Campanhas" right={<ExportButton filename="campanhas" rows={campaigns as unknown as Record<string, unknown>[]} />}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#f1f5f9] bg-[#f8fafc]">
+                <Th>Campanha</Th>
+                <Th right onClick={() => setSortBy('investment')} active={sortBy === 'investment'}>Investimento</Th>
+                <Th right onClick={() => setSortBy('leads')} active={sortBy === 'leads'}>Leads</Th>
+                <Th right onClick={() => setSortBy('revenue')} active={sortBy === 'revenue'}>Receita</Th>
+                <Th right onClick={() => setSortBy('roas')} active={sortBy === 'roas'}>ROAS</Th>
+                <Th right onClick={() => setSortBy('revPerLead')} active={sortBy === 'revPerLead'}>R$/Lead</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map(c => (
+                <tr key={c.id} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
+                  <Td bold>{c.name}</Td>
+                  <Td right mono>{fmtCurrency(c.investment)}</Td>
+                  <Td right mono>{fmtNumber(c.leads)}</Td>
+                  <Td right mono>{fmtCurrency(c.revenue)}</Td>
+                  <Td right mono>{fmtMult(c.roas)}</Td>
+                  <Td right mono>{fmtCurrency(c.revPerLead)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {campaigns.length === 0 && <div className="text-center py-8 text-gray-500">Nenhuma campanha no período</div>}
+      </CardBox>
+    </Layout>
   );
 };
 

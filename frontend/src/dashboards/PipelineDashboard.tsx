@@ -1,55 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { Layout } from '../components';
+import crmDashboardService, { PipelineStage } from '../services/crmDashboardService';
+import { useFilters } from '../contexts/FilterContext';
+import { getDateRange, fmtCurrency, fmtNumber, LoadingScreen, ErrorScreen, MiniKpi, CardBox, Th, Td, ExportButton } from '../utils/dashboardHelpers';
 
 const PipelineDashboard: React.FC = () => {
+  const { filters } = useFilters();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<PipelineStage[]>([]);
+
+  const load = async () => {
+    try {
+      setLoading(true); setError(null);
+      const { since, until } = getDateRange(filters.period);
+      setPipeline(await crmDashboardService.getPipeline(since, until));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro ao carregar');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, [filters.period]);
+
+  if (error) return <ErrorScreen title="Pipeline" error={error} onRetry={load} />;
+  if (loading) return <LoadingScreen title="Pipeline" />;
+
+  const totalDeals = pipeline.reduce((s, p) => s + p.count, 0);
+  const totalValue = pipeline.reduce((s, p) => s + p.value, 0);
+  const allDeals = pipeline.flatMap(s => s.deals.map(d => ({ etapa: s.stageName, ...d })));
+
   return (
-    <div style={{ padding: '32px' }}>
-      <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '16px' }}>
-        Pipeline Dashboard
-      </h1>
-      <p style={{ color: '#666', marginBottom: '24px', fontSize: '14px' }}>
-        Este dashboard será implementado nas próximas fases do projeto.
-      </p>
-
-      <div
-        style={{
-          backgroundColor: '#f0f7ff',
-          borderLeft: '4px solid #0284c7',
-          borderRadius: '8px',
-          padding: '16px',
-        }}
-      >
-        <p style={{ color: '#0284c7', fontWeight: '600', marginBottom: '8px' }}>
-          Estrutura de Dados:
-        </p>
-        <ul style={{ color: '#0284c7', marginLeft: '20px', fontSize: '14px' }}>
-          <li>API integrada e tipada</li>
-          <li>Componentes base prontos para uso</li>
-          <li>Filtros globais conectados</li>
-          <li>Estado global (Zustand) disponível</li>
-        </ul>
+    <Layout title="Pipeline" breadcrumb={['Dashboard', 'Pipeline']}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+        <MiniKpi label="Deals Abertos" value={fmtNumber(totalDeals)} color="#0ea5e9" />
+        <MiniKpi label="Valor Total" value={fmtCurrency(totalValue)} color="#10b981" />
+        <MiniKpi label="Etapas" value={fmtNumber(pipeline.length)} color="#6366f1" />
       </div>
 
-      <div
-        style={{
-          backgroundColor: '#f3f4f6',
-          borderRadius: '8px',
-          padding: '16px',
-          marginTop: '24px',
-          fontSize: '12px',
-          color: '#666',
-        }}
-      >
-        <p>
-          <strong>Layout:</strong> Sidebar + Header + Filtros Globais
-        </p>
-        <p>
-          <strong>Temas:</strong> Dark Mode / Light Mode (automático)
-        </p>
-        <p>
-          <strong>Design System:</strong> Tokens, Cores, Tipografia
-        </p>
-      </div>
-    </div>
+      <CardBox title="Deals por Etapa" right={<ExportButton filename="pipeline" rows={allDeals as unknown as Record<string, unknown>[]} />}>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#f1f5f9] bg-[#f8fafc]">
+                <Th>Etapa</Th>
+                <Th>Deal</Th>
+                <Th>Paciente</Th>
+                <Th right>Valor</Th>
+                <Th right>Dias na Etapa</Th>
+                <Th>Campanha</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {allDeals.slice(0, 200).map(d => (
+                <tr key={d.id} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
+                  <Td bold>{d.etapa}</Td>
+                  <Td>{d.title}</Td>
+                  <Td>{d.personName || '—'}</Td>
+                  <Td right mono>{fmtCurrency(d.value)}</Td>
+                  <Td right mono>{d.daysInStage}d</Td>
+                  <Td>{d.campanha || '—'}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {allDeals.length === 0 && <div className="text-center py-8 text-gray-500">Pipeline vazio no período</div>}
+      </CardBox>
+    </Layout>
   );
 };
 
