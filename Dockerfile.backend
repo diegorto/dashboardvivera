@@ -1,30 +1,17 @@
-# Backend Build Stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY backend/package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source
-COPY backend/src ./src
-
-# Production Stage
+# Backend - Node.js Server
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY backend/package*.json ./
+# Copy package files from root
+COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --production
+# Install production dependencies
+RUN npm ci --omit=dev
 
-# Copy source from builder
-COPY --from=builder /app/src ./src
+# Copy server and backend code
+COPY server.js ./
+COPY backend ./backend
 
 # Create data directory for any local storage
 RUN mkdir -p /app/data

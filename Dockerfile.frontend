@@ -9,13 +9,12 @@ COPY frontend/package*.json ./
 # Install dependencies
 RUN npm ci
 
-# Copy source
+# Copy source files needed for build
 COPY frontend/src ./src
 COPY frontend/index.html ./
 COPY frontend/vite.config.ts ./
-COPY frontend/tsconfig.json ./
 
-# Build
+# Build (handles tsconfig internally)
 RUN npm run build
 
 # Production Stage - Nginx
