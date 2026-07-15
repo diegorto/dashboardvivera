@@ -1496,6 +1496,260 @@ app.get('/api/dashboard/whatsapp/ranking', async (req, res) => {
   }
 });
 
+// ============================================
+// IA Executive (Fase 7)
+// ============================================
+
+// Motor de insights baseado em regras: analisa dados reais e gera insights estruturados.
+// Nao substitui visualizacoes (regra #5) - apenas explica os dados.
+function generateInsights({ ads, deals, stages }) {
+  const insights = [];
+
+  const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
+  const totalLeads = ads.reduce((sum, ad) => sum + ad.leads, 0);
+  const wonDeals = deals.filter(d => d.status === 'won');
+  const lostDeals = deals.filter(d => d.status === 'lost');
+  const totalRevenue = wonDeals.reduce((sum, d) => sum + d.value, 0);
+  const roas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+  const cac = totalLeads > 0 ? totalSpend / totalLeads : 0;
+  const conversionRate = deals.length > 0 ? (wonDeals.length / deals.length) * 100 : 0;
+
+  // 1. Performance geral (ROAS)
+  if (totalSpend > 0) {
+    insights.push({
+      id: 'roas',
+      title: 'Retorno sobre Investimento em Ads',
+      description: `ROAS de ${roas.toFixed(2)}x: R$ ${totalSpend.toFixed(0)} investidos geraram R$ ${totalRevenue.toFixed(0)} em receita.`,
+      severity: roas >= 3 ? 'success' : roas >= 1.5 ? 'warning' : 'critical',
+      trend: roas >= 3 ? 'up' : 'down',
+      recommendation: roas >= 3
+        ? 'Performance saudável. Considere escalar o investimento nas campanhas de melhor retorno.'
+        : roas >= 1.5
+        ? 'ROAS abaixo do ideal (3x). Revise segmentação e criativos das campanhas de pior desempenho.'
+        : 'ROAS crítico. Pause campanhas sem retorno e realoque orçamento.',
+      metric: parseFloat(roas.toFixed(2))
+    });
+  }
+
+  // 2. CAC
+  if (totalLeads > 0) {
+    insights.push({
+      id: 'cac',
+      title: 'Custo por Lead',
+      description: `Cada lead custou em média R$ ${cac.toFixed(2)} (${totalLeads} leads com R$ ${totalSpend.toFixed(0)} investidos).`,
+      severity: 'info',
+      trend: 'stable',
+      recommendation: 'Compare com o ticket médio para validar se o custo de aquisição é sustentável.',
+      metric: parseFloat(cac.toFixed(2))
+    });
+  }
+
+  // 3. Melhor campanha real (por ROAS)
+  const campaignMap = {};
+  ads.forEach(ad => {
+    if (!campaignMap[ad.campaignName]) {
+      campaignMap[ad.campaignName] = { spend: 0, leads: 0, revenue: 0 };
+    }
+    campaignMap[ad.campaignName].spend += ad.spend;
+    campaignMap[ad.campaignName].leads += ad.leads;
+  });
+  deals.forEach(deal => {
+    if (deal.campanha && campaignMap[deal.campanha]) {
+      campaignMap[deal.campanha].revenue += deal.value;
+    }
+  });
+
+  const campaigns = Object.entries(campaignMap)
+    .map(([name, c]) => ({ name, ...c, roas: c.spend > 0 ? c.revenue / c.spend : 0 }))
+    .filter(c => c.spend > 0);
+
+  if (campaigns.length > 0) {
+    const best = campaigns.reduce((a, b) => (a.roas > b.roas ? a : b));
+    if (best.roas > 0) {
+      insights.push({
+        id: 'best-campaign',
+        title: 'Melhor Campanha',
+        description: `"${best.name}" tem o melhor ROAS: ${best.roas.toFixed(2)}x (R$ ${best.spend.toFixed(0)} investidos, R$ ${best.revenue.toFixed(0)} em receita).`,
+        severity: 'success',
+        trend: 'up',
+        recommendation: 'Considere aumentar o orçamento desta campanha.',
+        metric: parseFloat(best.roas.toFixed(2))
+      });
+    }
+
+    // 4. Anomalia: campanha com gasto e sem leads
+    const wasted = campaigns.filter(c => c.spend > 50 && c.leads === 0);
+    if (wasted.length > 0) {
+      const worst = wasted.reduce((a, b) => (a.spend > b.spend ? a : b));
+      insights.push({
+        id: 'wasted-spend',
+        title: 'Campanha sem Retorno',
+        description: `"${worst.name}" gastou R$ ${worst.spend.toFixed(0)} sem gerar nenhum lead no período.`,
+        severity: 'critical',
+        trend: 'down',
+        recommendation: 'Pause ou revise esta campanha imediatamente.',
+        metric: parseFloat(worst.spend.toFixed(2))
+      });
+    }
+  }
+
+  // 5. Gargalo do funil (etapa com deals mais parados)
+  const openDeals = deals.filter(d => d.status === 'open');
+  if (stages.length > 0 && openDeals.length > 0) {
+    const now = Date.now();
+    const stageTimes = stages.map(stage => {
+      const stageDeals = openDeals.filter(d => d.stageId === stage.id && d.stageChangeTime);
+      const times = stageDeals.map(d => (now - new Date(d.stageChangeTime).getTime()) / (1000 * 60 * 60 * 24));
+      return {
+        name: stage.name,
+        count: stageDeals.length,
+        avgDays: times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0
+      };
+    }).filter(s => s.count > 0);
+
+    if (stageTimes.length > 0) {
+      const bottleneck = stageTimes.reduce((a, b) => (a.avgDays > b.avgDays ? a : b));
+      if (bottleneck.avgDays > 3) {
+        insights.push({
+          id: 'funnel-bottleneck',
+          title: 'Gargalo no Funil',
+          description: `A etapa "${bottleneck.name}" retém ${bottleneck.count} deals há ${bottleneck.avgDays.toFixed(1)} dias em média.`,
+          severity: bottleneck.avgDays > 7 ? 'critical' : 'warning',
+          trend: 'down',
+          recommendation: 'Priorize follow-up com os deals parados nesta etapa.',
+          metric: parseFloat(bottleneck.avgDays.toFixed(1))
+        });
+      }
+    }
+  }
+
+  // 6. Motivo de perda dominante
+  if (lostDeals.length > 0) {
+    const reasons = {};
+    lostDeals.forEach(d => {
+      const r = d.lostReason || 'Motivo desconhecido';
+      reasons[r] = (reasons[r] || 0) + 1;
+    });
+    const [topReason, count] = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0];
+    const pct = ((count / lostDeals.length) * 100).toFixed(0);
+    insights.push({
+      id: 'loss-reason',
+      title: 'Principal Motivo de Perda',
+      description: `"${topReason}" responde por ${pct}% das ${lostDeals.length} oportunidades perdidas.`,
+      severity: 'warning',
+      trend: 'down',
+      recommendation: 'Crie um plano de contorno específico para este motivo (script de objeção, ajuste de preço, follow-up).',
+      metric: count
+    });
+  }
+
+  // 7. Taxa de conversão geral
+  if (deals.length > 0) {
+    insights.push({
+      id: 'conversion',
+      title: 'Conversão Geral',
+      description: `${wonDeals.length} de ${deals.length} leads viraram vendas (${conversionRate.toFixed(1)}%).`,
+      severity: conversionRate >= 15 ? 'success' : conversionRate >= 8 ? 'info' : 'warning',
+      trend: conversionRate >= 15 ? 'up' : 'stable',
+      recommendation: conversionRate >= 15
+        ? 'Taxa de conversão saudável para o setor.'
+        : 'Há espaço para melhorar a conversão. Analise o funil para identificar onde os leads travam.',
+      metric: parseFloat(conversionRate.toFixed(1))
+    });
+  }
+
+  return insights;
+}
+
+// GET /api/dashboard/ai/insights - Insights estruturados gerados dos dados reais
+app.get('/api/dashboard/ai/insights', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [ads, deals, stages] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until),
+      getPipedriveStages()
+    ]);
+
+    const insights = generateInsights({ ads, deals, stages });
+
+    res.json({
+      success: true,
+      range,
+      data: insights
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/ai/narrative - Resumo executivo em linguagem natural via Claude
+// Requer ANTHROPIC_API_KEY no .env; sem a chave retorna available: false
+app.get('/api/dashboard/ai/narrative', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.json({
+        success: true,
+        range,
+        data: {
+          available: false,
+          narrative: null,
+          reason: 'ANTHROPIC_API_KEY não configurada'
+        }
+      });
+    }
+
+    const [ads, deals, stages] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(range.since, range.until),
+      getPipedriveStages()
+    ]);
+
+    const insights = generateInsights({ ads, deals, stages });
+
+    const Anthropic = require('@anthropic-ai/sdk');
+    const anthropic = new Anthropic();
+
+    const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
+    const totalRevenue = deals.filter(d => d.status === 'won').reduce((sum, d) => sum + d.value, 0);
+
+    const response = await anthropic.messages.create({
+      model: 'claude-opus-4-8',
+      max_tokens: 1024,
+      system: 'Você é um analista de BI da clínica Vivera. Escreva um resumo executivo curto (3-5 frases) em português brasileiro, direto e acionável, baseado APENAS nos dados fornecidos. Não invente números.',
+      messages: [{
+        role: 'user',
+        content: `Período: ${range.since} a ${range.until}\nInvestimento em ads: R$ ${totalSpend.toFixed(2)}\nReceita: R$ ${totalRevenue.toFixed(2)}\nLeads: ${deals.length}\nVendas: ${deals.filter(d => d.status === 'won').length}\n\nInsights detectados:\n${insights.map(i => `- ${i.title}: ${i.description}`).join('\n')}\n\nEscreva o resumo executivo.`
+      }]
+    });
+
+    const textBlock = response.content.find(b => b.type === 'text');
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        available: true,
+        narrative: textBlock ? textBlock.text : null,
+        model: response.model
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
