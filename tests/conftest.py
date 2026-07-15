@@ -46,7 +46,6 @@ def mock_pipedrive_api():
 def sample_patient():
     """Dados de amostra de paciente"""
     return {
-        "id": 1,
         "clairis_id": "CLR-12345",
         "name": "João Silva",
         "phone": "5548999999999",

@@ -144,15 +144,22 @@ class ConflictQueueManager:
                 logger.error(f"Estratégia de resolução inválida: {resolution}")
                 return False, "Estratégia de resolução inválida"
 
+            # Auto-select value based on resolution strategy if not provided
+            final_resolved_value = resolved_value
+            if resolution == "CLAIRIS_WINS" and not final_resolved_value:
+                final_resolved_value = conflict.clairis_value
+            elif resolution == "PIPEDRIVE_WINS" and not final_resolved_value:
+                final_resolved_value = conflict.pipedrive_value
+
             # Validar valor resolvido
-            if resolution != "REJECT" and not resolved_value:
+            if resolution != "REJECT" and not final_resolved_value:
                 logger.error("Valor resolvido necessário para estratégias não-REJECT")
                 return False, "Valor resolvido necessário"
 
             # Atualizar conflito
             conflict.status = "RESOLVED"
             conflict.resolution = resolution
-            conflict.resolved_value = str(resolved_value) if resolved_value else None
+            conflict.resolved_value = str(final_resolved_value) if final_resolved_value else None
             conflict.resolved_by = resolved_by
             conflict.resolved_at = datetime.utcnow()
 
@@ -351,6 +358,9 @@ class ConflictQueueManager:
                 return {
                     "batch_id": batch_id,
                     "total_conflicts": 0,
+                    "pending_count": 0,
+                    "resolved_count": 0,
+                    "ignored_count": 0,
                     "conflicts": [],
                     "summary": "Nenhum conflito encontrado"
                 }

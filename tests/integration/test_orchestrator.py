@@ -206,10 +206,10 @@ class TestSyncOrchestrationFlow:
         """Testa agregação de estatísticas por batch"""
         batch_id = "stats-test-batch"
 
-        # Criar 3 registros de sincronização
-        for status in ["success", "success", "error"]:
+        # Criar 3 registros de sincronização com batch_ids únicos
+        for i, status in enumerate(["success", "success", "error"]):
             sync_exec = SyncExecution(
-                batch_id=f"{batch_id}-{status}",
+                batch_id=f"{batch_id}-{i}",
                 status=status,
                 files_exported=100
             )
