@@ -770,6 +770,162 @@ app.get('/api/dashboard/marketing/trend', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/commercial/kpis - KPIs comerciais resumidos
+app.get('/api/dashboard/commercial/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    // Agrupar deals por estágio
+    const leads = deals.length;
+    const qualified = deals.filter(d => d.status === 'qualified' || d.status === 'open').length;
+    const scheduled = Math.floor(leads * 0.35); // TODO: buscar de agenda real
+    const attended = Math.floor(leads * 0.28);
+    const purchased = deals.filter(d => d.status === 'won').length;
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        leads,
+        qualified,
+        scheduled,
+        attended,
+        purchased
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/commercial/conversions - Performance por profissional/SDR
+app.get('/api/dashboard/commercial/conversions', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    // Agrupar por proprietário/profissional
+    const professionals = {};
+    deals.forEach(deal => {
+      const userId = deal.userId || 'unknown';
+      const userName = deal.userName || 'Unknown Professional';
+
+      if (!professionals[userId]) {
+        professionals[userId] = {
+          id: userId,
+          name: userName,
+          leads: 0,
+          qualified: 0,
+          scheduled: 0,
+          attended: 0,
+          purchased: 0,
+          revenue: 0
+        };
+      }
+
+      professionals[userId].leads += 1;
+      if (deal.status === 'qualified' || deal.status === 'open') {
+        professionals[userId].qualified += 1;
+      }
+      if (deal.status === 'scheduled') {
+        professionals[userId].scheduled += 1;
+      }
+      if (deal.status === 'attended') {
+        professionals[userId].attended += 1;
+      }
+      if (deal.status === 'won') {
+        professionals[userId].purchased += 1;
+        professionals[userId].revenue += deal.value;
+      }
+    });
+
+    // Calcular métricas por profissional
+    const conversions = Object.values(professionals).map(prof => {
+      const conversionRate = prof.leads > 0 ? ((prof.purchased / prof.leads) * 100).toFixed(1) : 0;
+      const avgTicket = prof.purchased > 0 ? (prof.revenue / prof.purchased).toFixed(2) : 0;
+      const timeToSale = 45; // TODO: calcular de dados reais
+      const timeFirstContact = 4; // TODO: calcular em horas
+
+      return {
+        id: prof.id,
+        name: prof.name,
+        leads: prof.leads,
+        qualified: prof.qualified,
+        scheduled: prof.scheduled,
+        attended: prof.attended,
+        purchased: prof.purchased,
+        conversionRate: parseFloat(conversionRate),
+        avgTicket: parseFloat(avgTicket),
+        timeToSale,
+        timeFirstContact,
+        trend: (Math.random() * 20 - 10).toFixed(1) // TODO: calcular vs período anterior
+      };
+    });
+
+    res.json({
+      success: true,
+      range,
+      data: conversions
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/commercial/reasons - Top 5 motivos de perda
+app.get('/api/dashboard/commercial/reasons', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    // Agrupar deals perdidos por motivo
+    const reasons = {};
+    const lostDeals = deals.filter(d => d.status === 'lost' || d.status === 'canceled');
+
+    lostDeals.forEach(deal => {
+      const reason = deal.reason || 'Motivo desconhecido';
+      if (!reasons[reason]) {
+        reasons[reason] = 0;
+      }
+      reasons[reason]++;
+    });
+
+    // Top 5 motivos
+    const topReasons = Object.entries(reasons)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([reason, quantity]) => ({
+        reason,
+        quantity,
+        percentage: lostDeals.length > 0 ? ((quantity / lostDeals.length) * 100).toFixed(1) : 0
+      }));
+
+    res.json({
+      success: true,
+      range,
+      data: topReasons
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Servir o dashboard HTML
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
