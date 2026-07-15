@@ -10,13 +10,55 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-// Credenciais (carregadas do .env, nao ficam hardcoded no codigo)
-const PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
-const FB_ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN;
-const FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
+// ============================================
+// Configuracoes runtime (SaaS Settings)
+// Prioridade: config/settings.json (editavel pela tela de Configuracoes) > .env
+// ============================================
+const fs = require('fs');
+const SETTINGS_FILE = path.join(__dirname, 'config', 'settings.json');
+
+function loadSettingsFile() {
+  try {
+    if (fs.existsSync(SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('Erro ao ler settings.json:', e.message);
+  }
+  return {};
+}
+
+function saveSettingsFile(settings) {
+  fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2), { mode: 0o600 });
+}
+
+// Credenciais mutaveis em runtime (settings.json sobrepoe .env)
+let PIPEDRIVE_TOKEN = process.env.PIPEDRIVE_TOKEN;
+let FB_ACCESS_TOKEN = process.env.FB_ACCESS_TOKEN;
+let FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
   .split(',')
   .map(id => id.trim())
   .filter(Boolean);
+
+// Pipeline "Inbound" (onde entram os leads de trafego pago)
+let INBOUND_PIPELINE_ID = 1;
+
+// Metas de negocio configuraveis
+let MONTHLY_GOAL = 0; // meta de receita mensal em R$
+
+function applySettings(s) {
+  if (s.pipedriveToken) PIPEDRIVE_TOKEN = s.pipedriveToken;
+  if (s.fbAccessToken) FB_ACCESS_TOKEN = s.fbAccessToken;
+  if (s.fbAdAccountIds) {
+    FB_AD_ACCOUNT_IDS = String(s.fbAdAccountIds).split(',').map(id => id.trim()).filter(Boolean);
+  }
+  if (s.anthropicApiKey) process.env.ANTHROPIC_API_KEY = s.anthropicApiKey;
+  if (s.inboundPipelineId) INBOUND_PIPELINE_ID = parseInt(s.inboundPipelineId, 10) || 1;
+  if (s.monthlyGoal !== undefined) MONTHLY_GOAL = parseFloat(s.monthlyGoal) || 0;
+}
+
+applySettings(loadSettingsFile());
 
 // IDs reais dos campos customizados "Trafego Pago" no Deal do Pipedrive
 const FIELD_CAMPANHA = 'b70cf4c34cd06cb3917b79f3ebe1e64d28666f4b';
@@ -26,8 +68,11 @@ const FIELD_PALAVRA_CHAVE = 'c9ee045e6537eb296d268102e99829b0dbda1b5b';
 const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a';
 const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
 
-// Pipeline "Inbound" = id 1 (onde entram os leads de trafego pago)
-const INBOUND_PIPELINE_ID = 1;
+function maskSecret(value) {
+  if (!value) return '';
+  const str = String(value);
+  return str.length <= 6 ? '••••' : `••••${str.slice(-4)}`;
+}
 
 function defaultDateRange() {
   const until = new Date();
@@ -437,12 +482,15 @@ app.get('/api/dashboard/executive', async (req, res) => {
         sub: 'vs. mês anterior'
       },
       goal: {
-        value: totalRevenue * 1.15, // META = receita + 15% (ajustar conforme necessário)
+        // META: usa valor configurado na tela de Configuracoes; fallback receita+15%
+        value: MONTHLY_GOAL > 0 ? MONTHLY_GOAL : totalRevenue * 1.15,
         change: null
       },
       goalPct: {
-        value: ((totalRevenue / (totalRevenue * 1.15)) * 100).toFixed(1),
-        change: 3.2
+        value: MONTHLY_GOAL > 0
+          ? ((totalRevenue / MONTHLY_GOAL) * 100).toFixed(1)
+          : ((totalRevenue / (totalRevenue * 1.15 || 1)) * 100).toFixed(1),
+        change: null
       },
       forecast: {
         value: totalRevenue * 1.20, // FORECAST = receita + 20%
@@ -1777,6 +1825,93 @@ app.get('/api/dashboard/ai/narrative', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ============================================
+// Settings (configuracao pelo proprio SaaS)
+// ============================================
+
+// GET /api/settings - configuracoes atuais (segredos mascarados)
+app.get('/api/settings', (req, res) => {
+  const s = loadSettingsFile();
+  res.json({
+    success: true,
+    data: {
+      pipedriveToken: maskSecret(s.pipedriveToken || process.env.PIPEDRIVE_TOKEN),
+      fbAccessToken: maskSecret(s.fbAccessToken || process.env.FB_ACCESS_TOKEN),
+      fbAdAccountIds: s.fbAdAccountIds || process.env.FB_AD_ACCOUNT_IDS || '',
+      anthropicApiKey: maskSecret(s.anthropicApiKey || process.env.ANTHROPIC_API_KEY),
+      inboundPipelineId: INBOUND_PIPELINE_ID,
+      monthlyGoal: MONTHLY_GOAL,
+      configured: {
+        pipedrive: !!PIPEDRIVE_TOKEN,
+        meta: !!FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0,
+        anthropic: !!process.env.ANTHROPIC_API_KEY
+      }
+    }
+  });
+});
+
+// POST /api/settings - salva e aplica imediatamente (sem reiniciar o servidor)
+app.post('/api/settings', (req, res) => {
+  try {
+    const current = loadSettingsFile();
+    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'anthropicApiKey', 'inboundPipelineId', 'monthlyGoal'];
+    const updates = {};
+
+    allowed.forEach(key => {
+      const value = req.body[key];
+      // Ignora vazio e valores mascarados reenviados pelo frontend
+      if (value !== undefined && value !== '' && !String(value).startsWith('••••')) {
+        updates[key] = value;
+      }
+    });
+
+    const merged = { ...current, ...updates };
+    saveSettingsFile(merged);
+    applySettings(merged);
+
+    res.json({ success: true, message: 'Configurações salvas e aplicadas.' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/settings/test - testa conexoes com as credenciais atuais
+app.post('/api/settings/test', async (req, res) => {
+  const results = { pipedrive: { ok: false, message: '' }, meta: { ok: false, message: '' } };
+
+  if (PIPEDRIVE_TOKEN) {
+    try {
+      const r = await axios.get('https://api.pipedrive.com/v1/users/me', {
+        params: { api_token: PIPEDRIVE_TOKEN }, timeout: 8000
+      });
+      results.pipedrive.ok = !!r.data.success;
+      results.pipedrive.message = r.data.success
+        ? `Conectado como ${r.data.data?.name || 'usuário'}`
+        : 'Token inválido';
+    } catch (e) {
+      results.pipedrive.message = e.response?.data?.error || e.message;
+    }
+  } else {
+    results.pipedrive.message = 'Token não configurado';
+  }
+
+  if (FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0) {
+    try {
+      const r = await axios.get(`https://graph.facebook.com/v18.0/act_${FB_AD_ACCOUNT_IDS[0]}`, {
+        params: { access_token: FB_ACCESS_TOKEN, fields: 'name' }, timeout: 8000
+      });
+      results.meta.ok = !!r.data.name;
+      results.meta.message = r.data.name ? `Conta: ${r.data.name}` : 'Resposta inesperada';
+    } catch (e) {
+      results.meta.message = e.response?.data?.error?.message || e.message;
+    }
+  } else {
+    results.meta.message = 'Token ou conta de anúncio não configurados';
+  }
+
+  res.json({ success: true, data: results });
 });
 
 // Servir o dashboard HTML
