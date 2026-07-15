@@ -196,6 +196,74 @@ export const financialAPI = {
   },
 };
 
+// Governance APIs
+export const governanceAPI = {
+  getAuditKPIs: async () => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/audit/kpis`);
+    return response.data;
+  },
+
+  getAuditStats: async (days: number = 30) => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/audit/stats`, {
+      params: { days },
+    });
+    return response.data;
+  },
+
+  getPatientJourney: async (patientId: string) => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/patient-journey/${patientId}`);
+    return response.data;
+  },
+
+  listPatientsByStage: async (stage: string) => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/patient-journey/stage/${stage}`);
+    return response.data;
+  },
+
+  getHighPriorityPatients: async (limit: number = 10) => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/patient-journey/priority-high`, {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  getUnresolvedConflicts: async () => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/conflicts/unresolved`);
+    return response.data;
+  },
+
+  resolveConflict: async (conflictId: string, resolutionValue: string) => {
+    const response = await apiClient.post<ApiResponse<any>>(`/governance/conflicts/${conflictId}/resolve`, {
+      resolutionValue,
+    });
+    return response.data;
+  },
+
+  getPendingApprovals: async () => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/approvals/pending`);
+    return response.data;
+  },
+
+  approveItem: async (approvalId: string, userId: string) => {
+    const response = await apiClient.post<ApiResponse<any>>(`/governance/approvals/${approvalId}/approve`, {
+      userId,
+    });
+    return response.data;
+  },
+
+  rejectItem: async (approvalId: string, userId: string) => {
+    const response = await apiClient.post<ApiResponse<any>>(`/governance/approvals/${approvalId}/reject`, {
+      userId,
+    });
+    return response.data;
+  },
+
+  getHealth: async () => {
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/health`);
+    return response.data;
+  },
+};
+
 // Cliente HTTP generico (usado pelos services de dashboard)
 export const api = apiClient;
 
@@ -211,4 +279,5 @@ export default {
   whatsapp: whatsappAPI,
   professional: professionalAPI,
   financial: financialAPI,
+  governance: governanceAPI,
 };
