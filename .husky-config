@@ -1,0 +1,25 @@
+# Husky pre-commit hook configuration
+# Install with: npm install husky --save-dev && npx husky install
+
+# Add to backend/package.json:
+# {
+#   "husky": {
+#     "hooks": {
+#       "pre-commit": "npm run lint",
+#       "pre-push": "npm test"
+#     }
+#   }
+# }
+
+# Or use .husky/pre-commit file:
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running linters..."
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "❌ Lint failed. Commit aborted."
+  exit 1
+fi
+
+echo "✅ Pre-commit checks passed"

@@ -1,0 +1,78 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          port: 22
+          script: |
+            cd /home/app/dashboardvivera
+            git pull origin main
+            docker-compose build --no-cache
+            docker-compose up -d
+            docker-compose exec -T backend npm run migrate --if-present
+            
+            # Health checks
+            sleep 5
+            if ! curl -f http://localhost:3001/api/governance/health; then
+              echo "Backend health check failed"
+              docker-compose logs backend
+              exit 1
+            fi
+            
+            echo "✅ Deployment successful"
+
+      - name: Notify Slack
+        if: success()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "✅ Deployment to production successful",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Vivera Dashboard - Production Deployment*\n✅ Status: Success\n🔗 URL: https://your-domain.com"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Notify Slack on Failure
+        if: failure()
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "❌ Deployment to production failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Vivera Dashboard - Production Deployment*\n❌ Status: Failed\n📋 Check: https://github.com/diegorto/dashboardvivera/actions"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
