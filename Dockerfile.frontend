@@ -13,8 +13,9 @@ RUN npm ci
 COPY frontend/src ./src
 COPY frontend/index.html ./
 COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig.json ./
 
-# Build (handles tsconfig internally)
+# Build
 RUN npm run build
 
 # Production Stage - Nginx
