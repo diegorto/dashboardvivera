@@ -1,4 +1,5 @@
 import re
+import pandas as pd
 from src.core.logger import setup_logger
 
 logger = setup_logger(__name__)

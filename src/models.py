@@ -39,9 +39,9 @@ class PatientPriority(str, Enum):
 
 class StagingPatient(Base):
     __tablename__ = "staging_patients"
-    
+
     id = Column(Integer, primary_key=True)
-    clairis_id = Column(String(50), unique=True, index=True)
+    clairis_id = Column(String(50), unique=True, index=True, nullable=False)
     phone = Column(String(20), index=True)
     name = Column(String(255))
     email = Column(String(255), index=True)

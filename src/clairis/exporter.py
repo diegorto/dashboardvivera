@@ -101,62 +101,62 @@ class ClairisExporter:
         return {
             "pacientes_ativos": {
                 "name": "Pacientes Ativos",
-                "url": f"{self.page.context.browser}patient/list/",
+                "url": f"{self.settings.CLAIRIS_URL}patient/list/",
                 "filename": f"clairis_pacientes_ativos_{self.date_str}.xlsx",
                 "export_button_selector": 'button:has-text("EXPORTAR")'
             },
             "pacientes_inativos": {
                 "name": "Pacientes Inativos",
-                "url": f"{self.page.context.browser}patient/list/",
+                "url": f"{self.settings.CLAIRIS_URL}patient/list/",
                 "filename": f"clairis_pacientes_inativos_{self.date_str}.xlsx",
                 "filters": [{"name": "Tab", "selector": 'a:has-text("PACIENTES INATIVOS")', "value": ""}]
             },
             "orcamentos_pendentes": {
                 "name": "Orçamentos Pendentes",
-                "url": f"{self.page.context.browser}general-budgets/",
+                "url": f"{self.settings.CLAIRIS_URL}general-budgets/",
                 "filename": f"clairis_orcamentos_pendentes_{self.date_str}.xlsx",
                 "filters": [{"name": "Tab", "selector": 'a:has-text("PENDENTES")', "value": ""}]
             },
             "orcamentos_pagos": {
                 "name": "Orçamentos Pagos",
-                "url": f"{self.page.context.browser}general-budgets/",
+                "url": f"{self.settings.CLAIRIS_URL}general-budgets/",
                 "filename": f"clairis_orcamentos_pagos_{self.date_str}.xlsx",
                 "filters": [{"name": "Tab", "selector": 'a:has-text("PAGOS")', "value": ""}]
             },
             "orcamentos_aprovados": {
                 "name": "Orçamentos Aprovados",
-                "url": f"{self.page.context.browser}general-budgets/",
+                "url": f"{self.settings.CLAIRIS_URL}general-budgets/",
                 "filename": f"clairis_orcamentos_aprovados_{self.date_str}.xlsx",
                 "filters": [{"name": "Tab", "selector": 'a:has-text("APROVADOS")', "value": ""}]
             },
             "orcamentos_reprovados": {
                 "name": "Orçamentos Reprovados",
-                "url": f"{self.page.context.browser}rejected-budgets/",
+                "url": f"{self.settings.CLAIRIS_URL}rejected-budgets/",
                 "filename": f"clairis_orcamentos_reprovados_{self.date_str}.xlsx"
             },
             "retornos_pendentes": {
                 "name": "Retornos Pendentes",
-                "url": f"{self.page.context.browser}retornos/",
+                "url": f"{self.settings.CLAIRIS_URL}retornos/",
                 "filename": f"clairis_retornos_pendentes_{self.date_str}.xlsx"
             },
             "faturamento": {
                 "name": "Faturamento",
-                "url": f"{self.page.context.browser}billing/",
+                "url": f"{self.settings.CLAIRIS_URL}billing/",
                 "filename": f"clairis_faturamento_{self.date_str}.xlsx"
             },
             "insumos": {
                 "name": "Insumos",
-                "url": f"{self.page.context.browser}supplies/",
+                "url": f"{self.settings.CLAIRIS_URL}supplies/",
                 "filename": f"clairis_insumos_{self.date_str}.xlsx"
             },
             "chat_crm_leads": {
                 "name": "Chat CRM Leads",
-                "url": f"{self.page.context.browser}chat/painel-analyctics/",
+                "url": f"{self.settings.CLAIRIS_URL}chat/painel-analyctics/",
                 "filename": f"clairis_crm_leads_{self.date_str}.xlsx"
             },
             "clairis_bi": {
                 "name": "Clairis B.I",
-                "url": f"{self.page.context.browser}clairis-bi/",
+                "url": f"{self.settings.CLAIRIS_URL}clairis-bi/",
                 "filename": f"clairis_bi_{self.date_str}.xlsx"
             }
         }
