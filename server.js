@@ -166,6 +166,14 @@ async function getPipedriveDeals(since, until) {
             status: deal.status,
             addDate,
             value: deal.status === 'won' ? (deal.value || 0) : 0,
+            rawValue: deal.value || 0,
+            stageId: deal.stage_id,
+            stageChangeTime: deal.stage_change_time || deal.add_time || '',
+            userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
+            userName: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.name : '',
+            lostReason: deal.lost_reason || '',
+            wonTime: deal.won_time || '',
+            lostTime: deal.lost_time || '',
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
             palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
@@ -187,6 +195,26 @@ async function getPipedriveDeals(since, until) {
     return deals;
   } catch (error) {
     console.error('Erro ao buscar deals Pipedrive:', error.response?.data?.error || error.message);
+    return [];
+  }
+}
+
+// Busca as etapas (stages) do pipeline Inbound no Pipedrive
+async function getPipedriveStages() {
+  try {
+    const response = await axios.get('https://api.pipedrive.com/v1/stages', {
+      params: { api_token: PIPEDRIVE_TOKEN, pipeline_id: INBOUND_PIPELINE_ID }
+    });
+    if (response.data.success && response.data.data) {
+      return response.data.data.map(s => ({
+        id: s.id,
+        name: s.name,
+        order: s.order_nr
+      })).sort((a, b) => a.order - b.order);
+    }
+    return [];
+  } catch (error) {
+    console.error('Erro ao buscar stages Pipedrive:', error.response?.data?.error || error.message);
     return [];
   }
 }
@@ -899,7 +927,7 @@ app.get('/api/dashboard/commercial/reasons', async (req, res) => {
     const lostDeals = deals.filter(d => d.status === 'lost' || d.status === 'canceled');
 
     lostDeals.forEach(deal => {
-      const reason = deal.reason || 'Motivo desconhecido';
+      const reason = deal.lostReason || 'Motivo desconhecido';
       if (!reasons[reason]) {
         reasons[reason] = 0;
       }
@@ -920,6 +948,146 @@ app.get('/api/dashboard/commercial/reasons', async (req, res) => {
       success: true,
       range,
       data: topReasons
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/crm/kpis - KPIs do CRM (pipeline aberto, valor, perdidos, recuperaveis)
+app.get('/api/dashboard/crm/kpis', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    const openDeals = deals.filter(d => d.status === 'open');
+    const lostDeals = deals.filter(d => d.status === 'lost');
+    const wonDeals = deals.filter(d => d.status === 'won');
+
+    const pipelineValue = openDeals.reduce((sum, d) => sum + d.rawValue, 0);
+
+    // Tempo medio na etapa atual (dias) dos deals abertos
+    const now = Date.now();
+    const stageTimes = openDeals
+      .filter(d => d.stageChangeTime)
+      .map(d => (now - new Date(d.stageChangeTime).getTime()) / (1000 * 60 * 60 * 24));
+    const avgStageTime = stageTimes.length > 0
+      ? stageTimes.reduce((a, b) => a + b, 0) / stageTimes.length
+      : 0;
+
+    // Recuperaveis: perdidos com valor > 0 (candidatos a reengajamento)
+    const recoverable = lostDeals.filter(d => d.rawValue > 0).length;
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        openDeals: openDeals.length,
+        pipelineValue,
+        avgStageTime: parseFloat(avgStageTime.toFixed(1)),
+        lostDeals: lostDeals.length,
+        recoverable,
+        wonDeals: wonDeals.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/crm/pipeline - Kanban: deals agrupados por etapa + gargalos
+app.get('/api/dashboard/crm/pipeline', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [deals, stages] = await Promise.all([
+      getPipedriveDeals(range.since, range.until),
+      getPipedriveStages()
+    ]);
+
+    const openDeals = deals.filter(d => d.status === 'open');
+    const now = Date.now();
+
+    const pipeline = stages.map(stage => {
+      const stageDeals = openDeals.filter(d => d.stageId === stage.id);
+      const stageValue = stageDeals.reduce((sum, d) => sum + d.rawValue, 0);
+
+      // Tempo medio (dias) que os deals estao parados nesta etapa
+      const times = stageDeals
+        .filter(d => d.stageChangeTime)
+        .map(d => (now - new Date(d.stageChangeTime).getTime()) / (1000 * 60 * 60 * 24));
+      const avgDays = times.length > 0 ? times.reduce((a, b) => a + b, 0) / times.length : 0;
+
+      return {
+        stageId: stage.id,
+        stageName: stage.name,
+        count: stageDeals.length,
+        value: stageValue,
+        avgDays: parseFloat(avgDays.toFixed(1)),
+        deals: stageDeals.slice(0, 20).map(d => ({
+          id: d.id,
+          title: d.title,
+          value: d.rawValue,
+          personName: d.personName,
+          daysInStage: d.stageChangeTime
+            ? parseFloat(((now - new Date(d.stageChangeTime).getTime()) / (1000 * 60 * 60 * 24)).toFixed(1))
+            : 0,
+          origem: d.origem,
+          campanha: d.campanha
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      range,
+      data: pipeline
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/crm/recovery - Oportunidades perdidas recuperaveis
+app.get('/api/dashboard/crm/recovery', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const deals = await getPipedriveDeals(range.since, range.until);
+
+    const lostDeals = deals
+      .filter(d => d.status === 'lost')
+      .sort((a, b) => b.rawValue - a.rawValue)
+      .slice(0, 50)
+      .map(d => ({
+        id: d.id,
+        title: d.title,
+        personName: d.personName,
+        value: d.rawValue,
+        lostReason: d.lostReason || 'Motivo desconhecido',
+        lostDate: (d.lostTime || '').slice(0, 10),
+        origem: d.origem,
+        campanha: d.campanha,
+        email: d.email
+      }));
+
+    res.json({
+      success: true,
+      range,
+      data: lostDeals
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
