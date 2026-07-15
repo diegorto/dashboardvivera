@@ -74,6 +74,47 @@ function maskSecret(value) {
   return str.length <= 6 ? '••••' : `••••${str.slice(-4)}`;
 }
 
+// ============================================
+// Cache em memoria para chamadas externas (Meta/Pipedrive)
+// Evita refazer as mesmas chamadas a cada carregamento de tela
+// ============================================
+const CACHE_TTL_MS = 60 * 1000; // 60s
+const _cache = new Map();
+
+async function cached(key, fn) {
+  const hit = _cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+    return hit.value;
+  }
+  const value = await fn();
+  _cache.set(key, { at: Date.now(), value });
+  // Limpeza simples para nao crescer indefinidamente
+  if (_cache.size > 200) {
+    const oldest = [..._cache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+    if (oldest) _cache.delete(oldest[0]);
+  }
+  return value;
+}
+
+function invalidateCache() {
+  _cache.clear();
+}
+
+
+// Wrappers com cache (60s) sobre as chamadas externas
+function getMetaAds(since, until) {
+  return cached(`meta:${since}:${until}`, () => fetchMetaAdsUncached(since, until));
+}
+function getPipedriveDeals(since, until) {
+  return cached(`deals:${since}:${until}:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveDealsUncached(since, until));
+}
+function getPipedriveStages() {
+  return cached(`stages:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveStagesUncached());
+}
+function getPipedriveActivities(since, until) {
+  return cached(`activities:${since}:${until}`, () => fetchPipedriveActivitiesUncached(since, until));
+}
+
 function defaultDateRange() {
   const until = new Date();
   const since = new Date();
@@ -90,7 +131,7 @@ function joinKey(campanha, conjunto, anuncio) {
 // "leads" aqui = o que o proprio Meta Ads Manager reporta como acao do tipo "lead"
 // (o "leads_meta" da tabela de audit) - o que o gerenciador diz que aconteceu.
 // Depois comparamos com o Pipedrive, que confirma se realmente aconteceu.
-async function getMetaAds(since, until) {
+async function fetchMetaAdsUncached(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
   const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions}`;
@@ -178,7 +219,7 @@ function aggregateMetaAds(ads) {
 
 // Pipedrive: busca Deals (negocios) do funil Inbound dentro do periodo (filtra por add_time).
 // Campanha/Conjunto/Palavra-chave vivem no proprio Deal (campos "Trafego Pago").
-async function getPipedriveDeals(since, until) {
+async function fetchPipedriveDealsUncached(since, until) {
   try {
     const deals = [];
     let start = 0;
@@ -245,7 +286,7 @@ async function getPipedriveDeals(since, until) {
 }
 
 // Busca atividades do Pipedrive (agenda, ligacoes, whatsapp) no periodo
-async function getPipedriveActivities(since, until) {
+async function fetchPipedriveActivitiesUncached(since, until) {
   try {
     const activities = [];
     let start = 0;
@@ -297,7 +338,7 @@ async function getPipedriveActivities(since, until) {
 }
 
 // Busca as etapas (stages) do pipeline Inbound no Pipedrive
-async function getPipedriveStages() {
+async function fetchPipedriveStagesUncached() {
   try {
     const response = await axios.get('https://api.pipedrive.com/v1/stages', {
       params: { api_token: PIPEDRIVE_TOKEN, pipeline_id: INBOUND_PIPELINE_ID }
@@ -1870,6 +1911,7 @@ app.post('/api/settings', (req, res) => {
     const merged = { ...current, ...updates };
     saveSettingsFile(merged);
     applySettings(merged);
+    invalidateCache();
 
     res.json({ success: true, message: 'Configurações salvas e aplicadas.' });
   } catch (error) {
@@ -1914,15 +1956,31 @@ app.post('/api/settings/test', async (req, res) => {
   res.json({ success: true, data: results });
 });
 
-// Servir o dashboard HTML
-app.get('/', (req, res) => {
+// Dashboard legado (preservado)
+app.get('/legacy', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-api.html'));
 });
 
-// Painel Vivera Orofacial - Corrida das SDRs
+// Painel Vivera Orofacial - Corrida das SDRs (preservado)
 app.get('/sdr', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard-sdr.html'));
 });
+
+// SaaS React (build de producao em frontend/dist)
+const DIST_DIR = path.join(__dirname, 'frontend', 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  // SPA fallback: qualquer rota nao-API cai no index.html do React
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/legacy' || req.path === '/sdr') return next();
+    res.sendFile(path.join(DIST_DIR, 'index.html'));
+  });
+} else {
+  // Sem build do frontend: raiz serve o dashboard legado
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dashboard-api.html'));
+  });
+}
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

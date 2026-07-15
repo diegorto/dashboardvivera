@@ -20,7 +20,7 @@ export interface ConnectionTestResult {
 }
 
 class SettingsService {
-  private baseUrl = 'http://localhost:3000/api';
+  private baseUrl = '/api';
 
   private extractError(error: unknown): string {
     if (error instanceof AxiosError) {

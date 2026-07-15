@@ -213,7 +213,7 @@ export const DataTable = <T extends Record<string, any>>({
             <tr style={{ backgroundColor: COLORS.neutral[50], borderBottom: `1px solid ${COLORS.neutral[200]}` }}>
               {columns.map((col) => (
                 <th
-                  key={col.id}
+                  key={String(col.id)}
                   onClick={() => col.sortable !== false && handleSort(String(col.id))}
                   style={{
                     padding: SPACING.md,
@@ -258,7 +258,7 @@ export const DataTable = <T extends Record<string, any>>({
               >
                 {columns.map((col) => (
                   <td
-                    key={col.id}
+                    key={String(col.id)}
                     style={{
                       padding: SPACING.md,
                       fontSize: '14px',

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { ApiResponse, PaginatedResponse } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = '/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -196,8 +196,13 @@ export const financialAPI = {
   },
 };
 
+// Cliente HTTP generico (usado pelos services de dashboard)
+export const api = apiClient;
+
 // Export all APIs
 export default {
+  get: apiClient.get.bind(apiClient),
+  post: apiClient.post.bind(apiClient),
   executive: executiveAPI,
   marketing: marketingAPI,
   commercial: commercialAPI,

@@ -85,7 +85,7 @@ const AIInsight: React.FC<AIInsightProps> = ({ insights, loading = false }) => {
             }}
             onMouseEnter={(e) => {
               if (insight.onClick) {
-                (e.currentTarget as HTMLDivElement).opacity = '1';
+                (e.currentTarget as HTMLDivElement).style.opacity = '1';
                 (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)';
               }
             }}

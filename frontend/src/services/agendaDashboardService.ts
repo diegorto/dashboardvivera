@@ -39,7 +39,7 @@ export interface FullAgendaDashboardData {
 }
 
 class AgendaDashboardService {
-  private baseUrl = 'http://localhost:3000/api/dashboard';
+  private baseUrl = '/api/dashboard';
 
   private extractError(error: unknown): string {
     if (error instanceof AxiosError) {

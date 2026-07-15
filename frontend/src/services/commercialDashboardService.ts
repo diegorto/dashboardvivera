@@ -47,7 +47,7 @@ export interface FullDashboardData {
 }
 
 class CommercialDashboardService {
-  private baseUrl = 'http://localhost:3000/api/dashboard';
+  private baseUrl = '/api/dashboard';
 
   async getCommercialKPIs(since: string, until: string): Promise<CommercialKPIs> {
     try {

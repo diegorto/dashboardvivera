@@ -31,7 +31,7 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
   const secondaryText = mode === 'dark' ? '#94a3b8' : '#94a3b8';
   const hoverBg = mode === 'dark' ? '#1e293b' : '#f8fafc';
 
-  const unreadNotifications = notifications.filter((n) => !n.read).length;
+  const unreadNotifications = notifications.length;
 
   return (
     <div

@@ -7,10 +7,10 @@ export * from './stores/appStore';
 
 // Export all contexts
 export * from './contexts/ThemeContext';
-export * from './contexts/FilterContext';
+export { FilterProvider } from './contexts/FilterContext';
 
 // Export all types
-export * from './types';
+// Tipos: importe diretamente de './types' (AIInsight conflita com o componente homonimo)
 
 // Export routes
 export { routes, Router } from './router/routes';
