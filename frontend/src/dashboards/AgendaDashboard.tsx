@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components';
+import { ExportButton } from '../utils/dashboardHelpers';
 import agendaDashboardService, { AgendaKPIs, Appointment } from '../services/agendaDashboardService';
 import { useAppStore } from '../stores/appStore';
 
@@ -79,8 +80,17 @@ const AgendaDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Agendadas Hoje', 'Valor': kpis.today, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Agendadas Amanhã', 'Valor': kpis.tomorrow, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Agendadas Esta Semana', 'Valor': kpis.week, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Realizadas Hoje', 'Valor': kpis.doneToday, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Taxa de Conclusão', 'Valor': `${kpis.completionRate.toFixed(1)}%`, 'Tipo': 'Percentage' },
+    { 'Métrica': 'No-show', 'Valor': kpis.noShow, 'Tipo': 'Quantity' }
+  ] : [];
+
   return (
-    <Layout title="Agenda" breadcrumb={['Dashboard', 'Agenda']}>
+    <Layout title="Agenda" breadcrumb={['Dashboard', 'Agenda']} right={<ExportButton filename="agenda-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">

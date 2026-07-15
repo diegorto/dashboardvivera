@@ -4,6 +4,7 @@ import financialDashboardService, { FinancialKPIs, MonthlyFinancialData } from '
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { ExportButton } from '../utils/dashboardHelpers';
 
 const FinancialDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -111,8 +112,17 @@ const FinancialDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Receita', 'Valor': kpis.revenue, 'Tipo': 'Currency' },
+    { 'Métrica': 'Despesa com Ads', 'Valor': kpis.adSpend, 'Tipo': 'Currency' },
+    { 'Métrica': 'Lucro Bruto', 'Valor': kpis.grossProfit, 'Tipo': 'Currency' },
+    { 'Métrica': 'Margem', 'Valor': `${kpis.margin}%`, 'Tipo': 'Percentage' },
+    { 'Métrica': 'Ticket Médio', 'Valor': kpis.avgTicket, 'Tipo': 'Currency' },
+    { 'Métrica': 'Contagem de Vendas', 'Valor': kpis.salesCount, 'Tipo': 'Quantity' }
+  ] : [];
+
   return (
-    <Layout title="Financeiro" breadcrumb={['Dashboard', 'Financeiro']}>
+    <Layout title="Financeiro" breadcrumb={['Dashboard', 'Financeiro']} right={<ExportButton filename="financial-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">

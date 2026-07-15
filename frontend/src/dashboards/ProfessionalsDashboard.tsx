@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components';
+import { ExportButton } from '../utils/dashboardHelpers';
 import professionalsDashboardService, { ProfessionalsKPIs, ProfessionalRanking } from '../services/professionalsDashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
@@ -123,8 +124,16 @@ const ProfessionalsDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Total de Profissionais', 'Valor': kpis.totalProfessionals, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Total de Deals', 'Valor': kpis.totalDeals, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Deals Ganhos', 'Valor': kpis.totalWon, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Receita Total', 'Valor': kpis.totalRevenue, 'Tipo': 'Currency' },
+    { 'Métrica': 'Receita Média por Profissional', 'Valor': kpis.avgRevenuePerProfessional, 'Tipo': 'Currency' }
+  ] : [];
+
   return (
-    <Layout title="Profissionais" breadcrumb={['Dashboard', 'Profissionais']}>
+    <Layout title="Profissionais" breadcrumb={['Dashboard', 'Profissionais']} right={<ExportButton filename="professionals-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">

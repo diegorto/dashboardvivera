@@ -3,6 +3,7 @@ import { Layout } from '../components';
 import crmDashboardService, { CRMKPIs, PipelineStage, RecoveryOpportunity } from '../services/crmDashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
+import { ExportButton } from '../utils/dashboardHelpers';
 
 const CRMDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -116,8 +117,17 @@ const CRMDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Deals Abertos', 'Valor': kpis.openDeals, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Valor Pipeline', 'Valor': kpis.pipelineValue, 'Tipo': 'Currency' },
+    { 'Métrica': 'Tempo Médio', 'Valor': `${kpis.avgStageTime} dias`, 'Tipo': 'Duration' },
+    { 'Métrica': 'Deals Perdidos', 'Valor': kpis.lostDeals, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Oportunidades Recuperáveis', 'Valor': kpis.recoverable, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Deals Ganhos', 'Valor': kpis.wonDeals, 'Tipo': 'Quantity' }
+  ] : [];
+
   return (
-    <Layout title="CRM Intelligence" breadcrumb={['Dashboard', 'CRM']}>
+    <Layout title="CRM Intelligence" breadcrumb={['Dashboard', 'CRM']} right={<ExportButton filename="crm-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">

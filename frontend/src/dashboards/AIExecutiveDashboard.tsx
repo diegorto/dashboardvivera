@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components';
+import { ExportButton } from '../utils/dashboardHelpers';
 import aiDashboardService, { AIInsight, AINarrative, InsightSeverity } from '../services/aiDashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
@@ -115,8 +116,17 @@ const AIExecutiveDashboard: React.FC = () => {
     );
   }
 
+  const exportData = insights.map(i => ({
+    'ID': i.id,
+    'Severidade': i.severity,
+    'Título': i.title,
+    'Descrição': i.description,
+    'Recomendação': i.recommendation,
+    'Métrica': i.metric
+  }));
+
   return (
-    <Layout title="IA Executive" breadcrumb={['Dashboard', 'IA Executive']}>
+    <Layout title="IA Executive" breadcrumb={['Dashboard', 'IA Executive']} right={<ExportButton filename="ai-insights" rows={exportData} />}>
       {/* Narrativa Executiva */}
       <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 mb-6">
         <div className="flex items-center gap-2 mb-3">

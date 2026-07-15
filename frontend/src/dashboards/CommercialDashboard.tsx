@@ -4,6 +4,7 @@ import commercialDashboardService, { CommercialKPIs, ProfessionalConversion, Los
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ExportButton } from '../utils/dashboardHelpers';
 
 const CommercialDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -131,8 +132,16 @@ const CommercialDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Leads', 'Valor': kpis.leads, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Qualificados', 'Valor': kpis.qualified, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Agendados', 'Valor': kpis.scheduled, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Comparecidos', 'Valor': kpis.attended, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Comprados', 'Valor': kpis.purchased, 'Tipo': 'Quantity' }
+  ] : [];
+
   return (
-    <Layout title="Commercial Intelligence" breadcrumb={['Dashboard', 'Comercial']}>
+    <Layout title="Commercial Intelligence" breadcrumb={['Dashboard', 'Comercial']} right={<ExportButton filename="commercial-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">

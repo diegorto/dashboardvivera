@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Layout } from '../components';
+import { ExportButton } from '../utils/dashboardHelpers';
 import whatsappDashboardService, { WhatsAppKPIs, AttendantRanking } from '../services/whatsappDashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
@@ -108,8 +109,18 @@ const WhatsAppDashboard: React.FC = () => {
 
   const integrationPending = kpis.messagesSent === 0 && kpis.messagesReceived === 0;
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Mensagens Enviadas', 'Valor': kpis.messagesSent, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Mensagens Recebidas', 'Valor': kpis.messagesReceived, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Chamadas', 'Valor': kpis.calls, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Chamadas Perdidas', 'Valor': kpis.missedCalls, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Tempo Primeira Resposta (min)', 'Valor': kpis.avgFirstResponseTime, 'Tipo': 'Duration' },
+    { 'Métrica': 'Tempo Médio Resposta (min)', 'Valor': kpis.avgResponseTime, 'Tipo': 'Duration' },
+    { 'Métrica': 'Taxa de Conversão', 'Valor': `${kpis.conversionRate.toFixed(1)}%`, 'Tipo': 'Percentage' }
+  ] : [];
+
   return (
-    <Layout title="WhatsApp Analytics" breadcrumb={['Dashboard', 'WhatsApp']}>
+    <Layout title="WhatsApp Analytics" breadcrumb={['Dashboard', 'WhatsApp']} right={<ExportButton filename="whatsapp-dashboard" rows={exportData} />}>
       {/* Aviso de integração pendente */}
       {integrationPending && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-6">

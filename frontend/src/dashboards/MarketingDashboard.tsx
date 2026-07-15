@@ -4,6 +4,7 @@ import marketingDashboardService, { MarketingKPIs, Campaign, TrendDataPoint } fr
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { ExportButton } from '../utils/dashboardHelpers';
 
 const MarketingDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -137,8 +138,16 @@ const MarketingDashboard: React.FC = () => {
     );
   }
 
+  const exportData = kpis ? [
+    { 'Métrica': 'Investimento Total', 'Valor': kpis.totalInvestment, 'Tipo': 'Currency' },
+    { 'Métrica': 'Receita Total', 'Valor': kpis.totalRevenue, 'Tipo': 'Currency' },
+    { 'Métrica': 'ROAS Médio', 'Valor': kpis.avgRoas, 'Tipo': 'Multiple' },
+    { 'Métrica': 'Total de Leads', 'Valor': kpis.totalLeads, 'Tipo': 'Quantity' },
+    { 'Métrica': 'Impressões', 'Valor': kpis.totalImpressions, 'Tipo': 'Quantity' }
+  ] : [];
+
   return (
-    <Layout title="Marketing Intelligence" breadcrumb={['Dashboard', 'Marketing']}>
+    <Layout title="Marketing Intelligence" breadcrumb={['Dashboard', 'Marketing']} right={<ExportButton filename="marketing-dashboard" rows={exportData} />}>
       {/* Summary KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
