@@ -405,9 +405,15 @@ app.get('/api/dashboard/executive', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const [ads, deals] = await Promise.all([
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+
+    const [ads, deals, agendaActivities] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until)
+      getPipedriveDeals(range.since, range.until),
+      getPipedriveActivities(todayStr, tomorrowStr)
     ]);
 
     // Agregações básicas
@@ -415,6 +421,13 @@ app.get('/api/dashboard/executive', async (req, res) => {
     const totalLeads = ads.reduce((sum, ad) => sum + ad.leads, 0);
     const totalRevenue = deals.reduce((sum, deal) => sum + deal.value, 0);
     const totalDealsWon = deals.filter(d => d.status === 'won').length;
+
+    // Agenda real (atividades Pipedrive)
+    const todayActs = agendaActivities.filter(a => a.dueDate === todayStr);
+    const tomorrowActs = agendaActivities.filter(a => a.dueDate === tomorrowStr);
+    const attendanceRate = todayActs.length > 0
+      ? (todayActs.filter(a => a.done).length / todayActs.length) * 100
+      : 0;
 
     // KPIs calculados
     const kpis = {
@@ -460,20 +473,20 @@ app.get('/api/dashboard/executive', async (req, res) => {
         change: 6.8
       },
       appointmentsToday: {
-        value: 42, // TODO: buscar da agenda real
+        value: todayActs.length,
         sub: 'agendadas'
       },
       appointmentsTomorrow: {
-        value: 38, // TODO: buscar da agenda real
+        value: tomorrowActs.length,
         sub: 'agendadas'
       },
       attendance: {
-        value: 91.2, // TODO: calcular de dados reais
-        change: 2.3
+        value: parseFloat(attendanceRate.toFixed(1)),
+        change: null // TODO: comparar com periodo anterior
       },
       noShow: {
-        value: 4, // TODO: calcular de dados reais
-        change: 0.5
+        value: 0, // TODO: integrar com sistema de presenca real
+        change: null
       },
       leads: {
         value: totalLeads,
@@ -587,13 +600,29 @@ app.get('/api/dashboard/funnel', async (req, res) => {
 // GET /api/dashboard/agenda - Agenda do dia e amanhã
 app.get('/api/dashboard/agenda', async (req, res) => {
   try {
-    // TODO: Integrar com sistema de agenda real (se existir)
-    // Por enquanto retorna dados mock estruturados
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrow = tomorrowDate.toISOString().slice(0, 10);
+
+    const activities = await getPipedriveActivities(today, tomorrow);
+    const todayActs = activities.filter(a => a.dueDate === today);
+    const tomorrowActs = activities.filter(a => a.dueDate === tomorrow);
+
     res.json({
       success: true,
+      range: { since: today, until: tomorrow },
       data: {
-        today: { scheduled: 42, attended: 38, noShow: 4 },
-        tomorrow: { scheduled: 38, attended: 0, noShow: 0 }
+        today: {
+          scheduled: todayActs.length,
+          attended: todayActs.filter(a => a.done).length,
+          noShow: 0 // TODO: integrar com sistema de presenca real
+        },
+        tomorrow: {
+          scheduled: tomorrowActs.length,
+          attended: 0,
+          noShow: 0
+        }
       }
     });
   } catch (error) {
