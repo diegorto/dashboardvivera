@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import Layout from './components/Layout';
 import Router from './router/routes';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { FilterProvider } from './contexts/FilterContext';
@@ -10,9 +9,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ThemeProvider>
         <FilterProvider>
-          <Layout>
-            <Router />
-          </Layout>
+          <Router />
         </FilterProvider>
       </ThemeProvider>
     </BrowserRouter>

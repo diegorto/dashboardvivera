@@ -18,8 +18,20 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
   const location = useLocation();
   const { notifications } = useAppStore();
   const { mode } = useTheme();
-  const { filters, getPeriodLabel } = useFilters();
+  const { filters, setFilter, getPeriodLabel } = useFilters();
   const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const periodOptions = [
+    { value: 'today', label: 'Hoje' },
+    { value: 'week', label: 'Esta semana' },
+    { value: 'month', label: 'Este mês' },
+    { value: 'year', label: 'Este ano' },
+  ];
+
+  const handlePeriodChange = (periodValue: string) => {
+    setFilter('period', periodValue);
+    setShowDatePicker(false);
+  };
 
   // Determine current page info from routes
   const currentRoute = routes.find((r) => r.path === location.pathname);
@@ -100,6 +112,53 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
           {getPeriodLabel()}
           <ChevronDown size={14} color={secondaryText} />
         </button>
+
+        {/* Date Picker Dropdown */}
+        {showDatePicker && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '100%',
+              right: 0,
+              marginTop: '8px',
+              backgroundColor: bgColor,
+              border: `1px solid ${borderColor}`,
+              borderRadius: '8px',
+              boxShadow: mode === 'dark' ? '0 4px 12px rgba(0, 0, 0, 0.4)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
+              zIndex: 100,
+              minWidth: '180px',
+            }}
+          >
+            {periodOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handlePeriodChange(option.value)}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  backgroundColor: filters.period === option.value ? '#f0f4ff' : 'transparent',
+                  color: filters.period === option.value ? '#6366f1' : textColor,
+                  fontSize: '13px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  transition: 'background-color 200ms',
+                }}
+                onMouseEnter={(e) => {
+                  if (filters.period !== option.value) {
+                    e.currentTarget.style.backgroundColor = hoverBg;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = filters.period === option.value ? '#f0f4ff' : 'transparent';
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Filters */}
