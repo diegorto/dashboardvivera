@@ -1,7 +1,7 @@
 """Encryption utilities for sensitive data at rest"""
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
 from typing import Optional
@@ -43,7 +43,7 @@ class EncryptionManager:
                 pass
 
         # Otherwise, derive from master key using PBKDF2
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=b'executive_os_salt',  # Fixed salt for consistency

@@ -1,9 +1,29 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+
 from src.core.logger import setup_logger
 from src.api.approval_routes import router as approval_router
+from src.security.middleware import APIKeyAuthMiddleware, RateLimitHeaderMiddleware
+from src.security.rbac import User, AuthenticationError
 
 logger = setup_logger(__name__)
+
+# Database dependency (will be configured based on environment)
+def get_db() -> Session:
+    """Get database session - override this in actual deployment"""
+    from src.core.database import SessionLocal
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_current_user(request: Request) -> User:
+    """Extract current user from request state (set by middleware)"""
+    if not hasattr(request.state, "current_user"):
+        raise AuthenticationError("Not authenticated")
+    return request.state.current_user
 
 # Create FastAPI application
 app = FastAPI(

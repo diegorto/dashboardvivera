@@ -3,7 +3,6 @@ from enum import Enum
 from typing import List, Callable
 from functools import wraps
 from fastapi import HTTPException, Depends, Request
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
 
 from src.core.logger import setup_logger
 
@@ -163,6 +162,7 @@ def require_role(*roles: UserRole):
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         async def wrapper(*args, **kwargs):
+            # Try to get current_user from kwargs (when used as dependency)
             current_user: User = kwargs.get("current_user")
 
             if not current_user:

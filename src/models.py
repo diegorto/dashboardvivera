@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from enum import Enum
+import hashlib
 
 Base = declarative_base()
 
@@ -34,6 +35,41 @@ class PatientPriority(str, Enum):
     HIGH = "🟠 Alto"
     MEDIUM = "🟡 Médio"
     LOW = "🟢 Baixo"
+
+# ========== SECURITY MODELS ==========
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(100), unique=True, index=True, nullable=False)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    role = Column(String(50), nullable=False)  # admin, reviewer, operator, analyst, api_service
+    active = Column(Boolean, default=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = Column(DateTime)
+
+class APIKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String(100), ForeignKey("users.user_id"), index=True, nullable=False)
+    key_hash = Column(String(255), unique=True, index=True, nullable=False)  # SHA256 hash
+    name = Column(String(255))
+    requests_per_minute = Column(Integer, default=60)
+    active = Column(Boolean, default=True, index=True)
+    revoked_at = Column(DateTime)
+    last_used_at = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def set_key(self, key: str):
+        """Hash the key for secure storage"""
+        self.key_hash = hashlib.sha256(key.encode()).hexdigest()
+
+    def verify_key(self, key: str) -> bool:
+        """Verify key against stored hash"""
+        return self.key_hash == hashlib.sha256(key.encode()).hexdigest()
 
 # ========== STAGING TABLES ==========
 
@@ -215,3 +251,5 @@ Index('idx_staging_patients_phone', StagingPatient.phone)
 Index('idx_staging_budgets_status', StagingBudget.status)
 Index('idx_patient_journey_status', PatientJourney.current_status)
 Index('idx_approval_queue_status', ApprovalQueue.status)
+Index('idx_api_keys_user_id_active', APIKey.user_id, APIKey.active)
+Index('idx_users_active_role', User.active, User.role)

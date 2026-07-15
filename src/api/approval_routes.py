@@ -1,13 +1,14 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+from fastapi import APIRouter, Depends, HTTPException, Query, Path, Request
 from sqlalchemy.orm import Session
 from src.core.database import SessionLocal
 from src.core.logger import setup_logger
 from src.approval.queue import ApprovalQueueManager
 from src.models import ApprovalQueue, AuditLog, AuditLogStatus
 from src.staging.repository import StagingRepository
+from src.security.rbac import User, Permission, require_permission, require_role, UserRole
 
 logger = setup_logger(__name__)
 
@@ -79,7 +80,7 @@ class ApprovalStatistics(BaseModel):
     newest_item_hours: int
 
 
-# ========== DEPENDENCY ==========
+# ========== DEPENDENCIES ==========
 
 def get_db():
     db = SessionLocal()
@@ -87,6 +88,13 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def get_current_user(request: Request) -> User:
+    """Extract current user from request state (set by middleware)"""
+    if not hasattr(request.state, "current_user"):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    return request.state.current_user
 
 
 # ========== ROUTER ==========
@@ -97,12 +105,14 @@ router = APIRouter(prefix="/api/approval", tags=["approval"])
 # ========== ENDPOINTS ==========
 
 @router.get("/queue", response_model=List[ApprovalItemResponse])
+@require_permission(Permission.VIEW_QUEUE)
 async def list_approval_queue(
     status: Optional[str] = Query(None, description="Filter by status (pending, approved, rejected)"),
     batch_id: Optional[str] = Query(None, description="Filter by batch_id"),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retorna itens da fila de aprovação com filtros opcionais
@@ -140,9 +150,11 @@ async def list_approval_queue(
 
 
 @router.get("/queue/{item_id}", response_model=ApprovalItemResponse)
+@require_permission(Permission.VIEW_QUEUE)
 async def get_approval_item(
     item_id: int = Path(..., gt=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retorna detalhes de um item da fila de aprovação
@@ -185,10 +197,12 @@ async def get_approval_item(
 
 
 @router.post("/queue/{item_id}/approve")
+@require_permission(Permission.APPROVE_CHANGES)
 async def approve_item(
     item_id: int = Path(..., gt=0),
     request: ApprovalActionRequest = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Aprova um item da fila de aprovação
@@ -255,10 +269,12 @@ async def approve_item(
 
 
 @router.post("/queue/{item_id}/reject")
+@require_permission(Permission.REJECT_CHANGES)
 async def reject_item(
     item_id: int = Path(..., gt=0),
     request: ApprovalActionRequest = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Rejeita um item da fila de aprovação
@@ -324,10 +340,12 @@ async def reject_item(
 
 
 @router.post("/queue/{item_id}/correct")
+@require_permission(Permission.CORRECT_CHANGES)
 async def correct_item(
     item_id: int = Path(..., gt=0),
     request: ApprovalActionRequest = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Corrige um item com valor customizado e aprova
@@ -405,9 +423,11 @@ async def correct_item(
 
 
 @router.post("/queue/bulk/approve")
+@require_permission(Permission.APPROVE_CHANGES)
 async def bulk_approve(
     request: BulkApprovalRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Aprova múltiplos itens em lote
@@ -473,9 +493,11 @@ async def bulk_approve(
 
 
 @router.get("/statistics", response_model=ApprovalStatistics)
+@require_permission(Permission.VIEW_AUDIT_LOGS)
 async def get_statistics(
     batch_id: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retorna estatísticas da fila de aprovação
@@ -529,9 +551,11 @@ async def get_statistics(
 
 
 @router.get("/batch/{batch_id}/summary")
+@require_permission(Permission.VIEW_QUEUE)
 async def get_batch_summary(
     batch_id: str = Path(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """
     Retorna resumo da fila de aprovação para um batch específico
