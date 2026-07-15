@@ -4,9 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from unittest.mock import Mock, MagicMock, patch
 
-from src.core.database import Base
 from src.models import (
-    StagingPatient, AuditLog, AuditLogStatus, ApprovalQueue,
+    Base, StagingPatient, AuditLog, AuditLogStatus, ApprovalQueue,
     SyncExecution, SyncLog
 )
 from src.executive_os.database import (

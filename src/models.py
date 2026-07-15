@@ -118,7 +118,7 @@ class AuditLog(Base):
     rejected_reason = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    metadata = Column(JSON)
+    meta_data = Column(JSON)
 
 # ========== PATIENT JOURNEY TABLES ==========
 

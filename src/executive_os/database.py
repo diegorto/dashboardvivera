@@ -147,7 +147,7 @@ class AuditLogArchive(ExecutiveOSBase):
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    metadata = Column(JSON)
+    meta_data = Column(JSON)
 
 class ApprovalQueueArchive(ExecutiveOSBase):
     """Arquivo de fila de aprovações (histórico)"""

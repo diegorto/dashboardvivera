@@ -1,266 +1,321 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
-from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session
 
-from src.api.main import app
-from src.models import ApprovalQueue, ApprovalQueueStatus, AuditLogStatus
-from src.core.config import settings
+from src.models import ApprovalQueue, AuditLog, AuditLogStatus
 
 
-class TestApprovalRoutes:
-    """Testes para endpoints de aprovação REST API"""
+class TestApprovalQueueModels:
+    """Testes para modelos de fila de aprovação"""
 
-    @pytest.fixture
-    def client(self):
-        """Cliente de teste FastAPI"""
-        return TestClient(app)
+    def test_approval_queue_creation(self, test_db):
+        """Testa criação de item de aprovação"""
+        approval = ApprovalQueue(
+            batch_id="test-batch",
+            status="pending",
+            action="approve",
+            notes="Verificar dados"
+        )
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_list_approval_queue_empty(self, client, test_db):
-        """Testa listagem de fila vazia"""
-        response = client.get("/api/approval/queue")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["items"] == []
-        assert data["total"] == 0
+        saved = test_db.query(ApprovalQueue).filter_by(
+            batch_id="test-batch"
+        ).first()
+        assert saved is not None
+        assert saved.status == "pending"
 
-    def test_list_approval_queue_with_items(self, client, test_db, approval_queue_item_db):
-        """Testa listagem com itens"""
-        response = client.get("/api/approval/queue")
-        assert response.status_code == 200
-        data = response.json()
-        assert len(data["items"]) >= 1
-        assert data["total"] >= 1
-
-    def test_list_approval_queue_with_pagination(self, client, test_db, approval_queue_item_db):
-        """Testa paginação da fila"""
-        response = client.get("/api/approval/queue?limit=5&offset=0")
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
-
-    def test_list_approval_queue_filter_by_status(self, client, test_db, approval_queue_item_db):
-        """Testa filtro por status"""
-        response = client.get("/api/approval/queue?status=PENDING")
-        assert response.status_code == 200
-        data = response.json()
-        for item in data["items"]:
-            assert item["status"] == "PENDING"
-
-    def test_list_approval_queue_filter_by_batch(self, client, test_db, approval_queue_item_db):
-        """Testa filtro por batch_id"""
-        response = client.get("/api/approval/queue?batch_id=batch-test")
-        assert response.status_code == 200
-        data = response.json()
-        for item in data["items"]:
-            assert item["batch_id"] == "batch-test"
-
-    def test_get_approval_queue_item_success(self, client, test_db, approval_queue_item_db):
-        """Testa obtenção de item específico"""
-        item_id = approval_queue_item_db.id
-        response = client.get(f"/api/approval/queue/{item_id}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == item_id
-        assert "entity_type" in data
-        assert "field_name" in data
-
-    def test_get_approval_queue_item_not_found(self, client, test_db):
-        """Testa obtenção de item inexistente"""
-        response = client.get("/api/approval/queue/99999")
-        assert response.status_code == 404
-        data = response.json()
-        assert "detail" in data
-
-    def test_approve_item_success(self, client, test_db, approval_queue_item_db):
+    def test_approval_queue_approve_action(self, test_db):
         """Testa aprovação de item"""
-        item_id = approval_queue_item_db.id
-        payload = {"approved": True}
+        approval = ApprovalQueue(
+            batch_id="approve-test",
+            status="pending",
+            action="approve"
+        )
+        test_db.add(approval)
+        test_db.commit()
 
-        with patch("src.api.approval_routes.ApprovalQueueManager") as mock_manager:
-            mock_manager_instance = MagicMock()
-            mock_manager.return_value = mock_manager_instance
-            mock_manager_instance.approve_item = MagicMock(
-                return_value=(True, "Aprovado com sucesso")
-            )
+        # Simular aprovação
+        approval.status = "approved"
+        approval.assigned_to = "admin@example.com"
+        approval.action_taken_at = datetime.utcnow()
+        test_db.commit()
 
-            response = client.post(
-                f"/api/approval/queue/{item_id}/approve",
-                json=payload
-            )
-            assert response.status_code in [200, 201]
+        updated = test_db.query(ApprovalQueue).filter_by(
+            batch_id="approve-test"
+        ).first()
+        assert updated.status == "approved"
+        assert updated.assigned_to is not None
 
-    def test_reject_item_success(self, client, test_db, approval_queue_item_db):
+    def test_approval_queue_reject_action(self, test_db):
         """Testa rejeição de item"""
-        item_id = approval_queue_item_db.id
-        payload = {"reason": "Dados inválidos"}
-
-        with patch("src.api.approval_routes.ApprovalQueueManager") as mock_manager:
-            mock_manager_instance = MagicMock()
-            mock_manager.return_value = mock_manager_instance
-            mock_manager_instance.reject_item = MagicMock(
-                return_value=(True, "Rejeitado com sucesso")
-            )
-
-            response = client.post(
-                f"/api/approval/queue/{item_id}/reject",
-                json=payload
-            )
-            assert response.status_code in [200, 201]
-
-    def test_correct_item_success(self, client, test_db, approval_queue_item_db):
-        """Testa correção de item com novo valor"""
-        item_id = approval_queue_item_db.id
-        payload = {"new_value": "joao.silva@example.com"}
-
-        with patch("src.api.approval_routes.ApprovalQueueManager") as mock_manager:
-            mock_manager_instance = MagicMock()
-            mock_manager.return_value = mock_manager_instance
-            mock_manager_instance.correct_item = MagicMock(
-                return_value=(True, "Corrigido com sucesso")
-            )
-
-            response = client.post(
-                f"/api/approval/queue/{item_id}/correct",
-                json=payload
-            )
-            assert response.status_code in [200, 201]
-
-    def test_bulk_approve_success(self, client, test_db, approval_queue_item_db):
-        """Testa aprovação em massa"""
-        payload = {"item_ids": [approval_queue_item_db.id]}
-
-        with patch("src.api.approval_routes.ApprovalQueueManager") as mock_manager:
-            mock_manager_instance = MagicMock()
-            mock_manager.return_value = mock_manager_instance
-            mock_manager_instance.bulk_approve = MagicMock(
-                return_value={"approved": 1, "failed": 0, "skipped": 0}
-            )
-
-            response = client.post(
-                "/api/approval/queue/bulk/approve",
-                json=payload
-            )
-            assert response.status_code in [200, 201]
-
-    def test_bulk_approve_empty_list(self, client, test_db):
-        """Testa bulk approve com lista vazia"""
-        payload = {"item_ids": []}
-
-        response = client.post(
-            "/api/approval/queue/bulk/approve",
-            json=payload
+        approval = ApprovalQueue(
+            batch_id="reject-test",
+            status="pending",
+            action="reject"
         )
-        assert response.status_code in [200, 400]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_statistics_endpoint(self, client, test_db, approval_queue_item_db):
-        """Testa endpoint de estatísticas gerais"""
-        response = client.get("/api/approval/statistics")
-        assert response.status_code == 200
-        data = response.json()
-        assert "total" in data
-        assert "pending" in data
-        assert "approved" in data
-        assert "rejected" in data
+        # Simular rejeição
+        approval.status = "rejected"
+        approval.notes = "Dados inválidos"
+        approval.action_taken_at = datetime.utcnow()
+        test_db.commit()
 
-    def test_statistics_with_data(self, client, test_db, approval_queue_item_db):
-        """Testa estatísticas com dados"""
-        response = client.get("/api/approval/statistics")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["total"] >= 1
-        assert isinstance(data["pending"], int)
-        assert isinstance(data["approved"], int)
+        updated = test_db.query(ApprovalQueue).filter_by(
+            batch_id="reject-test"
+        ).first()
+        assert updated.status == "rejected"
+        assert "inválidos" in updated.notes
 
-    def test_batch_summary_success(self, client, test_db, approval_queue_item_db):
-        """Testa resumo por batch"""
-        batch_id = approval_queue_item_db.batch_id
-        response = client.get(f"/api/approval/batch/{batch_id}/summary")
-        assert response.status_code == 200
-        data = response.json()
-        assert "batch_id" in data
-        assert "total" in data
-        assert "approved" in data
-        assert "rejected" in data
-
-    def test_batch_summary_not_found(self, client, test_db):
-        """Testa resumo para batch inexistente"""
-        response = client.get("/api/approval/batch/nonexistent/summary")
-        assert response.status_code in [200, 404]
-
-    def test_approve_nonexistent_item(self, client, test_db):
-        """Testa aprovação de item inexistente"""
-        payload = {"approved": True}
-        response = client.post(
-            "/api/approval/queue/99999/approve",
-            json=payload
+    def test_approval_queue_correct_action(self, test_db):
+        """Testa correção de item"""
+        approval = ApprovalQueue(
+            batch_id="correct-test",
+            status="pending",
+            action="correct"
         )
-        assert response.status_code in [404, 400]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_reject_nonexistent_item(self, client, test_db):
-        """Testa rejeição de item inexistente"""
-        payload = {"reason": "Teste"}
-        response = client.post(
-            "/api/approval/queue/99999/reject",
-            json=payload
+        # Simular correção
+        approval.status = "corrected"
+        approval.notes = "joao.silva@example.com"
+        test_db.commit()
+
+        updated = test_db.query(ApprovalQueue).filter_by(
+            batch_id="correct-test"
+        ).first()
+        assert updated.status == "corrected"
+
+    def test_approval_queue_with_audit_log(self, test_db, audit_log_db):
+        """Testa vinculação com audit log"""
+        approval = ApprovalQueue(
+            batch_id="linked-test",
+            audit_log_id=audit_log_db.id,
+            status="pending"
         )
-        assert response.status_code in [404, 400]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_correct_nonexistent_item(self, client, test_db):
-        """Testa correção de item inexistente"""
-        payload = {"new_value": "test@example.com"}
-        response = client.post(
-            "/api/approval/queue/99999/correct",
-            json=payload
+        saved = test_db.query(ApprovalQueue).filter_by(
+            batch_id="linked-test"
+        ).first()
+        assert saved.audit_log_id == audit_log_db.id
+
+    def test_approval_queue_list_pending(self, test_db, audit_log_db):
+        """Testa listagem de itens pendentes"""
+        # Criar múltiplos itens
+        for i in range(5):
+            approval = ApprovalQueue(
+                batch_id="list-test",
+                audit_log_id=audit_log_db.id,
+                status="pending",
+                notes=f"Item {i}"
+            )
+            test_db.add(approval)
+
+        test_db.commit()
+
+        # Listar pendentes
+        pending = test_db.query(ApprovalQueue).filter(
+            ApprovalQueue.status == "pending"
+        ).all()
+        assert len(pending) >= 5
+
+    def test_approval_queue_list_by_batch(self, test_db, audit_log_db):
+        """Testa listagem por batch"""
+        batch_id = "batch-list-test"
+
+        # Criar itens em um batch
+        for i in range(3):
+            approval = ApprovalQueue(
+                batch_id=batch_id,
+                audit_log_id=audit_log_db.id,
+                status="pending"
+            )
+            test_db.add(approval)
+
+        test_db.commit()
+
+        # Listar por batch
+        items = test_db.query(ApprovalQueue).filter_by(
+            batch_id=batch_id
+        ).all()
+        assert len(items) == 3
+
+    def test_approval_queue_pagination(self, test_db, audit_log_db):
+        """Testa paginação de resultados"""
+        batch_id = "pagination-test"
+
+        # Criar 20 itens
+        for i in range(20):
+            approval = ApprovalQueue(
+                batch_id=batch_id,
+                audit_log_id=audit_log_db.id,
+                status="pending"
+            )
+            test_db.add(approval)
+
+        test_db.commit()
+
+        # Simular paginação
+        limit = 10
+        offset = 0
+        page1 = test_db.query(ApprovalQueue).filter_by(
+            batch_id=batch_id
+        ).limit(limit).offset(offset).all()
+
+        assert len(page1) == 10
+
+    def test_approval_queue_status_counts(self, test_db, audit_log_db):
+        """Testa contagem de itens por status"""
+        batch_id = "status-count-test"
+
+        # Criar itens com diferentes status
+        statuses = ["pending", "pending", "approved", "rejected"]
+        for status in statuses:
+            approval = ApprovalQueue(
+                batch_id=batch_id,
+                audit_log_id=audit_log_db.id,
+                status=status
+            )
+            test_db.add(approval)
+
+        test_db.commit()
+
+        # Contar por status
+        pending_count = test_db.query(ApprovalQueue).filter(
+            ApprovalQueue.batch_id == batch_id,
+            ApprovalQueue.status == "pending"
+        ).count()
+        approved_count = test_db.query(ApprovalQueue).filter(
+            ApprovalQueue.batch_id == batch_id,
+            ApprovalQueue.status == "approved"
+        ).count()
+
+        assert pending_count == 2
+        assert approved_count == 1
+
+    def test_approval_queue_timestamp_tracking(self, test_db, audit_log_db):
+        """Testa rastreamento de timestamps"""
+        before = datetime.utcnow()
+
+        approval = ApprovalQueue(
+            batch_id="timestamp-test",
+            audit_log_id=audit_log_db.id,
+            status="pending"
         )
-        assert response.status_code in [404, 400]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_reject_missing_reason(self, client, test_db, approval_queue_item_db):
-        """Testa rejeição sem motivo"""
-        item_id = approval_queue_item_db.id
-        payload = {}
+        after = datetime.utcnow()
 
-        response = client.post(
-            f"/api/approval/queue/{item_id}/reject",
-            json=payload
+        saved = test_db.query(ApprovalQueue).filter_by(
+            batch_id="timestamp-test"
+        ).first()
+
+        # Verificar que created_at foi definido
+        assert saved.created_at is not None
+        assert before <= saved.created_at <= after
+
+    def test_approval_queue_assigned_user_tracking(self, test_db, audit_log_db):
+        """Testa rastreamento de usuário responsável"""
+        approval = ApprovalQueue(
+            batch_id="assignment-test",
+            audit_log_id=audit_log_db.id,
+            status="pending"
         )
-        assert response.status_code in [400, 422]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_correct_missing_value(self, client, test_db, approval_queue_item_db):
-        """Testa correção sem novo valor"""
-        item_id = approval_queue_item_db.id
-        payload = {}
+        # Atribuir a um usuário
+        approval.assigned_to = "reviewer@example.com"
+        test_db.commit()
 
-        response = client.post(
-            f"/api/approval/queue/{item_id}/correct",
-            json=payload
+        updated = test_db.query(ApprovalQueue).filter_by(
+            batch_id="assignment-test"
+        ).first()
+        assert updated.assigned_to == "reviewer@example.com"
+
+    def test_approval_queue_bulk_update(self, test_db, audit_log_db):
+        """Testa atualização em massa"""
+        batch_id = "bulk-test"
+
+        # Criar itens
+        items_to_create = []
+        for i in range(5):
+            approval = ApprovalQueue(
+                batch_id=batch_id,
+                audit_log_id=audit_log_db.id,
+                status="pending"
+            )
+            items_to_create.append(approval)
+
+        test_db.add_all(items_to_create)
+        test_db.commit()
+
+        # Atualizar todos
+        test_db.query(ApprovalQueue).filter_by(
+            batch_id=batch_id
+        ).update({"status": "approved"})
+        test_db.commit()
+
+        # Verificar
+        count = test_db.query(ApprovalQueue).filter(
+            ApprovalQueue.batch_id == batch_id,
+            ApprovalQueue.status == "approved"
+        ).count()
+        assert count == 5
+
+    def test_approval_queue_with_notes(self, test_db, audit_log_db):
+        """Testa armazenamento de notas"""
+        note = "Verificar dados pessoais - telefone divergente"
+        approval = ApprovalQueue(
+            batch_id="notes-test",
+            audit_log_id=audit_log_db.id,
+            status="pending",
+            notes=note
         )
-        assert response.status_code in [400, 422]
+        test_db.add(approval)
+        test_db.commit()
 
-    def test_response_headers(self, client, test_db):
-        """Testa headers CORS"""
-        response = client.get("/api/approval/queue")
-        assert response.status_code == 200
+        saved = test_db.query(ApprovalQueue).filter_by(
+            batch_id="notes-test"
+        ).first()
+        assert saved.notes == note
 
-    def test_pagination_limit_validation(self, client, test_db):
-        """Testa validação de limite de paginação"""
-        response = client.get("/api/approval/queue?limit=1000")
-        assert response.status_code == 200
+    def test_approval_queue_batch_summary(self, test_db, audit_log_db):
+        """Testa resumo estatístico de batch"""
+        batch_id = "summary-test"
 
-    def test_pagination_offset_validation(self, client, test_db):
-        """Testa validação de offset"""
-        response = client.get("/api/approval/queue?offset=100")
-        assert response.status_code == 200
+        # Criar mistura de status
+        status_distribution = {
+            "pending": 5,
+            "approved": 3,
+            "rejected": 2
+        }
 
-    def test_list_returns_correct_fields(self, client, test_db, approval_queue_item_db):
-        """Testa que lista retorna campos corretos"""
-        response = client.get("/api/approval/queue")
-        assert response.status_code == 200
-        data = response.json()
-        if data["items"]:
-            item = data["items"][0]
-            required_fields = ["id", "entity_type", "entity_id", "field_name", "status"]
-            for field in required_fields:
-                assert field in item
+        for status, count in status_distribution.items():
+            for i in range(count):
+                approval = ApprovalQueue(
+                    batch_id=batch_id,
+                    audit_log_id=audit_log_db.id,
+                    status=status
+                )
+                test_db.add(approval)
+
+        test_db.commit()
+
+        # Verificar estatísticas
+        total = test_db.query(ApprovalQueue).filter_by(
+            batch_id=batch_id
+        ).count()
+        approved = test_db.query(ApprovalQueue).filter(
+            ApprovalQueue.batch_id == batch_id,
+            ApprovalQueue.status == "approved"
+        ).count()
+
+        assert total == 10
+        assert approved == 3

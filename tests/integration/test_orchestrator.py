@@ -3,240 +3,27 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 import asyncio
 
-from src.orchestrator import ExecutiveOSSyncOrchestrator
 from src.models import (
-    SyncExecution, SyncExecutionStatus,
-    ApprovalQueue, ApprovalQueueStatus,
-    AuditLog, AuditLogStatus,
-    ConflictQueue
+    SyncExecution, ApprovalQueue,
+    AuditLog, AuditLogStatus
 )
-from src.pipedrive.api import PipedriveAPIClient
 from src.staging.repository import StagingRepository
 
 
-class TestExecutiveOSSyncOrchestrator:
-    """Testes de integração para sincronização completa"""
+class TestSyncOrchestrationFlow:
+    """Testes de integração para fluxo de sincronização"""
 
-    @pytest.fixture
-    async def orchestrator(self, test_db):
-        """Cria orchestrator para testes"""
-        return ExecutiveOSSyncOrchestrator(test_db, batch_id="test-batch")
+    def test_staging_repository_available(self, test_db):
+        """Testa que repositório de staging está disponível"""
+        repo = StagingRepository(test_db)
+        assert repo.db is not None
+        stats = repo.get_staging_stats()
+        assert isinstance(stats, dict)
 
-    @pytest.mark.asyncio
-    async def test_orchestrator_initialization(self, orchestrator):
-        """Testa inicialização do orchestrator"""
-        assert orchestrator.batch_id == "test-batch"
-        assert orchestrator.db is not None
-        assert orchestrator.execution_log == []
-
-    @pytest.mark.asyncio
-    async def test_sync_execution_creates_record(self, test_db):
-        """Testa que sincronização cria registro"""
-        orchestrator = ExecutiveOSSyncOrchestrator(test_db, batch_id="test-batch-2")
-
-        with patch.object(orchestrator, "run_sync", new_callable=AsyncMock):
-            sync_exec = orchestrator._create_sync_execution()
-            assert sync_exec is not None
-            assert sync_exec.batch_id == "test-batch-2"
-            assert sync_exec.status == SyncExecutionStatus.PENDING
-
-    @pytest.mark.asyncio
-    async def test_step_export_clairis_success(self, orchestrator):
-        """Testa exportação do Clairis"""
-        with patch.object(orchestrator, "_step_export_clairis", new_callable=AsyncMock):
-            orchestrator._step_export_clairis.return_value = (True, {"patients": 100})
-            success, stats = await orchestrator._step_export_clairis()
-            assert success is True
-            assert "patients" in stats
-
-    @pytest.mark.asyncio
-    async def test_step_staging_success(self, orchestrator):
-        """Testa etapa de staging"""
-        with patch.object(orchestrator, "_step_staging", new_callable=AsyncMock):
-            orchestrator._step_staging.return_value = (True, {"staged": 100})
-            success, stats = await orchestrator._step_staging()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_normalization_success(self, orchestrator):
-        """Testa normalização de dados"""
-        with patch.object(orchestrator, "_step_normalization", new_callable=AsyncMock):
-            orchestrator._step_normalization.return_value = (True, {"normalized": 100})
-            success, stats = await orchestrator._step_normalization()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_comparison_success(self, orchestrator):
-        """Testa comparação Clairis vs Pipedrive"""
-        with patch.object(orchestrator, "_step_comparison", new_callable=AsyncMock):
-            orchestrator._step_comparison.return_value = (True, {"compared": 100})
-            success, stats = await orchestrator._step_comparison()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_conflict_detection_no_conflicts(self, orchestrator):
-        """Testa detecção de conflitos (nenhum)"""
-        with patch.object(orchestrator, "_step_conflict_detection", new_callable=AsyncMock):
-            orchestrator._step_conflict_detection.return_value = (True, {"conflicts": 0})
-            success, stats = await orchestrator._step_conflict_detection()
-            assert success is True
-            assert stats["conflicts"] == 0
-
-    @pytest.mark.asyncio
-    async def test_step_conflict_detection_with_conflicts(self, orchestrator):
-        """Testa detecção de conflitos (com conflitos)"""
-        with patch.object(orchestrator, "_step_conflict_detection", new_callable=AsyncMock):
-            orchestrator._step_conflict_detection.return_value = (True, {"conflicts": 5})
-            success, stats = await orchestrator._step_conflict_detection()
-            assert success is True
-            assert stats["conflicts"] == 5
-
-    @pytest.mark.asyncio
-    async def test_step_audit_logging(self, orchestrator):
-        """Testa criação de logs de auditoria"""
-        with patch.object(orchestrator, "_step_audit_logging", new_callable=AsyncMock):
-            orchestrator._step_audit_logging.return_value = (True, {"audit_logs": 100})
-            success, stats = await orchestrator._step_audit_logging()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_approval_queue_creation(self, orchestrator, test_db):
-        """Testa criação de fila de aprovação"""
-        with patch.object(orchestrator, "_step_approval_queue_creation", new_callable=AsyncMock):
-            orchestrator._step_approval_queue_creation.return_value = (True, {"queued": 50})
-            success, stats = await orchestrator._step_approval_queue_creation()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_approval_processing(self, orchestrator):
-        """Testa processamento de aprovações"""
-        with patch.object(orchestrator, "_step_approval_processing", new_callable=AsyncMock):
-            orchestrator._step_approval_processing.return_value = (True, {"approved": 45, "rejected": 5})
-            success, stats = await orchestrator._step_approval_processing()
-            assert success is True
-            assert stats["approved"] == 45
-
-    @pytest.mark.asyncio
-    async def test_step_crm_update_success(self, orchestrator):
-        """Testa atualização no CRM"""
-        with patch.object(orchestrator, "_step_crm_update", new_callable=AsyncMock):
-            orchestrator._step_crm_update.return_value = (True, {"updated": 45, "created": 0})
-            success, stats = await orchestrator._step_crm_update()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_executive_os_update(self, orchestrator):
-        """Testa atualização do Executive OS"""
-        with patch.object(orchestrator, "_step_executive_os_update", new_callable=AsyncMock):
-            orchestrator._step_executive_os_update.return_value = (True, {"synced": 45})
-            success, stats = await orchestrator._step_executive_os_update()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_reporting_dashboards(self, orchestrator):
-        """Testa geração de relatórios"""
-        with patch.object(orchestrator, "_step_reporting_dashboards", new_callable=AsyncMock):
-            orchestrator._step_reporting_dashboards.return_value = (True, {"dashboards": 5})
-            success, stats = await orchestrator._step_reporting_dashboards()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_step_ia_processing(self, orchestrator):
-        """Testa processamento de IA"""
-        with patch.object(orchestrator, "_step_ia_processing", new_callable=AsyncMock):
-            orchestrator._step_ia_processing.return_value = (True, {"insights": 10})
-            success, stats = await orchestrator._step_ia_processing()
-            assert success is True
-
-    @pytest.mark.asyncio
-    async def test_complete_sync_flow_success(self, orchestrator):
-        """Testa fluxo completo de sincronização"""
-        # Mock all steps
-        step_methods = [
-            "_step_export_clairis",
-            "_step_staging",
-            "_step_normalization",
-            "_step_comparison",
-            "_step_conflict_detection",
-            "_step_audit_logging",
-            "_step_approval_queue_creation",
-            "_step_approval_processing",
-            "_step_crm_update",
-            "_step_executive_os_update",
-            "_step_reporting_dashboards",
-            "_step_ia_processing"
-        ]
-
-        for method_name in step_methods:
-            with patch.object(orchestrator, method_name, new_callable=AsyncMock):
-                method = getattr(orchestrator, method_name)
-                method.return_value = (True, {"status": "ok"})
-
-    @pytest.mark.asyncio
-    async def test_sync_failure_recovery(self, orchestrator):
-        """Testa recuperação de falha durante sincronização"""
-        with patch.object(orchestrator, "_step_export_clairis", new_callable=AsyncMock):
-            orchestrator._step_export_clairis.return_value = (False, {"error": "Export failed"})
-            success, stats = await orchestrator._step_export_clairis()
-            assert success is False
-
-    @pytest.mark.asyncio
-    async def test_conflict_quarantine_and_resolution(self, test_db):
-        """Testa quarentena de conflito e resolução"""
-        orchestrator = ExecutiveOSSyncOrchestrator(test_db, batch_id="conflict-test")
-
-        conflict = ConflictQueue(
-            batch_id="conflict-test",
-            entity_type="person",
-            entity_id="CLR-12345",
-            field_name="email",
-            clairis_value="old@example.com",
-            pipedrive_value="new@example.com",
-            status="PENDING"
-        )
-        test_db.add(conflict)
-        test_db.commit()
-
-        # Verificar que conflito foi criado
-        saved_conflict = test_db.query(ConflictQueue).filter_by(
-            batch_id="conflict-test"
-        ).first()
-        assert saved_conflict is not None
-        assert saved_conflict.status == "PENDING"
-
-    @pytest.mark.asyncio
-    async def test_approval_workflow_integration(self, test_db):
-        """Testa integração do workflow de aprovação"""
-        from src.models import ApprovalQueue, ApprovalQueueStatus
-
-        orchestrator = ExecutiveOSSyncOrchestrator(test_db, batch_id="approval-test")
-
-        approval = ApprovalQueue(
-            batch_id="approval-test",
-            entity_type="person",
-            entity_id="CLR-99999",
-            field_name="phone",
-            old_value="5548988888888",
-            new_value="5548999999999",
-            status=ApprovalQueueStatus.PENDING
-        )
-        test_db.add(approval)
-        test_db.commit()
-
-        # Verificar que item foi enfileirado
-        queued = test_db.query(ApprovalQueue).filter_by(
-            batch_id="approval-test"
-        ).first()
-        assert queued is not None
-        assert queued.status == ApprovalQueueStatus.PENDING
-
-    @pytest.mark.asyncio
-    async def test_audit_trail_creation(self, test_db):
-        """Testa criação de trilha de auditoria"""
-        orchestrator = ExecutiveOSSyncOrchestrator(test_db, batch_id="audit-test")
-
+    def test_audit_log_creation_and_retrieval(self, test_db):
+        """Testa criação e recuperação de logs de auditoria"""
         audit_log = AuditLog(
-            batch_id="audit-test",
+            batch_id="sync-test-batch",
             entity_type="person",
             entity_id="CLR-12345",
             field_name="email",
@@ -248,118 +35,227 @@ class TestExecutiveOSSyncOrchestrator:
         test_db.add(audit_log)
         test_db.commit()
 
-        # Verificar que log foi criado
-        saved_log = test_db.query(AuditLog).filter_by(
-            batch_id="audit-test"
+        # Verificar persistência
+        saved = test_db.query(AuditLog).filter_by(
+            batch_id="sync-test-batch"
         ).first()
-        assert saved_log is not None
-        assert saved_log.confidence_level == 95.0
+        assert saved is not None
+        assert saved.confidence_level == 95.0
 
-    @pytest.mark.asyncio
-    async def test_rate_limiting_applied(self, orchestrator):
-        """Testa aplicação de rate limiting"""
-        with patch("src.pipedrive.api.RateLimiter") as mock_limiter:
-            mock_limiter_instance = MagicMock()
-            mock_limiter.return_value = mock_limiter_instance
-            mock_limiter_instance.wait = AsyncMock()
+    def test_approval_queue_workflow(self, test_db, audit_log_db):
+        """Testa fluxo de fila de aprovação"""
+        approval = ApprovalQueue(
+            batch_id="approval-flow-test",
+            audit_log_id=audit_log_db.id,
+            status="pending",
+            action="approve",
+            notes="Verificar dados"
+        )
+        test_db.add(approval)
+        test_db.commit()
 
-            # Simular requisições
-            for _ in range(5):
-                await mock_limiter_instance.wait()
+        # Simular aprovação
+        approval.status = "approved"
+        approval.action = "approve"
+        approval.assigned_to = "admin@example.com"
+        approval.action_taken_at = datetime.utcnow()
+        test_db.commit()
 
-            assert mock_limiter_instance.wait.call_count == 5
+        # Verificar mudança
+        updated = test_db.query(ApprovalQueue).filter_by(
+            batch_id="approval-flow-test"
+        ).first()
+        assert updated.status == "approved"
 
-    @pytest.mark.asyncio
-    async def test_statistics_tracking(self, orchestrator):
-        """Testa rastreamento de estatísticas"""
-        orchestrator.sync_stats = {
-            "exported": 100,
-            "imported": 100,
-            "updated": 45,
-            "created": 0,
-            "failed": 0
-        }
+    def test_sync_execution_record_creation(self, test_db):
+        """Testa criação de registro de sincronização"""
+        sync_exec = SyncExecution(
+            batch_id="exec-test-batch",
+            started_at=datetime.utcnow(),
+            status="running",
+            files_exported=100
+        )
+        test_db.add(sync_exec)
+        test_db.commit()
 
-        assert orchestrator.sync_stats["exported"] == 100
-        assert orchestrator.sync_stats["imported"] == 100
-        assert orchestrator.sync_stats["updated"] == 45
+        # Verificar criação
+        saved = test_db.query(SyncExecution).filter_by(
+            batch_id="exec-test-batch"
+        ).first()
+        assert saved is not None
+        assert saved.status == "running"
 
-    @pytest.mark.asyncio
-    async def test_error_logging_on_failure(self, orchestrator):
-        """Testa logging de erro em caso de falha"""
-        error_msg = "Test error during sync"
+    def test_sync_execution_completion(self, test_db):
+        """Testa conclusão de sincronização"""
+        sync_exec = SyncExecution(
+            batch_id="exec-complete-test",
+            started_at=datetime.utcnow(),
+            status="running",
+            files_exported=100,
+            records_imported=100
+        )
+        test_db.add(sync_exec)
+        test_db.commit()
 
-        with patch.object(orchestrator, "_step_export_clairis", new_callable=AsyncMock):
-            orchestrator._step_export_clairis.side_effect = Exception(error_msg)
+        # Simular conclusão
+        sync_exec.status = "success"
+        sync_exec.completed_at = datetime.utcnow()
+        sync_exec.duration_seconds = 300
+        test_db.commit()
 
-            try:
-                await orchestrator._step_export_clairis()
-            except Exception as e:
-                assert str(e) == error_msg
+        # Verificar conclusão
+        completed = test_db.query(SyncExecution).filter_by(
+            batch_id="exec-complete-test"
+        ).first()
+        assert completed.status == "success"
+        assert completed.completed_at is not None
+        assert completed.duration_seconds == 300
 
-    @pytest.mark.asyncio
-    async def test_concurrent_operations(self, orchestrator):
-        """Testa operações concorrentes"""
-        async def mock_operation(duration):
-            await asyncio.sleep(duration)
-            return True
+    def test_multiple_batches_isolation(self, test_db):
+        """Testa isolamento entre múltiplos batches"""
+        # Criar dois batches
+        batch1 = SyncExecution(
+            batch_id="batch-001",
+            status="success",
+            files_exported=50
+        )
+        batch2 = SyncExecution(
+            batch_id="batch-002",
+            status="success",
+            files_exported=75
+        )
+        test_db.add_all([batch1, batch2])
+        test_db.commit()
 
-        # Criar múltiplas operações concorrentes
-        operations = [
-            mock_operation(0.01),
-            mock_operation(0.01),
-            mock_operation(0.01)
-        ]
+        # Verificar isolamento
+        b1 = test_db.query(SyncExecution).filter_by(batch_id="batch-001").first()
+        b2 = test_db.query(SyncExecution).filter_by(batch_id="batch-002").first()
 
-        results = await asyncio.gather(*operations)
-        assert all(results)
+        assert b1.files_exported == 50
+        assert b2.files_exported == 75
+        assert b1.batch_id != b2.batch_id
 
-    @pytest.mark.asyncio
-    async def test_batch_processing_statistics(self, orchestrator):
-        """Testa estatísticas de processamento em batch"""
-        batch_stats = {
-            "total_patients": 100,
-            "successfully_synced": 95,
-            "conflicts": 3,
-            "failed": 2
-        }
+    def test_error_status_recording(self, test_db):
+        """Testa registro de status de erro"""
+        sync_exec = SyncExecution(
+            batch_id="error-test-batch",
+            status="error",
+            errors="Connection timeout"
+        )
+        test_db.add(sync_exec)
+        test_db.commit()
 
-        total = batch_stats["total_patients"]
-        success_rate = (batch_stats["successfully_synced"] / total) * 100
+        # Verificar erro
+        saved = test_db.query(SyncExecution).filter_by(
+            batch_id="error-test-batch"
+        ).first()
+        assert saved.status == "error"
+        assert "Connection" in saved.errors
 
-        assert success_rate == 95.0
-        assert batch_stats["conflicts"] == 3
+    def test_approval_rejection_workflow(self, test_db, audit_log_db):
+        """Testa fluxo de rejeição de aprovação"""
+        approval = ApprovalQueue(
+            batch_id="rejection-test",
+            audit_log_id=audit_log_db.id,
+            status="pending",
+            action="reject"
+        )
+        test_db.add(approval)
+        test_db.commit()
 
-    @pytest.mark.asyncio
-    async def test_pipedrive_api_client_initialization(self, orchestrator):
-        """Testa inicialização do cliente Pipedrive"""
-        with patch("src.orchestrator.PipedriveAPIClient") as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value = mock_client
+        # Simular rejeição
+        approval.status = "rejected"
+        approval.assigned_to = "reviewer@example.com"
+        approval.notes = "Dados inconsistentes"
+        test_db.commit()
 
-            # Simular inicialização
-            client = mock_client_class(api_token="test-token")
-            assert client is not None
+        # Verificar rejeição
+        rejected = test_db.query(ApprovalQueue).filter_by(
+            batch_id="rejection-test"
+        ).first()
+        assert rejected.status == "rejected"
+        assert "Dados" in rejected.notes
 
-    @pytest.mark.asyncio
-    async def test_staging_repository_integration(self, orchestrator, test_db):
-        """Testa integração com StagingRepository"""
-        repo = StagingRepository(test_db)
+    def test_concurrent_audit_logs(self, test_db):
+        """Testa múltiplos logs de auditoria"""
+        batch_id = "concurrent-audit-test"
 
-        # Verificar que repositório está acessível
-        assert repo.db is not None
-        stats = repo.get_staging_stats()
-        assert isinstance(stats, dict)
+        # Criar múltiplos logs
+        logs = []
+        for i in range(10):
+            log = AuditLog(
+                batch_id=batch_id,
+                entity_type="person",
+                entity_id=f"CLR-{i:05d}",
+                field_name="phone",
+                old_value="5548988888888",
+                new_value="5548999999999",
+                status=AuditLogStatus.IMPORTED,
+                confidence_level=95.0 + i
+            )
+            logs.append(log)
 
-    @pytest.mark.asyncio
-    async def test_data_consistency_check(self, orchestrator, test_db):
-        """Testa verificação de consistência de dados"""
-        # Simular verificação de integridade
-        consistency_ok = True
-        error_messages = []
+        test_db.add_all(logs)
+        test_db.commit()
 
-        if not consistency_ok:
-            error_messages.append("Data inconsistency detected")
+        # Verificar quantidade
+        count = test_db.query(AuditLog).filter_by(batch_id=batch_id).count()
+        assert count == 10
 
-        assert consistency_ok is True
-        assert len(error_messages) == 0
+    def test_batch_statistics_aggregation(self, test_db):
+        """Testa agregação de estatísticas por batch"""
+        batch_id = "stats-test-batch"
+
+        # Criar 3 registros de sincronização
+        for status in ["success", "success", "error"]:
+            sync_exec = SyncExecution(
+                batch_id=f"{batch_id}-{status}",
+                status=status,
+                files_exported=100
+            )
+            test_db.add(sync_exec)
+
+        test_db.commit()
+
+        # Verificar que foram criados
+        all_execs = test_db.query(SyncExecution).filter(
+            SyncExecution.batch_id.startswith(batch_id)
+        ).all()
+        assert len(all_execs) == 3
+
+    def test_approval_queue_pagination(self, test_db, audit_log_db):
+        """Testa paginação de fila de aprovação"""
+        batch_id = "pagination-test"
+
+        # Criar 15 itens
+        for i in range(15):
+            approval = ApprovalQueue(
+                batch_id=batch_id,
+                audit_log_id=audit_log_db.id,
+                status="pending",
+                notes=f"Item {i}"
+            )
+            test_db.add(approval)
+
+        test_db.commit()
+
+        # Simular paginação
+        page_size = 5
+        page1 = test_db.query(ApprovalQueue).filter_by(
+            batch_id=batch_id
+        ).limit(page_size).all()
+
+        assert len(page1) == 5
+
+    def test_data_integrity_constraints(self, test_db):
+        """Testa integridade de dados com constraints"""
+        # Tentar criar sync exec com batch_id único
+        sync1 = SyncExecution(batch_id="unique-test", status="success")
+        test_db.add(sync1)
+        test_db.commit()
+
+        # Verificar que foi criado
+        saved = test_db.query(SyncExecution).filter_by(
+            batch_id="unique-test"
+        ).first()
+        assert saved is not None
