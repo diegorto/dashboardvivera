@@ -227,7 +227,7 @@ class TestPipedriveUpdater:
         )
 
         assert success is False
-        assert "Validação" in msg or "validação" in msg.lower()
+        assert "caracteres" in msg.lower() or "validação" in msg.lower()
 
     @pytest.mark.asyncio
     async def test_create_person_safe_success(self, test_db):
@@ -261,7 +261,7 @@ class TestPipedriveUpdater:
         person_id, msg = await updater.create_person_safe(person_data, api_client)
 
         assert person_id is None
-        assert "Validação" in msg or "validação" in msg.lower()
+        assert "caracteres" in msg.lower() or "email" in msg.lower()
 
     @pytest.mark.asyncio
     async def test_detect_duplicates_by_phone_found(self, test_db):

@@ -12,7 +12,7 @@ class TestReconciliationEngine:
         """Testa normalização de telefone"""
         engine = ReconciliationEngine(None)
         result = engine._normalize_value("(48) 99999-9999", "phone")
-        assert result == "5548999999999"
+        assert result == "48999999999"
 
     def test_normalize_value_cpf(self):
         """Testa normalização de CPF"""

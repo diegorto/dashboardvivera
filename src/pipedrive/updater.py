@@ -71,20 +71,23 @@ class PipedriveUpdater:
                 differences,
                 self.ALLOWED_PERSON_FIELDS
             )
-            
+
             if not update_data:
                 logger.warning(f"Nenhum campo permitido para atualizar pessoa ID={person_id}")
                 return False, "Nenhum campo permitido"
-            
+
+            # Extract new values from difference tuples
+            update_values = {k: v[1] if isinstance(v, tuple) else v for k, v in update_data.items()}
+
             # 3. Validar dados antes de atualizar
-            is_valid, validation_msg = self._validate_person_data(update_data)
+            is_valid, validation_msg = self._validate_person_data(update_values)
             if not is_valid:
                 logger.error(f"Validação falhou: {validation_msg}")
                 return False, validation_msg
             
             # 4. Executar atualização
-            logger.info(f"Atualizando pessoa ID={person_id} com dados: {update_data}")
-            success = await api_client.update_person(person_id, update_data)
+            logger.info(f"Atualizando pessoa ID={person_id} com dados: {update_values}")
+            success = await api_client.update_person(person_id, update_values)
             
             if not success:
                 logger.error(f"Falha ao atualizar pessoa ID={person_id} na API")
@@ -153,20 +156,23 @@ class PipedriveUpdater:
                 differences,
                 self.ALLOWED_DEAL_FIELDS
             )
-            
+
             if not update_data:
                 logger.warning(f"Nenhum campo permitido para atualizar negócio ID={deal_id}")
                 return False, "Nenhum campo permitido"
-            
+
+            # Extract new values from difference tuples
+            update_values = {k: v[1] if isinstance(v, tuple) else v for k, v in update_data.items()}
+
             # 3. Validar dados
-            is_valid, validation_msg = self._validate_deal_data(update_data)
+            is_valid, validation_msg = self._validate_deal_data(update_values)
             if not is_valid:
                 logger.error(f"Validação falhou: {validation_msg}")
                 return False, validation_msg
-            
+
             # 4. Executar atualização
-            logger.info(f"Atualizando negócio ID={deal_id} com dados: {update_data}")
-            success = await api_client.update_deal(deal_id, update_data)
+            logger.info(f"Atualizando negócio ID={deal_id} com dados: {update_values}")
+            success = await api_client.update_deal(deal_id, update_values)
             
             if not success:
                 logger.error(f"Falha ao atualizar negócio ID={deal_id} na API")
