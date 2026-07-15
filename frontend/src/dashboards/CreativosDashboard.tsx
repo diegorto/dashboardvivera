@@ -17,6 +17,7 @@ interface Creative {
   sales: number;
   revenue: number;
   roas: number;
+  link: string;
 }
 
 const CreativosDashboard: React.FC = () => {
@@ -66,6 +67,7 @@ const CreativosDashboard: React.FC = () => {
                 <Th right onClick={() => setSortBy('cpl')} active={sortBy === 'cpl'}>CPL</Th>
                 <Th right onClick={() => setSortBy('sales')} active={sortBy === 'sales'}>Vendas</Th>
                 <Th right onClick={() => setSortBy('roas')} active={sortBy === 'roas'}>ROAS</Th>
+                <Th>Link</Th>
               </tr>
             </thead>
             <tbody>
@@ -79,6 +81,18 @@ const CreativosDashboard: React.FC = () => {
                   <Td right mono>{fmtCurrency(c.cpl)}</Td>
                   <Td right mono>{fmtNumber(c.sales)}</Td>
                   <Td right mono>{fmtMult(c.roas)}</Td>
+                  <Td>
+                    {c.link && (
+                      <a
+                        href={c.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#6366f1] hover:underline whitespace-nowrap text-[12px]"
+                      >
+                        Ver criativo ↗
+                      </a>
+                    )}
+                  </Td>
                 </tr>
               ))}
             </tbody>

@@ -11,6 +11,15 @@ import { useAppStore } from '../stores/appStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ExportButton } from '../utils/dashboardHelpers';
 
+// Valores monetários em milhares: 17500 -> "R$ 17.5k", 500000 -> "R$ 500k"
+const fmtK = (v: number): string => {
+  if (v >= 1000) {
+    const k = (v / 1000).toFixed(1).replace(/\.0$/, '');
+    return `R$ ${k}k`;
+  }
+  return `R$ ${Math.round(v)}`;
+};
+
 const ExecutiveDashboard: React.FC = () => {
   const { filters } = useFilters();
   const { addNotification } = useAppStore();
@@ -212,14 +221,14 @@ const ExecutiveDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-3 mb-6">
         <KPICard
           label="Receita"
-          value={`R$ ${(kpis.revenue.value as number / 1000000).toFixed(1)}M`}
+          value={fmtK(kpis.revenue.value as number)}
           change={kpis.revenue.change}
           sub={kpis.revenue.sub}
           accent="#6366f1"
         />
         <KPICard
           label="Meta"
-          value={`R$ ${(kpis.goal.value as number / 1000000).toFixed(1)}M`}
+          value={fmtK(kpis.goal.value as number)}
           sub="Meta"
           accent="#6366f1"
         />
@@ -232,14 +241,14 @@ const ExecutiveDashboard: React.FC = () => {
         />
         <KPICard
           label="Forecast"
-          value={`R$ ${(kpis.forecast.value as number / 1000000).toFixed(1)}M`}
+          value={fmtK(kpis.forecast.value as number)}
           change={kpis.forecast.change}
           sub="projetado"
           accent="#6366f1"
         />
         <KPICard
           label="Lucro"
-          value={`R$ ${(kpis.profit.value as number / 1000).toFixed(0)}K`}
+          value={fmtK(kpis.profit.value as number)}
           change={kpis.profit.change}
           accent="#10b981"
         />
@@ -278,13 +287,13 @@ const ExecutiveDashboard: React.FC = () => {
           accent="#6366f1"
         />
         <KPICard
-          label="Consultas Hoje"
+          label="Agendamentos Hoje"
           value={kpis.appointmentsToday.value}
           sub={kpis.appointmentsToday.sub}
           accent="#6366f1"
         />
         <KPICard
-          label="Consultas Amanhã"
+          label="Agenda Amanhã"
           value={kpis.appointmentsTomorrow.value}
           sub={kpis.appointmentsTomorrow.sub}
           accent="#6366f1"
@@ -351,11 +360,11 @@ const ExecutiveDashboard: React.FC = () => {
                   tick={{ fontSize: 11, fill: '#94a3b8' }}
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(v) => `R$ ${(v / 1000000).toFixed(1)}M`}
+                  tickFormatter={(v) => fmtK(v)}
                   width={56}
                 />
                 <Tooltip
-                  formatter={(v: any) => `R$ ${(v / 1000000).toFixed(2)}M`}
+                  formatter={(v: any) => fmtK(v)}
                   contentStyle={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}
                 />
                 <Line

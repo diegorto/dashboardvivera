@@ -134,7 +134,7 @@ function joinKey(campanha, conjunto, anuncio) {
 async function fetchMetaAdsUncached(since, until) {
   const ads = [];
   const timeRangeParam = JSON.stringify({ since, until });
-  const fields = `id,name,status,effective_status,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions}`;
+  const fields = `id,name,status,effective_status,preview_shareable_link,campaign_id,campaign{name},adset_id,adset{name},insights.time_range(${timeRangeParam}){spend,actions}`;
 
   for (const accountId of FB_AD_ACCOUNT_IDS) {
     console.log(`\nBuscando ads Meta - Account: ${accountId} (${since} a ${until})`);
@@ -171,6 +171,7 @@ async function fetchMetaAdsUncached(since, until) {
             adId: ad.id,
             adName: ad.name,
             status: ad.effective_status || ad.status,
+            previewLink: ad.preview_shareable_link || '',
             spend,
             leads
           });
@@ -285,7 +286,14 @@ async function fetchPipedriveDealsUncached(since, until) {
   }
 }
 
-// Busca atividades do Pipedrive (agenda, ligacoes, whatsapp) no periodo
+// Tipos de atividade da agenda no Pipedrive da Vivera (key_string reais da conta)
+const ACTIVITY_TYPE_SCHEDULED = 'agendamento_realizado'; // "Agendamento Realizado"
+const ACTIVITY_TYPE_ATTENDED = 'compareceu';             // "Compareceu"
+const ACTIVITY_TYPE_MISSED = 'faltou_reagendar';         // "Faltou - Reagendar"
+
+// Busca atividades do Pipedrive (agenda, ligacoes, whatsapp) no periodo.
+// NOTA: a API v1 /activities NAO filtra por start_date/end_date de forma confiavel
+// (retorna vazio) — buscamos tudo paginado e filtramos por due_date no codigo.
 async function fetchPipedriveActivitiesUncached(since, until) {
   try {
     const activities = [];
@@ -297,8 +305,6 @@ async function fetchPipedriveActivitiesUncached(since, until) {
         params: {
           api_token: PIPEDRIVE_TOKEN,
           user_id: 0, // todos os usuarios
-          start_date: since,
-          end_date: until,
           limit: 500,
           start
         }
@@ -306,14 +312,19 @@ async function fetchPipedriveActivitiesUncached(since, until) {
 
       if (response.data.success && response.data.data) {
         response.data.data.forEach(act => {
+          const dueDate = act.due_date || '';
+          if (since && dueDate && dueDate < since) return;
+          if (until && dueDate && dueDate > until) return;
+
           activities.push({
             id: act.id,
             subject: act.subject || '',
             type: act.type || '',
-            dueDate: act.due_date || '',
+            dueDate,
             dueTime: act.due_time || '',
             duration: act.duration || '',
             done: !!act.done,
+            markedAsDoneTime: act.marked_as_done_time || '',
             userId: act.user_id,
             userName: act.owner_name || '',
             personName: act.person_name || '',
@@ -496,23 +507,46 @@ app.get('/api/dashboard/executive', async (req, res) => {
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
 
-    const [ads, deals, agendaActivities] = await Promise.all([
+    const [ads, allDeals, allActivities] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until),
-      getPipedriveActivities(todayStr, tomorrowStr)
+      getPipedriveDeals(null, null),      // todos os deals; filtramos por won_time abaixo
+      getPipedriveActivities(null, null)  // todas as atividades; filtramos por tipo/data abaixo
     ]);
 
     // Agregações básicas
     const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
     const totalLeads = ads.reduce((sum, ad) => sum + ad.leads, 0);
-    const totalRevenue = deals.reduce((sum, deal) => sum + deal.value, 0);
-    const totalDealsWon = deals.filter(d => d.status === 'won').length;
 
-    // Agenda real (atividades Pipedrive)
-    const todayActs = agendaActivities.filter(a => a.dueDate === todayStr);
-    const tomorrowActs = agendaActivities.filter(a => a.dueDate === tomorrowStr);
-    const attendanceRate = todayActs.length > 0
-      ? (todayActs.filter(a => a.done).length / todayActs.length) * 100
+    // Receita = orcamentos FECHADOS (won) no periodo, pela data de fechamento (won_time)
+    const wonInPeriod = allDeals.filter(d => {
+      if (d.status !== 'won') return false;
+      const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+      return wonDate >= range.since && wonDate <= range.until;
+    });
+    const totalRevenue = wonInPeriod.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+    const totalDealsWon = wonInPeriod.length;
+
+    // Agenda real: atividades CONCLUIDAS por tipo (padrao Pipedrive da Vivera)
+    // - "Agendamento Realizado" concluida = agendamento feito no dia
+    // - "Compareceu" concluida = paciente compareceu
+    // - "Faltou - Reagendar" concluida = falta (no-show)
+    const scheduledToday = allActivities.filter(
+      a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && a.dueDate === todayStr
+    );
+    const scheduledTomorrow = allActivities.filter(
+      a => a.type === ACTIVITY_TYPE_SCHEDULED && a.dueDate === tomorrowStr
+    );
+    const attendedInPeriod = allActivities.filter(
+      a => a.type === ACTIVITY_TYPE_ATTENDED && a.done &&
+        a.dueDate >= range.since && a.dueDate <= range.until
+    );
+    const missedInPeriod = allActivities.filter(
+      a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
+        a.dueDate >= range.since && a.dueDate <= range.until
+    );
+    const attendanceTotal = attendedInPeriod.length + missedInPeriod.length;
+    const attendanceRate = attendanceTotal > 0
+      ? (attendedInPeriod.length / attendanceTotal) * 100
       : 0;
 
     // KPIs calculados
@@ -562,19 +596,19 @@ app.get('/api/dashboard/executive', async (req, res) => {
         change: 6.8
       },
       appointmentsToday: {
-        value: todayActs.length,
-        sub: 'agendadas'
+        value: scheduledToday.length,
+        sub: 'realizados hoje'
       },
       appointmentsTomorrow: {
-        value: tomorrowActs.length,
+        value: scheduledTomorrow.length,
         sub: 'agendadas'
       },
       attendance: {
         value: parseFloat(attendanceRate.toFixed(1)),
-        change: null // TODO: comparar com periodo anterior
+        change: null
       },
       noShow: {
-        value: 0, // TODO: integrar com sistema de presenca real
+        value: missedInPeriod.length,
         change: null
       },
       leads: {
@@ -1967,6 +2001,9 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
         d.campanha === ad.campaignName && d.conjunto === ad.adsetName && d.palavraChave === ad.adName
       );
       const revenue = relatedDeals.reduce((s, d) => s + d.value, 0);
+      // CPL: usa leads do Meta quando reportados; senao usa leads do CRM
+      // (campanhas de WhatsApp nao reportam action_type=lead no Meta)
+      const effectiveLeads = ad.leads > 0 ? ad.leads : relatedDeals.length;
       return {
         id: ad.adId,
         name: ad.adName,
@@ -1975,11 +2012,13 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
         status: ad.status,
         spend: ad.spend,
         leads: ad.leads,
-        cpl: ad.leads > 0 ? parseFloat((ad.spend / ad.leads).toFixed(2)) : 0,
+        cpl: effectiveLeads > 0 ? parseFloat((ad.spend / effectiveLeads).toFixed(2)) : 0,
         crmLeads: relatedDeals.length,
         sales: relatedDeals.filter(d => d.status === 'won').length,
         revenue,
-        roas: ad.spend > 0 ? parseFloat((revenue / ad.spend).toFixed(2)) : 0
+        roas: ad.spend > 0 ? parseFloat((revenue / ad.spend).toFixed(2)) : 0,
+        link: ad.previewLink ||
+          `https://www.facebook.com/adsmanager/manage/ads?act=${ad.accountId}&selected_ad_ids=${ad.adId}`
       };
     }).sort((a, b) => b.spend - a.spend);
 
