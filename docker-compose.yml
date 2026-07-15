@@ -1,22 +1,80 @@
+version: '3.8'
+
 services:
-  vivera-fotos:
-    build: ./vivera-fotos
-    restart: always
-    env_file:
-      - ./vivera-fotos/.env
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: dashboardvivera-backend
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      LOG_LEVEL: info
     volumes:
-      - ./vivera-fotos/data:/app/data
-      - ./vivera-fotos/uploads:/app/uploads
+      - ./backend/src:/app/src
+      - ./data:/app/data
+    restart: unless-stopped
     networks:
-      - n8n_default
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.vivera-fotos.rule=Host(`vivera.srv1522176.hstgr.cloud`)
-      - traefik.http.routers.vivera-fotos.tls=true
-      - traefik.http.routers.vivera-fotos.entrypoints=web,websecure
-      - traefik.http.routers.vivera-fotos.tls.certresolver=mytlschallenge
-      - traefik.http.services.vivera-fotos.loadbalancer.server.port=4000
+      - vivera-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/governance/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: dashboardvivera-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: http://backend:3001/api
+      NODE_ENV: production
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - vivera-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  nginx:
+    image: nginx:alpine
+    container_name: dashboardvivera-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - vivera-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 networks:
-  n8n_default:
-    external: true
+  vivera-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

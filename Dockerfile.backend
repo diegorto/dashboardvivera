@@ -1,0 +1,46 @@
+# Backend Build Stage
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source (no build needed for Node.js, but we compile TypeScript if needed)
+COPY backend/src ./src
+COPY backend/tsconfig.json ./
+
+# Production Stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY backend/package*.json ./
+
+# Install production dependencies only
+RUN npm ci --production
+
+# Copy source from builder
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/tsconfig.json ./
+
+# Create data directory for any local storage
+RUN mkdir -p /app/data
+
+# Expose port
+EXPOSE 3001
+
+# Environment
+ENV NODE_ENV=production
+ENV PORT=3001
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3001/api/governance/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+
+# Start server
+CMD ["node", "server.js"]
