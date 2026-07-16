@@ -10,6 +10,7 @@ export { default as Timeline } from './Timeline';
 export { default as CreativeCard } from './CreativeCard';
 export { default as AIInsight, AIInsightPanel } from './AIInsight';
 export { default as DrillDownDrawer } from './DrillDownDrawer';
+export { default as RevenueByFunnelCard } from './RevenueByFunnelCard';
 
 // Export types
 export type { default as KPICardProps } from './KPICard';

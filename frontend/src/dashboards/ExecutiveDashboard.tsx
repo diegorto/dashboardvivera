@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { KPICard, TopBar, Layout, DrillDownDrawer } from '../components';
 import OriginBreakdownCard from '../components/OriginBreakdownCard';
+import RevenueByFunnelCard from '../components/RevenueByFunnelCard';
 import dashboardService, {
   ExecutiveKPIs,
   ChartDataPoint,
@@ -35,6 +36,9 @@ const ExecutiveDashboard: React.FC = () => {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [origins, setOrigins] = useState<any[]>([]);
   const [loadingOrigins, setLoadingOrigins] = useState(false);
+  const [revenueByFunnel, setRevenueByFunnel] = useState<any[]>([]);
+  const [loadingRevenueByFunnel, setLoadingRevenueByFunnel] = useState(false);
+  const [totalRevenueByFunnel, setTotalRevenueByFunnel] = useState(0);
   // Drill-down: qual KPI está "explodido" no drawer lateral
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
@@ -66,22 +70,39 @@ const ExecutiveDashboard: React.FC = () => {
       setFunnel(data.funnel);
       setAlerts(data.alerts);
 
-      // Buscar dados de origem em paralelo
+      // Buscar dados de origem e receita por funil em paralelo
       setLoadingOrigins(true);
+      setLoadingRevenueByFunnel(true);
       try {
-        const originsResponse = await axios.get('/api/dashboard/executive/origins', {
-          params: {
-            since: dateRange.since,
-            until: dateRange.until
-          }
-        });
+        const [originsResponse, funnelRevenueResponse] = await Promise.all([
+          axios.get('/api/dashboard/executive/origins', {
+            params: {
+              since: dateRange.since,
+              until: dateRange.until
+            }
+          }),
+          axios.get('/api/dashboard/executive/funnel', {
+            params: {
+              since: dateRange.since,
+              until: dateRange.until
+            }
+          })
+        ]);
+
         if (originsResponse.data.success) {
           setOrigins(originsResponse.data.data.byOrigin || []);
         }
+
+        if (funnelRevenueResponse.data.success) {
+          const revenueData = funnelRevenueResponse.data.data.revenue;
+          setRevenueByFunnel(revenueData.byPipeline || []);
+          setTotalRevenueByFunnel(revenueData.total || 0);
+        }
       } catch (err) {
-        console.warn('Erro ao carregar dados de origem:', err);
+        console.warn('Erro ao carregar dados de origem/funnel:', err);
       } finally {
         setLoadingOrigins(false);
+        setLoadingRevenueByFunnel(false);
       }
 
       // Notificar usuário se houver alertas críticos
@@ -440,6 +461,21 @@ const ExecutiveDashboard: React.FC = () => {
           <p className="text-[11px] text-[#94a3b8] mt-1">Google, Instagram, Meta, Indicação</p>
           <div className="mt-4">
             <OriginBreakdownCard data={origins} loading={loadingOrigins} />
+          </div>
+        </div>
+      </div>
+
+      {/* RECEITA POR FUNIL */}
+      <div className="mb-6">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-6">
+          <h3 className="text-[13px] font-semibold text-[#0f172a]">Receita por Funil</h3>
+          <p className="text-[11px] text-[#94a3b8] mt-1">Inbound, Outbound, Referência</p>
+          <div className="mt-4">
+            <RevenueByFunnelCard
+              data={revenueByFunnel}
+              loading={loadingRevenueByFunnel}
+              total={totalRevenueByFunnel}
+            />
           </div>
         </div>
       </div>

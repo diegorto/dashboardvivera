@@ -1354,7 +1354,7 @@ app.get('/api/dashboard/revenue', async (req, res) => {
   }
 });
 
-// GET /api/dashboard/funnel - Dados do funil executivo
+// GET /api/dashboard/funnel - Dados do funil executivo (agora com dados REAIS do Pipedrive)
 app.get('/api/dashboard/funnel', async (req, res) => {
   try {
     const defaults = defaultDateRange();
@@ -1363,26 +1363,37 @@ app.get('/api/dashboard/funnel', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const deals = await getPipedriveDeals(null, null);
 
-    // Agrupa por etapa do funil
-    const stages = {};
-    deals.forEach(deal => {
-      const stage = deal.status || 'unknown';
-      if (!stages[stage]) {
-        stages[stage] = 0;
-      }
-      stages[stage]++;
+    // Deals que entraram no período
+    const dealsInRange = deals.filter(d => {
+      const addDate = (d.addTime || '').slice(0, 10);
+      return addDate >= range.since && addDate <= range.until;
     });
 
-    const totalLeads = deals.length;
-    const funnelData = [
-      { stage: 'Leads', value: totalLeads, pct: 100 },
-      { stage: 'Qualificados', value: Math.floor(totalLeads * 0.48), pct: 48 },
-      { stage: 'Agendados', value: Math.floor(totalLeads * 0.41), pct: 41 },
-      { stage: 'Comparecidos', value: Math.floor(totalLeads * 0.37), pct: 37 },
-      { stage: 'Vendidos', value: deals.filter(d => d.status === 'won').length, pct: Math.round((deals.filter(d => d.status === 'won').length / totalLeads) * 100) }
-    ];
+    // Agrupa por stageName (estágio real do Pipedrive)
+    const stageMap = {};
+    dealsInRange.forEach(deal => {
+      const stage = deal.stageName || 'Sem estágio';
+      if (!stageMap[stage]) {
+        stageMap[stage] = 0;
+      }
+      stageMap[stage]++;
+    });
+
+    // Monta funil com contagens REAIS
+    const funnelData = Object.keys(stageMap).map(stageName => {
+      const count = stageMap[stageName];
+      return {
+        stage: stageName,
+        value: count,
+        pct: dealsInRange.length > 0 ? Math.round((count / dealsInRange.length) * 100) : 0
+      };
+    }).sort((a, b) => {
+      // Ordenação por estágio padrão Pipedrive
+      const stageOrder = ['Entrada', 'Contato', 'Qualificado', 'Agendamento', 'Compareci', 'Won'];
+      return stageOrder.indexOf(a.stage) - stageOrder.indexOf(b.stage);
+    });
 
     res.json({
       success: true,
