@@ -16,8 +16,8 @@ const SettingsDashboard: React.FC = () => {
     pipedriveToken: '',
     fbAccessToken: '',
     fbAdAccountIds: '',
-    tintimApiKey: '',
-    tintimWorkspaceId: '',
+    tintimAccountCode: '',
+    tintimAccountToken: '',
     googleAdsCustomerId: '',
     googleAdsDeveloperToken: '',
     openaiApiKey: '',
@@ -38,8 +38,8 @@ const SettingsDashboard: React.FC = () => {
         pipedriveToken: data.pipedriveToken,
         fbAccessToken: data.fbAccessToken,
         fbAdAccountIds: data.fbAdAccountIds,
-        tintimApiKey: data.tintimApiKey || '',
-        tintimWorkspaceId: data.tintimWorkspaceId || '',
+        tintimAccountCode: data.tintimAccountCode || '',
+        tintimAccountToken: data.tintimAccountToken || '',
         googleAdsCustomerId: data.googleAdsCustomerId || '',
         googleAdsDeveloperToken: data.googleAdsDeveloperToken || '',
         openaiApiKey: data.openaiApiKey,
@@ -179,26 +179,26 @@ const SettingsDashboard: React.FC = () => {
 
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
-                Tintim API Key
+                Tintim Account Code (UUID)
               </label>
               <input
                 type="text"
-                value={form.tintimApiKey}
-                onChange={(e) => setField('tintimApiKey', e.target.value)}
-                placeholder="Cole a API Key do Tintim"
+                value={form.tintimAccountCode}
+                onChange={(e) => setField('tintimAccountCode', e.target.value)}
+                placeholder="f0fb74f6-c6fb-448f-b0ee-e5a4e49e886d"
                 className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
               />
             </div>
 
             <div>
               <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
-                Tintim Workspace ID
+                Tintim Account Token (Bearer)
               </label>
               <input
                 type="text"
-                value={form.tintimWorkspaceId}
-                onChange={(e) => setField('tintimWorkspaceId', e.target.value)}
-                placeholder="ID do workspace do Tintim"
+                value={form.tintimAccountToken}
+                onChange={(e) => setField('tintimAccountToken', e.target.value)}
+                placeholder="Cole o Bearer Token do Tintim"
                 className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
               />
             </div>

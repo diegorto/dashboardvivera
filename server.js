@@ -40,8 +40,8 @@ let FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
   .split(',')
   .map(id => id.trim())
   .filter(Boolean);
-let TINTIM_API_KEY = process.env.TINTIM_API_KEY;
-let TINTIM_WORKSPACE_ID = process.env.TINTIM_WORKSPACE_ID;
+let TINTIM_ACCOUNT_CODE = process.env.TINTIM_ACCOUNT_CODE;
+let TINTIM_ACCOUNT_TOKEN = process.env.TINTIM_ACCOUNT_TOKEN;
 let GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
 let GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 
@@ -57,8 +57,8 @@ function applySettings(s) {
   if (s.fbAdAccountIds) {
     FB_AD_ACCOUNT_IDS = String(s.fbAdAccountIds).split(',').map(id => id.trim()).filter(Boolean);
   }
-  if (s.tintimApiKey) TINTIM_API_KEY = s.tintimApiKey;
-  if (s.tintimWorkspaceId) TINTIM_WORKSPACE_ID = s.tintimWorkspaceId;
+  if (s.tintimAccountCode) TINTIM_ACCOUNT_CODE = s.tintimAccountCode;
+  if (s.tintimAccountToken) TINTIM_ACCOUNT_TOKEN = s.tintimAccountToken;
   if (s.googleAdsCustomerId) GOOGLE_ADS_CUSTOMER_ID = s.googleAdsCustomerId;
   if (s.googleAdsDeveloperToken) GOOGLE_ADS_DEVELOPER_TOKEN = s.googleAdsDeveloperToken;
   if (s.openaiApiKey) process.env.OPENAI_API_KEY = s.openaiApiKey;
@@ -2682,7 +2682,7 @@ app.get('/api/filters/options', async (req, res) => {
       allDeals
         .filter(d => d.pipeline_id)
         .map(d => {
-          const pipelineMap: Record<string, string> = {
+          const pipelineMap = {
             '1': 'Inbound',
             '2': 'Outbound',
             '3': 'Referência',
@@ -2691,7 +2691,7 @@ app.get('/api/filters/options', async (req, res) => {
         })
     );
 
-    const statusMap: Record<string, string> = {
+    const statusMap = {
       'open': 'Aberto',
       'won': 'Ganho',
       'lost': 'Perdido',
@@ -2742,8 +2742,8 @@ app.get('/api/settings', (req, res) => {
       pipedriveToken: maskSecret(s.pipedriveToken || process.env.PIPEDRIVE_TOKEN),
       fbAccessToken: maskSecret(s.fbAccessToken || process.env.FB_ACCESS_TOKEN),
       fbAdAccountIds: s.fbAdAccountIds || process.env.FB_AD_ACCOUNT_IDS || '',
-      tintimApiKey: maskSecret(s.tintimApiKey || process.env.TINTIM_API_KEY),
-      tintimWorkspaceId: s.tintimWorkspaceId || process.env.TINTIM_WORKSPACE_ID || '',
+      tintimAccountCode: maskSecret(s.tintimAccountCode || process.env.TINTIM_ACCOUNT_CODE),
+      tintimAccountToken: maskSecret(s.tintimAccountToken || process.env.TINTIM_ACCOUNT_TOKEN),
       googleAdsCustomerId: maskSecret(s.googleAdsCustomerId || process.env.GOOGLE_ADS_CUSTOMER_ID),
       googleAdsDeveloperToken: maskSecret(s.googleAdsDeveloperToken || process.env.GOOGLE_ADS_DEVELOPER_TOKEN),
       openaiApiKey: maskSecret(s.openaiApiKey || process.env.OPENAI_API_KEY),
@@ -2752,7 +2752,7 @@ app.get('/api/settings', (req, res) => {
       configured: {
         pipedrive: !!PIPEDRIVE_TOKEN,
         meta: !!FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0,
-        tintim: !!TINTIM_API_KEY && !!TINTIM_WORKSPACE_ID,
+        tintim: !!TINTIM_ACCOUNT_CODE && !!TINTIM_ACCOUNT_TOKEN,
         googleAds: !!GOOGLE_ADS_CUSTOMER_ID && !!GOOGLE_ADS_DEVELOPER_TOKEN,
         openai: !!process.env.OPENAI_API_KEY
       }
@@ -2764,7 +2764,7 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     const current = loadSettingsFile();
-    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'tintimApiKey', 'tintimWorkspaceId', 'googleAdsCustomerId', 'googleAdsDeveloperToken', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
+    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'tintimAccountCode', 'tintimAccountToken', 'googleAdsCustomerId', 'googleAdsDeveloperToken', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
     const updates = {};
 
     allowed.forEach(key => {

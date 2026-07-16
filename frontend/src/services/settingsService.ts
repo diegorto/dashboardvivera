@@ -4,8 +4,8 @@ export interface AppSettings {
   pipedriveToken: string;
   fbAccessToken: string;
   fbAdAccountIds: string;
-  tintimApiKey: string;
-  tintimWorkspaceId: string;
+  tintimAccountCode: string;
+  tintimAccountToken: string;
   googleAdsCustomerId: string;
   googleAdsDeveloperToken: string;
   openaiApiKey: string;
