@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppStore } from '../stores/appStore';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface NavItem {
   id: string;
@@ -32,7 +33,23 @@ const Sidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { sidebarOpen, toggleSidebar } = useAppStore();
+  const { mode } = useTheme();
   const groups = ['Intelligence', 'Media', 'Operations', 'AI', 'System'];
+
+  // Cores baseadas no tema
+  const colors = {
+    bg: mode === 'dark' ? '#0f172a' : '#ffffff',
+    border: mode === 'dark' ? '#1e293b' : '#e2e8f0',
+    textPrimary: mode === 'dark' ? '#ffffff' : '#0f172a',
+    textSecondary: mode === 'dark' ? '#94a3b8' : '#64748b',
+    textTertiary: mode === 'dark' ? '#475569' : '#94a3b8',
+    groupText: mode === 'dark' ? '#334155' : '#64748b',
+    activeBg: mode === 'dark' ? '#1e293b' : '#f0f4ff',
+    hoverBg: mode === 'dark' ? '#1e293b' : '#f8fafc',
+    accentBorder: '#6366f1',
+    accentText: '#6366f1',
+    avatarBg: mode === 'dark' ? '#6366f1' : '#e0e7ff',
+  };
 
   const currentActive = navItems.find((item) => item.path === location.pathname)?.id || 'executive';
 
@@ -52,25 +69,29 @@ const Sidebar: React.FC = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static left-0 top-0 h-screen w-56 bg-[#0f172a] border-r border-[#1e293b] shrink-0 flex flex-col z-40 transition-transform lg:transform-none ${
+        className={`fixed lg:static left-0 top-0 h-screen w-56 shrink-0 flex flex-col z-40 transition-all lg:transform-none ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{
+          backgroundColor: colors.bg,
+          borderRight: `1px solid ${colors.border}`,
+        }}
       >
         {/* Logo Vivera - Orofacial Avançada */}
-        <div className="px-5 py-4 border-b border-[#1e293b]">
+        <div className="px-5 py-4" style={{ borderBottom: `1px solid ${colors.border}` }}>
           <div
-            className="text-white font-extrabold uppercase leading-none"
-            style={{ fontSize: '22px', letterSpacing: '0.02em', fontStretch: 'condensed' }}
+            className="font-extrabold uppercase leading-none"
+            style={{ fontSize: '22px', letterSpacing: '0.02em', fontStretch: 'condensed', color: colors.textPrimary }}
           >
             VIVERA
           </div>
           <div
-            className="text-[#94a3b8] font-medium uppercase mt-1"
-            style={{ fontSize: '8.5px', letterSpacing: '0.32em' }}
+            className="font-medium uppercase mt-1"
+            style={{ fontSize: '8.5px', letterSpacing: '0.32em', color: colors.textSecondary }}
           >
             Orofacial Avançada
           </div>
-          <div className="text-[#475569] text-[9px] font-medium tracking-widest uppercase mt-1.5">
+          <div className="text-[9px] font-medium tracking-widest uppercase mt-1.5" style={{ color: colors.textTertiary }}>
             Command Center
           </div>
         </div>
@@ -81,41 +102,65 @@ const Sidebar: React.FC = () => {
             const items = navItems.filter((i) => i.group === group);
             return (
               <div key={group} className="mb-1">
-                <div className="px-5 py-2 text-[10px] font-semibold uppercase tracking-widest text-[#334155]">
+                <div
+                  className="px-5 py-2 text-[10px] font-semibold uppercase tracking-widest"
+                  style={{ color: colors.groupText }}
+                >
                   {group}
                 </div>
-                {items.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      handleNavigate(item);
-                      if (window.innerWidth < 1024) {
-                        toggleSidebar();
-                      }
-                    }}
-                    className={`w-full flex items-center gap-3 px-5 py-2 text-sm transition-all ${
-                      currentActive === item.id
-                        ? 'bg-[#1e293b] text-white border-r-2 border-[#6366f1]'
-                        : 'text-[#64748b] hover:text-[#94a3b8] hover:bg-[#1e293b]/50'
-                    }`}
-                  >
-                    <span className="text-xs opacity-60">{item.icon}</span>
-                    <span className="font-medium">{item.label}</span>
-                  </button>
-                ))}
+                {items.map((item) => {
+                  const isActive = currentActive === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        handleNavigate(item);
+                        if (window.innerWidth < 1024) {
+                          toggleSidebar();
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-5 py-2 text-sm transition-all"
+                      style={{
+                        backgroundColor: isActive ? colors.activeBg : 'transparent',
+                        color: isActive ? colors.accentText : colors.textSecondary,
+                        borderRight: isActive ? `2px solid ${colors.accentBorder}` : 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = colors.hoverBg;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
+                    >
+                      <span className="text-xs opacity-60">{item.icon}</span>
+                      <span className="font-medium">{item.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             );
           })}
         </nav>
 
         {/* User */}
-        <div className="px-5 py-4 border-t border-[#1e293b] flex items-center gap-3">
-          <div className="w-7 h-7 rounded-full bg-[#6366f1]/20 flex items-center justify-center text-[#6366f1] text-xs font-bold">
+        <div className="px-5 py-4 flex items-center gap-3" style={{ borderTop: `1px solid ${colors.border}` }}>
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+            style={{ backgroundColor: colors.avatarBg, color: colors.accentText }}
+          >
             DD
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-medium truncate">Dr. Diego</div>
-            <div className="text-[#475569] text-[10px]">Diretor Geral</div>
+            <div className="text-xs font-medium truncate" style={{ color: colors.textPrimary }}>
+              Dr. Diego
+            </div>
+            <div className="text-[10px]" style={{ color: colors.textTertiary }}>
+              Diretor Geral
+            </div>
           </div>
         </div>
       </aside>

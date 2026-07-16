@@ -11,7 +11,7 @@ export interface FilterOptions {
 }
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: '/api',
 });
 
 export const filterService = {
