@@ -1,17 +1,10 @@
 {
   "buildCommand": "cd web && npm install && npm run build",
-  "framework": "express",
+  "outputDirectory": "web/dist",
   "functions": {
-    "server.js": {
+    "api/**/*.js": {
       "memory": 1024,
       "maxDuration": 60
     }
-  },
-  "env": [
-    "META_TOKEN",
-    "META_ACCOUNTS",
-    "PIPEDRIVE_TOKEN",
-    "PIPEDRIVE_PIPELINE_ID",
-    "NODE_ENV"
-  ]
+  }
 }
