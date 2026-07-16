@@ -1,17 +1,10 @@
 module.exports = (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Content-Type', 'application/json');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  const { since = '2026-06-14', until = '2026-07-14' } = req.query;
 
   const dashboardData = {
     success: true,
-    range: { since, until },
+    range: { since: '2026-06-14', until: '2026-07-14' },
     previousRange: { since: '2026-05-14', until: '2026-06-14' },
     kpis: {
       receita: { current: 45000, deltaPct: 12.5 },
@@ -35,10 +28,7 @@ module.exports = (req, res) => {
         compareceram: 1,
         compras: 0,
         perdidos: 1,
-        objecoes: [
-          { tag: 'preço alto', count: 3 },
-          { tag: 'sem interesse', count: 2 }
-        ],
+        objecoes: [{ tag: 'preço alto', count: 3 }],
         receita: 0,
         roas: 0,
         receitaPorLead: 0,
@@ -58,51 +48,11 @@ module.exports = (req, res) => {
     ],
     funnel: {
       stages: [
-        {
-          key: 'leads',
-          label: 'Leads Recebidos',
-          count: 726,
-          pctFromStart: 100,
-          pctLossFromPrev: null,
-          perdidos: 50,
-          objecoes: [{ tag: 'sem interesse', count: 50 }]
-        },
-        {
-          key: 'qualificados',
-          label: 'Qualificados',
-          count: 380,
-          pctFromStart: 52.3,
-          pctLossFromPrev: 47.7,
-          perdidos: 30,
-          objecoes: []
-        },
-        {
-          key: 'agendados',
-          label: 'Agendados',
-          count: 190,
-          pctFromStart: 26.2,
-          pctLossFromPrev: 50,
-          perdidos: 20,
-          objecoes: []
-        },
-        {
-          key: 'compareceu',
-          label: 'Compareceram',
-          count: 150,
-          pctFromStart: 20.7,
-          pctLossFromPrev: 21,
-          perdidos: 10,
-          objecoes: []
-        },
-        {
-          key: 'vendido',
-          label: 'Vendidos',
-          count: 120,
-          pctFromStart: 16.5,
-          pctLossFromPrev: 20,
-          perdidos: 0,
-          objecoes: []
-        }
+        { key: 'leads', label: 'Leads', count: 726, pctFromStart: 100, pctLossFromPrev: null, perdidos: 50, objecoes: [] },
+        { key: 'qualificados', label: 'Qualificados', count: 380, pctFromStart: 52.3, pctLossFromPrev: 47.7, perdidos: 30, objecoes: [] },
+        { key: 'agendados', label: 'Agendados', count: 190, pctFromStart: 26.2, pctLossFromPrev: 50, perdidos: 20, objecoes: [] },
+        { key: 'compareceu', label: 'Compareceram', count: 150, pctFromStart: 20.7, pctLossFromPrev: 21, perdidos: 10, objecoes: [] },
+        { key: 'vendido', label: 'Vendidos', count: 120, pctFromStart: 16.5, pctLossFromPrev: 20, perdidos: 0, objecoes: [] }
       ],
       etapas: [],
       topCreativesByStage: {},
@@ -135,12 +85,10 @@ module.exports = (req, res) => {
         dataVenda: null,
         status: 'open',
         tempoAteFechar: null,
-        pipedriveUrl: 'https://vivera.pipedrive.com/deal/1'
+        pipedriveUrl: ''
       }
     ],
-    governance: {
-      semResponsavel: { count: 15, value: 4500 }
-    },
+    governance: { semResponsavel: { count: 15, value: 4500 } },
     revenueAtRisk: {
       qualificadosSemAgendamento: { count: 50, semOrcamento: 10, value: 15000, deals: [] },
       agendadosFaltaram: { count: 20, semOrcamento: 5, value: 6000, deals: [] },
@@ -149,7 +97,7 @@ module.exports = (req, res) => {
     },
     revenueAtRiskRange: { since: '2026-04-14', until: '2026-07-14' },
     insights: [
-      { id: 'insight-1', severity: 'critical', text: 'ROAS está abaixo do esperado - investigar criativos com performance baixa' }
+      { id: 'insight-1', severity: 'critical', text: 'ROAS está abaixo do esperado' }
     ],
     leadsSemOrigem: [],
     recepcao: {
@@ -158,19 +106,7 @@ module.exports = (req, res) => {
         compras: { current: 40, deltaPct: 5 },
         ticketMedio: { current: 300, deltaPct: 2 }
       },
-      fechamentos: [
-        {
-          id: 1,
-          nome: 'Procedimento A',
-          telefone: '48999999999',
-          procedimento: 'Preenchimento',
-          closer: 'João',
-          responsavel: 'Maria',
-          valor: 1500,
-          dataFechamento: '2026-07-05',
-          pipedriveUrl: 'https://vivera.pipedrive.com/deal/1'
-        }
-      ]
+      fechamentos: []
     },
     faturamentoTotal: { current: 57000, deltaPct: 10 },
     meta: { adsAccounts: 2, totalAdsComGasto: 75, totalDealsNoPeriodo: 726 },
