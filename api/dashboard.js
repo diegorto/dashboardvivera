@@ -106,7 +106,16 @@ module.exports = (req, res) => {
         compras: { current: 40, deltaPct: 5 },
         ticketMedio: { current: 300, deltaPct: 2 }
       },
-      fechamentos: []
+      fechamentos: [
+        {
+          id: 1,
+          nome: 'Maria Silva',
+          telefone: '48988888888',
+          valor: 800,
+          procedimento: 'Preenchimento',
+          pipedriveUrl: 'https://vivera.pipedrive.com/deal/100'
+        }
+      ]
     },
     faturamentoTotal: { current: 57000, deltaPct: 10 },
     meta: { adsAccounts: 2, totalAdsComGasto: 75, totalDealsNoPeriodo: 726 },
@@ -129,6 +138,28 @@ module.exports = (req, res) => {
       compareceram: [],
       vendas: [],
       perdidos: []
+    },
+    leadSources: {
+      google: {
+        leads: 245,
+        cpl: 85,
+        roas: 3.2,
+        receita: 20800
+      },
+      meta: {
+        leads: 381,
+        cpl: 21,
+        roas: 5.6,
+        receita: 45000
+      },
+      indicacao: {
+        leads: 85,
+        receita: 12000
+      },
+      outros: {
+        leads: 15,
+        receita: 2200
+      }
     }
   };
 
