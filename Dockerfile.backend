@@ -12,6 +12,8 @@ RUN npm ci --omit=dev
 # Copy server and backend code
 COPY server.js ./
 COPY backend ./backend
+COPY googleAdsMcpService.js ./
+COPY metaAdsMcpService.js ./
 
 # Create data directory for any local storage
 RUN mkdir -p /app/data
