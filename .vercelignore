@@ -10,3 +10,8 @@ FIX_*.md
 README_*.txt
 data/
 .claude/
+public/
+dashboard-sdr.html
+kpis.html
+test-fetch.html
+server.js
