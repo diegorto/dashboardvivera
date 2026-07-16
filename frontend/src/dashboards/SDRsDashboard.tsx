@@ -93,11 +93,6 @@ const WindowCard: React.FC<{ data: SDRWindowData }> = ({ data }) => {
                   {s.name}
                 </th>
               ))}
-              {data.sdrs.map(s => (
-                <th key={`p-${s.name}`} className="text-right text-[9px] font-semibold uppercase tracking-wider text-[#cbd5e1] px-2 py-2">
-                  {s.name.slice(0, 3)}. ant.
-                </th>
-              ))}
               <th className="text-right text-[9px] font-semibold uppercase tracking-wider text-[#0f172a] px-2 py-2">Meta</th>
             </tr>
           </thead>
@@ -113,11 +108,6 @@ const WindowCard: React.FC<{ data: SDRWindowData }> = ({ data }) => {
                   >
                     {s.current ? fmtVal(s.current[row.key], row.money) : '-'}
                     {s.variation && <VarBadge v={s.variation[row.key]} />}
-                  </td>
-                ))}
-                {data.sdrs.map(s => (
-                  <td key={`p-${s.name}`} className="text-right text-[11px] text-[#94a3b8] font-mono px-2 py-2">
-                    {s.previous ? fmtVal(s.previous[row.key], row.money) : '-'}
                   </td>
                 ))}
                 <td className="text-right text-[11px] font-bold font-mono text-[#0f172a] px-2 py-2">

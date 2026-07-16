@@ -3810,23 +3810,33 @@ app.post('/api/google-ads/connect', async (req, res) => {
   }
 });
 
-// GET /api/google-ads/campaigns - Lista campanhas do Google Ads via MCP
+// GET /api/google-ads/campaigns - Lista campanhas do Google Ads via MCP (auto-detecta credenciais do Pipeboard)
 app.get('/api/google-ads/campaigns', async (req, res) => {
   try {
-    if (!GOOGLE_ADS_CUSTOMER_ID) {
-      return res.json({
-        success: false,
-        error: 'Google Ads Customer ID não configurado. Acesse Configurações → Google Ads',
-        data: []
-      });
+    let customerId = GOOGLE_ADS_CUSTOMER_ID;
+
+    // Se não há customer ID configurado, tenta auto-detectar do Pipeboard
+    if (!customerId) {
+      console.log('Customer ID não configurado, tentando auto-detectar via Pipeboard...');
+      const customers = await googleAdsMcp.listCustomers();
+      if (customers.length > 0) {
+        customerId = customers[0].id || customers[0].customer_id;
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Google Ads: Nenhum cliente encontrado. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     console.log('Buscando campanhas do Google Ads...');
-    const campaigns = await googleAdsMcp.getCampaigns(GOOGLE_ADS_CUSTOMER_ID);
+    const campaigns = await googleAdsMcp.getCampaigns(customerId);
 
     res.json({
       success: true,
-      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      customer_id: customerId,
       total_campaigns: campaigns.length,
       data: campaigns
     });
@@ -3843,22 +3853,31 @@ app.get('/api/google-ads/campaigns', async (req, res) => {
 // GET /api/google-ads/metrics - Métricas de performance do Google Ads via MCP
 app.get('/api/google-ads/metrics', async (req, res) => {
   try {
-    if (!GOOGLE_ADS_CUSTOMER_ID) {
-      return res.json({
-        success: false,
-        error: 'Google Ads Customer ID não configurado',
-        data: []
-      });
+    let customerId = GOOGLE_ADS_CUSTOMER_ID;
+
+    if (!customerId) {
+      console.log('Customer ID não configurado, tentando auto-detectar via Pipeboard...');
+      const customers = await googleAdsMcp.listCustomers();
+      if (customers.length > 0) {
+        customerId = customers[0].id || customers[0].customer_id;
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Google Ads: Nenhum cliente encontrado. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
     console.log(`Buscando métricas do Google Ads (período: ${dateRange})...`);
 
-    const metrics = await googleAdsMcp.getMetrics(GOOGLE_ADS_CUSTOMER_ID, dateRange);
+    const metrics = await googleAdsMcp.getMetrics(customerId, dateRange);
 
     res.json({
       success: true,
-      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      customer_id: customerId,
       date_range: dateRange,
       total_campaigns: metrics.length,
       data: metrics
@@ -3876,22 +3895,31 @@ app.get('/api/google-ads/metrics', async (req, res) => {
 // GET /api/google-ads/conversions - Conversões/Leads do Google Ads via MCP
 app.get('/api/google-ads/conversions', async (req, res) => {
   try {
-    if (!GOOGLE_ADS_CUSTOMER_ID) {
-      return res.json({
-        success: false,
-        error: 'Google Ads Customer ID não configurado',
-        data: []
-      });
+    let customerId = GOOGLE_ADS_CUSTOMER_ID;
+
+    if (!customerId) {
+      console.log('Customer ID não configurado, tentando auto-detectar via Pipeboard...');
+      const customers = await googleAdsMcp.listCustomers();
+      if (customers.length > 0) {
+        customerId = customers[0].id || customers[0].customer_id;
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Google Ads: Nenhum cliente encontrado. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
     console.log(`Buscando conversões do Google Ads (período: ${dateRange})...`);
 
-    const conversions = await googleAdsMcp.getConversions(GOOGLE_ADS_CUSTOMER_ID, dateRange);
+    const conversions = await googleAdsMcp.getConversions(customerId, dateRange);
 
     res.json({
       success: true,
-      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      customer_id: customerId,
       date_range: dateRange,
       total_with_conversions: conversions.length,
       data: conversions
@@ -3947,14 +3975,21 @@ app.get('/api/meta-ads/accounts', async (req, res) => {
 // GET /api/meta-ads/campaigns - Lista campanhas do Meta Ads via MCP
 app.get('/api/meta-ads/campaigns', async (req, res) => {
   try {
-    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+    let accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
 
     if (!accountId) {
-      return res.json({
-        success: false,
-        error: 'Account ID não configurado',
-        data: []
-      });
+      console.log('Account ID não configurado, tentando auto-detectar via Pipeboard...');
+      const accounts = await metaAdsMcp.getAccounts();
+      if (accounts.length > 0) {
+        accountId = accounts[0].id || accounts[0].account_id;
+        console.log(`✅ Auto-detectado Account ID: ${accountId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Meta Ads: Nenhuma conta encontrada. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     console.log('Buscando campanhas do Meta Ads...');
@@ -3979,15 +4014,22 @@ app.get('/api/meta-ads/campaigns', async (req, res) => {
 // GET /api/meta-ads/metrics - Métricas de performance do Meta Ads via MCP
 app.get('/api/meta-ads/metrics', async (req, res) => {
   try {
-    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+    let accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
 
     if (!accountId) {
-      return res.json({
-        success: false,
-        error: 'Account ID não configurado',
-        data: []
-      });
+      console.log('Account ID não configurado, tentando auto-detectar via Pipeboard...');
+      const accounts = await metaAdsMcp.getAccounts();
+      if (accounts.length > 0) {
+        accountId = accounts[0].id || accounts[0].account_id;
+        console.log(`✅ Auto-detectado Account ID: ${accountId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Meta Ads: Nenhuma conta encontrada. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     console.log(`Buscando métricas do Meta Ads (período: ${dateRange})...`);
@@ -4013,15 +4055,22 @@ app.get('/api/meta-ads/metrics', async (req, res) => {
 // GET /api/meta-ads/conversions - Conversões/Leads do Meta Ads via MCP
 app.get('/api/meta-ads/conversions', async (req, res) => {
   try {
-    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+    let accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
 
     if (!accountId) {
-      return res.json({
-        success: false,
-        error: 'Account ID não configurado',
-        data: []
-      });
+      console.log('Account ID não configurado, tentando auto-detectar via Pipeboard...');
+      const accounts = await metaAdsMcp.getAccounts();
+      if (accounts.length > 0) {
+        accountId = accounts[0].id || accounts[0].account_id;
+        console.log(`✅ Auto-detectado Account ID: ${accountId}`);
+      } else {
+        return res.json({
+          success: false,
+          error: 'Meta Ads: Nenhuma conta encontrada. Configure PIPEBOARD_API_KEY no .env',
+          data: []
+        });
+      }
     }
 
     console.log('Buscando conversões do Meta Ads...');
@@ -4048,7 +4097,7 @@ loadCacheFromDisk();
 setInterval(warmCache, 5 * 60 * 1000);   // a cada 5 minutos
 setTimeout(warmCache, 3000);              // primeira carga logo apos subir
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
   const range = defaultDateRange();
   console.log(`

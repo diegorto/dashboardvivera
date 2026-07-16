@@ -48,6 +48,25 @@ async function testConnection() {
 }
 
 /**
+ * Lista clientes do Google Ads disponíveis via Pipeboard MCP
+ */
+async function listCustomers() {
+  try {
+    console.log('Listando clientes Google Ads disponíveis...');
+
+    const response = await googleAdsClient.post('/', {
+      method: 'list_google_ads_customers'
+    });
+
+    console.log(`✅ ${response.data.total_customers || response.data.customers?.length || 0} clientes encontrados`);
+    return response.data.customers || [];
+  } catch (error) {
+    console.error('Erro ao listar clientes:', error.response?.data || error.message);
+    return [];
+  }
+}
+
+/**
  * Busca campanhas do Google Ads via Pipeboard MCP
  */
 async function getCampaigns(customerId) {
@@ -139,6 +158,7 @@ async function getConversions(customerId, dateRange = 'LAST_30_DAYS') {
 
 module.exports = {
   testConnection,
+  listCustomers,
   getCampaigns,
   getMetrics,
   getConversions
