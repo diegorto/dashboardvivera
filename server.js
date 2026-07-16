@@ -646,6 +646,195 @@ app.get('/api/dashboard/executive', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/executive/drilldown?metric=... - registros que compoem cada KPI
+// Todo numero do Executive e clicavel e "explode" a lista do que o populou
+app.get('/api/dashboard/executive/drilldown', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+    const metric = String(req.query.metric || 'revenue');
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const tomorrowDate = new Date();
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+
+    const [ads, allDeals, allActivities] = await Promise.all([
+      getMetaAds(range.since, range.until),
+      getPipedriveDeals(null, null),
+      getPipedriveActivities(null, null)
+    ]);
+
+    // Link do criativo por Campanha|Conjunto|Anuncio (mesma convencao usada no Pipedrive)
+    const adLink = {};
+    ads.forEach(ad => {
+      adLink[`${ad.campaignName}|${ad.adsetName}|${ad.adName}`] =
+        ad.previewLink ||
+        `https://www.facebook.com/adsmanager/manage/ads?act=${ad.accountId}&selected_ad_ids=${ad.adId}`;
+    });
+    const linkForDeal = d => adLink[`${d.campanha}|${d.conjunto}|${d.palavraChave}`] || '';
+
+    const fmtBR = iso => (iso ? iso.slice(0, 10).split('-').reverse().join('/') : '');
+
+    const dealRow = d => ({
+      data: fmtBR(d.wonTime || d.addDate),
+      paciente: d.personName || d.title,
+      valor: d.rawValue || 0,
+      campanha: d.campanha || '-',
+      criativo: d.palavraChave || '-',
+      link: linkForDeal(d)
+    });
+
+    const actRow = a => ({
+      data: fmtBR(a.dueDate) + (a.dueTime ? ` ${a.dueTime}` : ''),
+      paciente: a.personName || a.dealTitle || '-',
+      assunto: a.subject,
+      responsavel: a.userName || '-'
+    });
+
+    const dealCols = [
+      { key: 'data', label: 'Fechamento' },
+      { key: 'paciente', label: 'Paciente' },
+      { key: 'valor', label: 'Valor (R$)' },
+      { key: 'campanha', label: 'Campanha' },
+      { key: 'criativo', label: 'Criativo' },
+      { key: 'link', label: 'Criativo (link)' }
+    ];
+    const actCols = [
+      { key: 'data', label: 'Data' },
+      { key: 'paciente', label: 'Paciente' },
+      { key: 'assunto', label: 'Assunto' },
+      { key: 'responsavel', label: 'Responsável' }
+    ];
+
+    const wonInPeriod = allDeals
+      .filter(d => {
+        if (d.status !== 'won') return false;
+        const wd = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+        return wd >= range.since && wd <= range.until;
+      })
+      .sort((a, b) => (b.wonTime || '').localeCompare(a.wonTime || ''));
+
+    let payload;
+    switch (metric) {
+      case 'leads':
+      case 'qualified': {
+        const inPeriod = allDeals
+          .filter(d => d.addDate >= range.since && d.addDate <= range.until)
+          .sort((a, b) => (b.addDate || '').localeCompare(a.addDate || ''));
+        payload = {
+          title: `Leads CRM no período (${inPeriod.length})`,
+          columns: [
+            { key: 'data', label: 'Entrada' },
+            { key: 'paciente', label: 'Paciente' },
+            { key: 'status', label: 'Status' },
+            { key: 'campanha', label: 'Campanha' },
+            { key: 'criativo', label: 'Criativo' },
+            { key: 'link', label: 'Criativo (link)' }
+          ],
+          rows: inPeriod.map(d => ({
+            data: fmtBR(d.addDate),
+            paciente: d.personName || d.title,
+            status: d.status === 'won' ? 'Ganho' : d.status === 'lost' ? 'Perdido' : 'Aberto',
+            campanha: d.campanha || '-',
+            criativo: d.palavraChave || '-',
+            link: linkForDeal(d)
+          }))
+        };
+        break;
+      }
+      case 'appointmentsToday': {
+        const rows = allActivities.filter(
+          a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && a.dueDate === todayStr
+        );
+        payload = { title: `Agendamentos realizados hoje (${rows.length})`, columns: actCols, rows: rows.map(actRow) };
+        break;
+      }
+      case 'appointmentsTomorrow': {
+        const rows = allActivities.filter(
+          a => a.type === ACTIVITY_TYPE_SCHEDULED && a.dueDate === tomorrowStr
+        );
+        payload = { title: `Agenda de amanhã (${rows.length})`, columns: actCols, rows: rows.map(actRow) };
+        break;
+      }
+      case 'attendance': {
+        const rows = allActivities.filter(
+          a => (a.type === ACTIVITY_TYPE_ATTENDED || a.type === ACTIVITY_TYPE_MISSED) &&
+            a.done && a.dueDate >= range.since && a.dueDate <= range.until
+        );
+        payload = {
+          title: `Comparecimentos e faltas no período (${rows.length})`,
+          columns: [{ key: 'status', label: 'Status' }, ...actCols],
+          rows: rows.map(a => ({
+            status: a.type === ACTIVITY_TYPE_ATTENDED ? '✅ Compareceu' : '❌ Faltou',
+            ...actRow(a)
+          }))
+        };
+        break;
+      }
+      case 'noShow': {
+        const rows = allActivities.filter(
+          a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
+            a.dueDate >= range.since && a.dueDate <= range.until
+        );
+        payload = { title: `Faltas no período (${rows.length})`, columns: actCols, rows: rows.map(actRow) };
+        break;
+      }
+      case 'roas':
+      case 'roi':
+      case 'cac': {
+        const rows = ads
+          .map(ad => {
+            const rel = allDeals.filter(
+              d => d.campanha === ad.campaignName && d.conjunto === ad.adsetName && d.palavraChave === ad.adName
+            );
+            const revenue = rel.filter(d => d.status === 'won').reduce((s, d) => s + (d.rawValue || 0), 0);
+            return {
+              criativo: ad.adName,
+              campanha: ad.campaignName,
+              investimento: parseFloat(ad.spend.toFixed(2)),
+              leadsCrm: rel.length,
+              receita: revenue,
+              roas: ad.spend > 0 ? parseFloat((revenue / ad.spend).toFixed(2)) : 0,
+              link: adLink[`${ad.campaignName}|${ad.adsetName}|${ad.adName}`] || ''
+            };
+          })
+          .sort((a, b) => b.investimento - a.investimento);
+        payload = {
+          title: 'Investimento x Retorno por criativo',
+          columns: [
+            { key: 'criativo', label: 'Criativo' },
+            { key: 'campanha', label: 'Campanha' },
+            { key: 'investimento', label: 'Investimento (R$)' },
+            { key: 'leadsCrm', label: 'Leads CRM' },
+            { key: 'receita', label: 'Receita (R$)' },
+            { key: 'roas', label: 'ROAS' },
+            { key: 'link', label: 'Criativo (link)' }
+          ],
+          rows
+        };
+        break;
+      }
+      default: {
+        // revenue, sales, avgTicket, forecast, goal, goalPct
+        const total = wonInPeriod.reduce((s, d) => s + (d.rawValue || 0), 0);
+        payload = {
+          title: `Vendas fechadas no período (${wonInPeriod.length}) — R$ ${total.toLocaleString('pt-BR')}`,
+          columns: dealCols,
+          rows: wonInPeriod.map(dealRow)
+        };
+      }
+    }
+
+    res.json({ success: true, range, metric, data: payload });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/dashboard/revenue - Dados para gráfico de receita vs meta vs forecast
 app.get('/api/dashboard/revenue', async (req, res) => {
   try {

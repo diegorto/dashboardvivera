@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { KPICard, TopBar, Layout } from '../components';
+import { KPICard, TopBar, Layout, DrillDownDrawer } from '../components';
 import dashboardService, {
   ExecutiveKPIs,
   ChartDataPoint,
@@ -31,6 +31,8 @@ const ExecutiveDashboard: React.FC = () => {
   const [revenueChart, setRevenueChart] = useState<ChartDataPoint[]>([]);
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  // Drill-down: qual KPI está "explodido" no drawer lateral
+  const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
   // Carregar dados quando filtros mudam
   useEffect(() => {
@@ -189,6 +191,7 @@ const ExecutiveDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 mb-6">
         <KPICard
           label="Receita"
+          onClick={() => setDrillMetric('revenue')}
           value={fmtK(kpis.revenue.value as number)}
           change={kpis.revenue.change}
           sub={kpis.revenue.sub}
@@ -196,12 +199,14 @@ const ExecutiveDashboard: React.FC = () => {
         />
         <KPICard
           label="Meta"
+          onClick={() => setDrillMetric('goal')}
           value={fmtK(kpis.goal.value as number)}
           sub="Meta"
           accent="#6366f1"
         />
         <KPICard
           label="% Meta"
+          onClick={() => setDrillMetric('goalPct')}
           value={`${kpis.goalPct.value}%`}
           change={kpis.goalPct.change}
           sub="progresso"
@@ -209,6 +214,7 @@ const ExecutiveDashboard: React.FC = () => {
         />
         <KPICard
           label="Forecast"
+          onClick={() => setDrillMetric('forecast')}
           value={fmtK(kpis.forecast.value as number)}
           change={kpis.forecast.change}
           sub="projetado"
@@ -216,18 +222,21 @@ const ExecutiveDashboard: React.FC = () => {
         />
         <KPICard
           label="ROI"
+          onClick={() => setDrillMetric('roi')}
           value={`${kpis.roi.value}%`}
           change={kpis.roi.change}
           accent="#8b5cf6"
         />
         <KPICard
           label="ROAS"
+          onClick={() => setDrillMetric('roas')}
           value={`${kpis.roas.value}x`}
           change={kpis.roas.change}
           accent="#8b5cf6"
         />
         <KPICard
           label="CAC"
+          onClick={() => setDrillMetric('cac')}
           value={`R$ ${kpis.cac.value}`}
           change={kpis.cac.change}
           accent="#0ea5e9"
@@ -238,48 +247,56 @@ const ExecutiveDashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-3 mb-6">
         <KPICard
           label="Ticket Médio"
+          onClick={() => setDrillMetric('avgTicket')}
           value={`R$ ${kpis.avgTicket.value}`}
           change={kpis.avgTicket.change}
           accent="#6366f1"
         />
         <KPICard
           label="Agendamentos Hoje"
+          onClick={() => setDrillMetric('appointmentsToday')}
           value={kpis.appointmentsToday.value}
           sub={kpis.appointmentsToday.sub}
           accent="#6366f1"
         />
         <KPICard
           label="Agenda Amanhã"
+          onClick={() => setDrillMetric('appointmentsTomorrow')}
           value={kpis.appointmentsTomorrow.value}
           sub={kpis.appointmentsTomorrow.sub}
           accent="#6366f1"
         />
         <KPICard
           label="Comparecimento"
+          onClick={() => setDrillMetric('attendance')}
           value={`${kpis.attendance.value}%`}
           change={kpis.attendance.change}
           accent="#10b981"
         />
         <KPICard
           label="No-show"
+          onClick={() => setDrillMetric('noShow')}
           value={kpis.noShow.value}
           change={kpis.noShow.change}
           accent="#ef4444"
         />
         <KPICard
           label="Leads"
+          onClick={() => setDrillMetric('leads')}
           value={kpis.leads.value}
           change={kpis.leads.change}
           accent="#6366f1"
         />
         <KPICard
           label="Qualificados"
+          onClick={() => setDrillMetric('qualified')}
           value={kpis.qualified.value}
           change={kpis.qualified.change}
           accent="#6366f1"
         />
         <KPICard
           label="Vendas"
+          onClick={() => setDrillMetric('sales')}
           value={kpis.sales.value}
           change={kpis.sales.change}
           accent="#10b981"
@@ -391,6 +408,19 @@ const ExecutiveDashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Drill-down: explode a lista que popula o KPI clicado */}
+      {drillMetric && (() => {
+        const r = getDateRange(filters.period, filters.dateRange);
+        return (
+          <DrillDownDrawer
+            metric={drillMetric}
+            since={r.since}
+            until={r.until}
+            onClose={() => setDrillMetric(null)}
+          />
+        );
+      })()}
     </Layout>
   );
 };
