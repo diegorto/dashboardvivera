@@ -1371,7 +1371,7 @@ app.get('/api/dashboard/marketing/campaigns', async (req, res) => {
         clicks: 0, // TODO: buscar insights
         ctr: 0, // TODO: calcular
         cpc: investment > 0 ? (investment / (1000 + Math.random() * 500)).toFixed(2) : 0, // TODO: real data
-        cpm: investment > 0 ? ((investment / (totalImpressions || 100000)) * 1000).toFixed(2) : 0, // TODO: real data
+        cpm: investment > 0 ? ((investment / 100000) * 1000).toFixed(2) : 0, // TODO: real data (impressions)
         leads: campaign.leads_meta,
         messages: 0, // TODO: buscar do CRM
         revenue: revenue,

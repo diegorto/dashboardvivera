@@ -76,19 +76,27 @@ class MarketingDashboardService {
   }
 
   /**
-   * Busca todos os dados do Marketing Dashboard de forma paralela
+   * Busca todos os dados do Marketing Dashboard de forma paralela com fallback
    */
   async getFullMarketingDashboard(since?: string, until?: string) {
-    const [kpis, campaigns, trendChart] = await Promise.all([
+    const results = await Promise.allSettled([
       this.getMarketingKPIs(since, until),
       this.getCampaigns(since, until),
       this.getTrendChart(since, until)
     ]);
 
+    const [kpisResult, campaignsResult, trendResult] = results;
+
     return {
-      kpis,
-      campaigns,
-      trendChart
+      kpis: kpisResult.status === 'fulfilled' ? kpisResult.value : {
+        totalInvestment: 0,
+        totalRevenue: 0,
+        avgRoas: 0,
+        totalLeads: 0,
+        totalImpressions: 0
+      },
+      campaigns: campaignsResult.status === 'fulfilled' ? campaignsResult.value : [],
+      trendChart: trendResult.status === 'fulfilled' ? trendResult.value : []
     };
   }
 }
