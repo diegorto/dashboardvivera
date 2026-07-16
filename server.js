@@ -626,8 +626,8 @@ app.get('/api/dashboard/executive', async (req, res) => {
       };
     };
 
-    const cur = aggregate(range, ads);
-    const prev = prevRange ? aggregate(prevRange, prevAds) : null;
+    const cur = aggregate(range, adsData);
+    const prev = prevRange ? aggregate(prevRange, prevAdsData) : null;
 
     // Variacao % vs periodo anterior; undefined (omitido no JSON) quando nao ha base
     const pct = (curVal, prevVal) => {
@@ -635,10 +635,10 @@ app.get('/api/dashboard/executive', async (req, res) => {
       return parseFloat((((curVal - prevVal) / prevVal) * 100).toFixed(1));
     };
 
-    const scheduledToday = allActivities.filter(
+    const scheduledToday = activitiesData.filter(
       a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && a.dueDate === todayStr
     );
-    const scheduledTomorrow = allActivities.filter(
+    const scheduledTomorrow = activitiesData.filter(
       a => a.type === ACTIVITY_TYPE_SCHEDULED && a.dueDate === tomorrowStr
     );
 
