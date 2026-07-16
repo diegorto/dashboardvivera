@@ -969,6 +969,110 @@ const _d = iso => new Date(iso + 'T12:00:00Z');
 const _iso = dt => dt.toISOString().slice(0, 10);
 const _addDays = (iso, n) => { const x = _d(iso); x.setUTCDate(x.getUTCDate() + n); return _iso(x); };
 
+// GET /api/dashboard/executive/origins - Leads por origem (Google, Instagram, Meta, Indicação) com ROAS
+app.get('/api/dashboard/executive/origins', async (req, res) => {
+  try {
+    const range = parseRange(req.query.since, req.query.until);
+    const [adsResult, dealsResult] = await Promise.allSettled([
+      getMetaAds(range.since, range.until).catch(() => []),
+      getPipedriveDeals(null, null).catch(() => [])
+    ]);
+
+    const ads = adsResult.status === 'fulfilled' ? adsResult.value : [];
+    const allDeals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
+
+    // Deals do período que entraram como leads
+    const dealsInRange = allDeals.filter(d => {
+      const addDate = (d.addTime || '').slice(0, 10);
+      return addDate >= range.since && addDate <= range.until;
+    });
+
+    // Deals que viraram receita (won) no período
+    const wonDeals = allDeals.filter(d => {
+      if (d.status !== 'won') return false;
+      const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+      return wonDate >= range.since && wonDate <= range.until;
+    });
+
+    // Agrupa leads por origem (campo customizado FIELD_ORIGEM)
+    const byOrigin = {};
+    dealsInRange.forEach(deal => {
+      const origem = deal[FIELD_ORIGEM] || 'Sem origem';
+      if (!byOrigin[origem]) {
+        byOrigin[origem] = { leads: [], won: [] };
+      }
+      byOrigin[origem].leads.push(deal);
+      if (deal.status === 'won') {
+        byOrigin[origem].won.push(deal);
+      }
+    });
+
+    // Calcula investimento por plataforma a partir do Meta Ads
+    const investmentByPlatform = {};
+    ads.forEach(ad => {
+      const platform = ad.platform || 'Meta'; // Meta, Google (quando implementado)
+      if (!investmentByPlatform[platform]) {
+        investmentByPlatform[platform] = 0;
+      }
+      investmentByPlatform[platform] += ad.spend || 0;
+    });
+
+    // Monta resposta com breakdown por origem
+    const origins = Object.keys(byOrigin).map(origem => {
+      const group = byOrigin[origem];
+      const leadCount = group.leads.length;
+      const wonCount = group.won.length;
+      const revenue = group.won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+
+      // Investimento: tenta identificar pela plataforma mencionada
+      let investment = 0;
+      if (origem.includes('Google')) {
+        investment = investmentByPlatform['Google'] || 0;
+      } else if (origem === 'Meta' || origem.includes('Instagram') || origem.includes('Facebook')) {
+        investment = investmentByPlatform['Meta'] || 0;
+      }
+
+      return {
+        origem,
+        leads: leadCount,
+        won: wonCount,
+        conversionRate: leadCount > 0 ? (wonCount / leadCount * 100).toFixed(1) : 0,
+        revenue: revenue,
+        investment: investment,
+        roas: investment > 0 ? (revenue / investment).toFixed(2) : investment === 0 && revenue > 0 ? '∞' : '0',
+        deals: group.won.map(d => ({
+          id: d.id,
+          title: d.title,
+          value: d.rawValue,
+          status: d.status,
+          stage: d.stageName,
+          wonDate: d.wonTime ? d.wonTime.slice(0, 10) : '-'
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        byOrigin: origins.sort((a, b) => b.revenue - a.revenue),
+        summary: {
+          totalLeads: dealsInRange.length,
+          totalWon: wonDeals.length,
+          totalRevenue: wonDeals.reduce((sum, d) => sum + (d.rawValue || 0), 0),
+          totalInvestment: Object.values(investmentByPlatform).reduce((a, b) => a + b, 0)
+        }
+      }
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      data: { byOrigin: [], summary: {} }
+    });
+  }
+});
+
 app.get('/api/dashboard/sdr-panel', async (req, res) => {
   try {
     const [users, allDeals, allActivities] = await Promise.all([

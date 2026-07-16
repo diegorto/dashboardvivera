@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { KPICard, TopBar, Layout, DrillDownDrawer } from '../components';
+import OriginBreakdownCard from '../components/OriginBreakdownCard';
 import dashboardService, {
   ExecutiveKPIs,
   ChartDataPoint,
@@ -8,6 +9,7 @@ import dashboardService, {
 } from '../services/dashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
+import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
 
@@ -31,6 +33,8 @@ const ExecutiveDashboard: React.FC = () => {
   const [revenueChart, setRevenueChart] = useState<ChartDataPoint[]>([]);
   const [funnel, setFunnel] = useState<FunnelStage[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [origins, setOrigins] = useState<any[]>([]);
+  const [loadingOrigins, setLoadingOrigins] = useState(false);
   // Drill-down: qual KPI está "explodido" no drawer lateral
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
@@ -61,6 +65,24 @@ const ExecutiveDashboard: React.FC = () => {
       setRevenueChart(data.revenueChart);
       setFunnel(data.funnel);
       setAlerts(data.alerts);
+
+      // Buscar dados de origem em paralelo
+      setLoadingOrigins(true);
+      try {
+        const originsResponse = await axios.get('/api/dashboard/executive/origins', {
+          params: {
+            since: dateRange.since,
+            until: dateRange.until
+          }
+        });
+        if (originsResponse.data.success) {
+          setOrigins(originsResponse.data.data.byOrigin || []);
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar dados de origem:', err);
+      } finally {
+        setLoadingOrigins(false);
+      }
 
       // Notificar usuário se houver alertas críticos
       if (data.alerts.some(a => a.severity === 'critical')) {
@@ -407,6 +429,17 @@ const ExecutiveDashboard: React.FC = () => {
             ) : (
               <div className="text-gray-500 text-center py-8">Sem dados</div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* BREAKDOWN POR ORIGEM */}
+      <div className="mb-6">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-6">
+          <h3 className="text-[13px] font-semibold text-[#0f172a]">Leads por Origem</h3>
+          <p className="text-[11px] text-[#94a3b8] mt-1">Google, Instagram, Meta, Indicação</p>
+          <div className="mt-4">
+            <OriginBreakdownCard data={origins} loading={loadingOrigins} />
           </div>
         </div>
       </div>
