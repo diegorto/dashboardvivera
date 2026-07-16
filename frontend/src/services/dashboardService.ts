@@ -33,6 +33,7 @@ export interface ChartDataPoint {
 
 export interface FunnelStage {
   stage: string;
+  count?: number;
   value: number;
   pct: number;
 }

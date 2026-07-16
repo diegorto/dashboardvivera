@@ -426,27 +426,58 @@ const ExecutiveDashboard: React.FC = () => {
 
           <div className="mt-4 space-y-3">
             {funnel.length > 0 ? (
-              funnel.map((stage, idx) => (
-                <div key={idx}>
-                  <div className="flex justify-between text-[11px] mb-1">
-                    <span className="text-[#475569] font-medium">{stage.stage}</span>
-                    <span className="text-[#0f172a] font-semibold font-mono">
-                      {stage.value.toLocaleString('pt-BR')}
-                    </span>
+              (() => {
+                // Mapear e filtrar estágios
+                const stageMap: { [key: string]: string } = {
+                  'Entrada': 'Entrada',
+                  'Contato': 'Leads',
+                  'Qualificado': 'Qualificados',
+                  'Agendamento': 'Agendaram',
+                  'Compareci': 'Compareceram',
+                  'Won': 'Fecharam'
+                };
+
+                const colors = ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#10b981'];
+
+                const filteredFunnel = funnel
+                  .filter(s => stageMap[s.stage])
+                  .map((s, idx) => ({
+                    ...s,
+                    displayName: stageMap[s.stage],
+                    originalStage: s.stage,
+                    index: idx,
+                    count: s.count || s.value
+                  }));
+
+                return filteredFunnel.map((stage) => (
+                  <div key={stage.originalStage}>
+                    <div className="flex justify-between items-start text-[11px] mb-1">
+                      <div>
+                        <span className="text-[#475569] font-medium">{stage.displayName}</span>
+                        {stage.originalStage === 'Won' && stage.value > 0 && (
+                          <div className="text-[10px] text-[#10b981] font-semibold mt-0.5">
+                            Faturado: R$ {(stage.value / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[#0f172a] font-semibold font-mono">
+                        {(stage.count || 0).toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                    <div className="h-5 bg-[#f1f5f9] rounded-md overflow-hidden">
+                      <div
+                        className="h-full rounded-md transition-all"
+                        style={{
+                          width: `${stage.pct}%`,
+                          backgroundColor: colors[stage.index] || '#6366f1',
+                          opacity: 0.85
+                        }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-[#94a3b8] mt-0.5">{stage.pct}%</div>
                   </div>
-                  <div className="h-5 bg-[#f1f5f9] rounded-md overflow-hidden">
-                    <div
-                      className="h-full rounded-md transition-all"
-                      style={{
-                        width: `${stage.pct}%`,
-                        backgroundColor: ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b'][idx] || '#6366f1',
-                        opacity: 0.85
-                      }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-[#94a3b8] mt-0.5">{stage.pct}%</div>
-                </div>
-              ))
+                ));
+              })()
             ) : (
               <div className="text-gray-500 text-center py-8">Sem dados</div>
             )}

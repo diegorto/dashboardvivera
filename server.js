@@ -1460,7 +1460,8 @@ app.get('/api/dashboard/funnel', async (req, res) => {
             const addDate = (deal.add_time || '').slice(0, 10);
             if (addDate >= range.since && addDate <= range.until) {
               dealsInRange.push({
-                stageName: deal.stage_id ? stageIdToName[deal.stage_id] || `Stage ${deal.stage_id}` : 'Sem estágio'
+                stageName: deal.stage_id ? stageIdToName[deal.stage_id] || `Stage ${deal.stage_id}` : 'Sem estágio',
+                value: deal.value || 0
               });
             }
           });
@@ -1480,21 +1481,23 @@ app.get('/api/dashboard/funnel', async (req, res) => {
     dealsInRange.forEach(deal => {
       const stage = deal.stageName;
       if (!stageMap[stage]) {
-        stageMap[stage] = 0;
+        stageMap[stage] = { count: 0, value: 0 };
       }
-      stageMap[stage]++;
+      stageMap[stage].count++;
+      stageMap[stage].value += deal.value || 0;
     });
 
-    // Monta funil com contagens REAIS
+    // Monta funil com contagens REAIS e valores
     const funnelData = Object.keys(stageMap).map(stageName => {
-      const count = stageMap[stageName];
+      const { count, value } = stageMap[stageName];
       return {
         stage: stageName,
-        value: count,
+        count: count,
+        value: value,
         pct: dealsInRange.length > 0 ? Math.round((count / dealsInRange.length) * 100) : 0
       };
     }).sort((a, b) => {
-      // Ordenação por estágio padrão Pipedrive
+      // Ordenação por estágio padrão Pipedrive - apenas os 6 solicitados
       const stageOrder = ['Entrada', 'Contato', 'Qualificado', 'Agendamento', 'Compareci', 'Won'];
       return stageOrder.indexOf(a.stage) - stageOrder.indexOf(b.stage);
     });
