@@ -547,6 +547,14 @@ app.get('/api/pipedrive/:resource', async (req, res) => {
 // GET /api/dashboard/executive - KPIs principais do executivo
 app.get('/api/dashboard/executive', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN || !FB_ACCESS_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive ou Meta não configurados. Acesse Configurações e adicione os tokens.',
+        data: { kpis: {}, revenueChart: [], funnel: [], alerts: [] }
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
@@ -562,30 +570,36 @@ app.get('/api/dashboard/executive', async (req, res) => {
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
 
-    const [ads, prevAds, allDeals, allActivities] = await Promise.all([
-      getMetaAds(range.since, range.until),
-      prevRange ? getMetaAds(prevRange.since, prevRange.until) : Promise.resolve([]),
-      getPipedriveDeals(null, null),      // todos os deals; filtramos por won_time abaixo
-      getPipedriveActivities(null, null)  // todas as atividades; filtramos por tipo/data abaixo
+    const [ads, prevAds, allDeals, allActivities] = await Promise.allSettled([
+      getMetaAds(range.since, range.until).catch(() => []),
+      prevRange ? getMetaAds(prevRange.since, prevRange.until).catch(() => []) : Promise.resolve([]),
+      getPipedriveDeals(null, null).catch(() => []),
+      getPipedriveActivities(null, null).catch(() => [])
     ]);
+
+    // Extrair valores ou fallback para arrays vazios
+    const adsData = ads.status === 'fulfilled' ? ads.value : [];
+    const prevAdsData = prevAds.status === 'fulfilled' ? prevAds.value : [];
+    const dealsData = allDeals.status === 'fulfilled' ? allDeals.value : [];
+    const activitiesData = allActivities.status === 'fulfilled' ? allActivities.value : [];
 
     // Agrega todas as metricas de um periodo (usado para o atual e o anterior)
     const aggregate = (r, adsArr) => {
       const spend = adsArr.reduce((sum, ad) => sum + ad.spend, 0);
       const leads = adsArr.reduce((sum, ad) => sum + ad.leads, 0);
       // Receita = orcamentos FECHADOS (won) no periodo, pela data de fechamento (won_time)
-      const won = allDeals.filter(d => {
+      const won = dealsData.filter(d => {
         if (d.status !== 'won') return false;
         const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
         return wonDate >= r.since && wonDate <= r.until;
       });
       const revenue = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
       // Agenda: atividades CONCLUIDAS por tipo (padrao Pipedrive da Vivera)
-      const attended = allActivities.filter(
+      const attended = activitiesData.filter(
         a => a.type === ACTIVITY_TYPE_ATTENDED && a.done &&
           a.dueDate >= r.since && a.dueDate <= r.until
       ).length;
-      const missed = allActivities.filter(
+      const missed = activitiesData.filter(
         a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
           a.dueDate >= r.since && a.dueDate <= r.until
       ).length;
@@ -1449,13 +1463,25 @@ app.get('/api/dashboard/marketing/trend', async (req, res) => {
 // GET /api/dashboard/commercial/kpis - KPIs comerciais resumidos
 app.get('/api/dashboard/commercial/kpis', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: { leads: 0, qualified: 0, scheduled: 0, attended: 0, purchased: 0 }
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const [dealsResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => [])
+    ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     // Agrupar deals por estágio
     const leads = deals.length;
@@ -1476,20 +1502,32 @@ app.get('/api/dashboard/commercial/kpis', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: { leads: 0, qualified: 0, scheduled: 0, attended: 0, purchased: 0 } });
   }
 });
 
 // GET /api/dashboard/commercial/conversions - Performance por profissional/SDR
 app.get('/api/dashboard/commercial/conversions', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: []
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const [dealsResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => [])
+    ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     // Agrupar por proprietário/profissional
     const professionals = {};
@@ -1555,20 +1593,32 @@ app.get('/api/dashboard/commercial/conversions', async (req, res) => {
       data: conversions
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: [] });
   }
 });
 
 // GET /api/dashboard/commercial/reasons - Top 5 motivos de perda
 app.get('/api/dashboard/commercial/reasons', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: []
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const [dealsResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => [])
+    ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     // Agrupar deals perdidos por motivo
     const reasons = {};
@@ -1598,20 +1648,32 @@ app.get('/api/dashboard/commercial/reasons', async (req, res) => {
       data: topReasons
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: [] });
   }
 });
 
 // GET /api/dashboard/crm/kpis - KPIs do CRM (pipeline aberto, valor, perdidos, recuperaveis)
 app.get('/api/dashboard/crm/kpis', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: { openDeals: 0, pipelineValue: 0, avgStageTime: 0, lostDeals: 0, recoverable: 0, wonDeals: 0 }
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const [dealsResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => [])
+    ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     const openDeals = deals.filter(d => d.status === 'open');
     const lostDeals = deals.filter(d => d.status === 'lost');
@@ -1644,23 +1706,34 @@ app.get('/api/dashboard/crm/kpis', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: { openDeals: 0, pipelineValue: 0, avgStageTime: 0, lostDeals: 0, recoverable: 0, wonDeals: 0 } });
   }
 });
 
 // GET /api/dashboard/crm/pipeline - Kanban: deals agrupados por etapa + gargalos
 app.get('/api/dashboard/crm/pipeline', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: []
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const [deals, stages] = await Promise.all([
-      getPipedriveDeals(range.since, range.until),
-      getPipedriveStages()
+    const [dealsResult, stagesResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => []),
+      getPipedriveStages().catch(() => [])
     ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
+    const stages = stagesResult.status === 'fulfilled' ? stagesResult.value : [];
 
     const openDeals = deals.filter(d => d.status === 'open');
     const now = Date.now();
@@ -1701,20 +1774,32 @@ app.get('/api/dashboard/crm/pipeline', async (req, res) => {
       data: pipeline
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: [] });
   }
 });
 
 // GET /api/dashboard/crm/recovery - Oportunidades perdidas recuperaveis
 app.get('/api/dashboard/crm/recovery', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: []
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(range.since, range.until);
+    const [dealsResult] = await Promise.allSettled([
+      getPipedriveDeals(range.since, range.until).catch(() => [])
+    ]);
+
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     const lostDeals = deals
       .filter(d => d.status === 'lost')
@@ -1738,7 +1823,7 @@ app.get('/api/dashboard/crm/recovery', async (req, res) => {
       data: lostDeals
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: [] });
   }
 });
 
@@ -1918,16 +2003,27 @@ app.get('/api/dashboard/professionals/ranking', async (req, res) => {
 // GET /api/dashboard/financial/kpis - Receita, investimento, lucro e margem
 app.get('/api/dashboard/financial/kpis', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN || !FB_ACCESS_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive ou Meta não configurados. Acesse Configurações e adicione os tokens.',
+        data: { revenue: 0, adSpend: 0, grossProfit: 0, margin: 0, avgTicket: 0, salesCount: 0 }
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const [ads, deals] = await Promise.all([
-      getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until)
+    const [adsResult, dealsResult] = await Promise.allSettled([
+      getMetaAds(range.since, range.until).catch(() => []),
+      getPipedriveDeals(range.since, range.until).catch(() => [])
     ]);
+
+    const ads = adsResult.status === 'fulfilled' ? adsResult.value : [];
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     const revenue = deals.reduce((sum, d) => sum + d.value, 0);
     const adSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
@@ -1950,23 +2046,34 @@ app.get('/api/dashboard/financial/kpis', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: { revenue: 0, adSpend: 0, grossProfit: 0, margin: 0, avgTicket: 0, salesCount: 0 } });
   }
 });
 
 // GET /api/dashboard/financial/monthly - Receita vs investimento vs lucro por mes
 app.get('/api/dashboard/financial/monthly', async (req, res) => {
   try {
+    if (!PIPEDRIVE_TOKEN || !FB_ACCESS_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive ou Meta não configurados. Acesse Configurações e adicione os tokens.',
+        data: []
+      });
+    }
+
     const defaults = defaultDateRange();
     const range = {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
 
-    const [ads, deals] = await Promise.all([
-      getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until)
+    const [adsResult, dealsResult] = await Promise.allSettled([
+      getMetaAds(range.since, range.until).catch(() => []),
+      getPipedriveDeals(range.since, range.until).catch(() => [])
     ]);
+
+    const ads = adsResult.status === 'fulfilled' ? adsResult.value : [];
+    const deals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
 
     const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     const monthData = {};
@@ -2003,7 +2110,7 @@ app.get('/api/dashboard/financial/monthly', async (req, res) => {
       data: chartData
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    res.json({ success: false, error: error.message, data: [] });
   }
 });
 
