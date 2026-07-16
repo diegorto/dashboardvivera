@@ -4,12 +4,15 @@ export interface AppSettings {
   pipedriveToken: string;
   fbAccessToken: string;
   fbAdAccountIds: string;
+  tintimApiKey: string;
+  tintimWorkspaceId: string;
   openaiApiKey: string;
   inboundPipelineId: number;
   monthlyGoal: number;
   configured: {
     pipedrive: boolean;
     meta: boolean;
+    tintim: boolean;
     openai: boolean;
   };
 }
@@ -17,6 +20,7 @@ export interface AppSettings {
 export interface ConnectionTestResult {
   pipedrive: { ok: boolean; message: string };
   meta: { ok: boolean; message: string };
+  tintim: { ok: boolean; message: string };
   openai: { ok: boolean; message: string };
 }
 

@@ -40,6 +40,8 @@ let FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
   .split(',')
   .map(id => id.trim())
   .filter(Boolean);
+let TINTIM_API_KEY = process.env.TINTIM_API_KEY;
+let TINTIM_WORKSPACE_ID = process.env.TINTIM_WORKSPACE_ID;
 
 // Pipeline "Inbound" (onde entram os leads de trafego pago)
 let INBOUND_PIPELINE_ID = 1;
@@ -53,6 +55,8 @@ function applySettings(s) {
   if (s.fbAdAccountIds) {
     FB_AD_ACCOUNT_IDS = String(s.fbAdAccountIds).split(',').map(id => id.trim()).filter(Boolean);
   }
+  if (s.tintimApiKey) TINTIM_API_KEY = s.tintimApiKey;
+  if (s.tintimWorkspaceId) TINTIM_WORKSPACE_ID = s.tintimWorkspaceId;
   if (s.openaiApiKey) process.env.OPENAI_API_KEY = s.openaiApiKey;
   if (s.inboundPipelineId) INBOUND_PIPELINE_ID = parseInt(s.inboundPipelineId, 10) || 1;
   if (s.monthlyGoal !== undefined) MONTHLY_GOAL = parseFloat(s.monthlyGoal) || 0;
@@ -2621,35 +2625,53 @@ app.get('/api/filters/options', async (req, res) => {
       return people[0]?.data?.success ? people[0].data.data : [];
     });
 
-    // Extrair opções únicas
+    // Extrair opções únicas do Pipedrive
+    // Procedimentos: campo customizado ou título do deal
     const procedures = new Set(
       allDeals
-        .map(d => d.title)
-        .filter(t => t && typeof t === 'string')
-    );
-
-    const professionals = new Set(
-      allDeals
-        .filter(d => d.user_id)
         .map(d => {
-          // Tentar encontrar o nome do usuário
-          const person = allPeople.find(p => p.owner_id === d.user_id);
-          return person?.name || `Profissional ${d.user_id}`;
+          // Tenta extrair procedimento do título (formato "Procedimento - Paciente")
+          const title = d.title || '';
+          const match = title.match(/^([^-]+)/);
+          return match ? match[1].trim() : title;
         })
+        .filter(p => p && typeof p === 'string' && p.length > 0)
     );
 
-    const sdrs = new Set(['Agda', 'Helenice']); // SDRs conhecidas
+    // Profissionais: obtém do field owner (person linked ao deal) ou user_id
+    const professionals = new Set(
+      allPeople
+        .filter(p => p.name && typeof p.name === 'string')
+        .map(p => p.name)
+    );
 
+    const sdrs = new Set(
+      allPeople
+        .filter(p => p.name && (p.name.toLowerCase().includes('agda') || p.name.toLowerCase().includes('helenice')))
+        .map(p => p.name)
+    );
+    if (sdrs.size === 0) sdrs.add('Agda', 'Helenice'); // fallback
+
+    // Campanhas: extrai do campo customizado ou do tráfego pago
     const campaigns = new Set(
       allDeals
         .filter(d => d[FIELD_CAMPANHA])
-        .map(d => d[FIELD_CAMPANHA])
+        .map(d => {
+          const campaign = d[FIELD_CAMPANHA];
+          return campaign && typeof campaign === 'string' ? campaign.trim() : '';
+        })
+        .filter(Boolean)
     );
 
+    // Ad Sets (Conjuntos): extrai do campo customizado
     const adSets = new Set(
       allDeals
         .filter(d => d[FIELD_CONJUNTO])
-        .map(d => d[FIELD_CONJUNTO])
+        .map(d => {
+          const conjunto = d[FIELD_CONJUNTO];
+          return conjunto && typeof conjunto === 'string' ? conjunto.trim() : '';
+        })
+        .filter(Boolean)
     );
 
     const pipelines = new Set(
@@ -2716,12 +2738,15 @@ app.get('/api/settings', (req, res) => {
       pipedriveToken: maskSecret(s.pipedriveToken || process.env.PIPEDRIVE_TOKEN),
       fbAccessToken: maskSecret(s.fbAccessToken || process.env.FB_ACCESS_TOKEN),
       fbAdAccountIds: s.fbAdAccountIds || process.env.FB_AD_ACCOUNT_IDS || '',
+      tintimApiKey: maskSecret(s.tintimApiKey || process.env.TINTIM_API_KEY),
+      tintimWorkspaceId: s.tintimWorkspaceId || process.env.TINTIM_WORKSPACE_ID || '',
       openaiApiKey: maskSecret(s.openaiApiKey || process.env.OPENAI_API_KEY),
       inboundPipelineId: INBOUND_PIPELINE_ID,
       monthlyGoal: MONTHLY_GOAL,
       configured: {
         pipedrive: !!PIPEDRIVE_TOKEN,
         meta: !!FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0,
+        tintim: !!TINTIM_API_KEY && !!TINTIM_WORKSPACE_ID,
         openai: !!process.env.OPENAI_API_KEY
       }
     }
@@ -2732,7 +2757,7 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     const current = loadSettingsFile();
-    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
+    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'tintimApiKey', 'tintimWorkspaceId', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
     const updates = {};
 
     allowed.forEach(key => {
@@ -2759,6 +2784,7 @@ app.post('/api/settings/test', async (req, res) => {
   const results = {
     pipedrive: { ok: false, message: '' },
     meta: { ok: false, message: '' },
+    tintim: { ok: false, message: '' },
     openai: { ok: false, message: '' }
   };
 
@@ -2798,6 +2824,20 @@ app.post('/api/settings/test', async (req, res) => {
     results.meta.message = 'Token ou conta de anúncio não configurados';
   }
 
+  if (TINTIM_API_KEY && TINTIM_WORKSPACE_ID) {
+    try {
+      const r = await axios.get(`https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/health`, {
+        headers: { Authorization: `Bearer ${TINTIM_API_KEY}` }, timeout: 8000
+      });
+      results.tintim.ok = !!r.data;
+      results.tintim.message = `Conectado ao Workspace ${TINTIM_WORKSPACE_ID}`;
+    } catch (e) {
+      results.tintim.message = e.response?.data?.message || e.message;
+    }
+  } else {
+    results.tintim.message = 'API Key ou Workspace ID não configurados';
+  }
+
   if (process.env.OPENAI_API_KEY) {
     try {
       const r = await axios.get('https://api.openai.com/v1/models', {
@@ -2813,6 +2853,119 @@ app.post('/api/settings/test', async (req, res) => {
   }
 
   res.json({ success: true, data: results });
+});
+
+// POST /api/settings/test/tintim - testa conexão com Tintim
+app.post('/api/settings/test/tintim', async (req, res) => {
+  const result = { ok: false, message: '' };
+
+  if (!TINTIM_API_KEY || !TINTIM_WORKSPACE_ID) {
+    result.message = 'API Key ou Workspace ID do Tintim não configurados';
+    return res.json({ success: true, data: result });
+  }
+
+  try {
+    // Testa conexão com a API do Tintim (endpoint genérico de health check)
+    const r = await axios.get(`https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/health`, {
+      headers: { 'Authorization': `Bearer ${TINTIM_API_KEY}` },
+      timeout: 8000
+    });
+    result.ok = !!r.data;
+    result.message = `Conectado ao Workspace ${TINTIM_WORKSPACE_ID}`;
+  } catch (e) {
+    result.message = e.response?.data?.message || e.message || 'Erro ao conectar com Tintim';
+  }
+
+  res.json({ success: true, data: result });
+});
+
+// GET /api/tintim/audit - auditoria de leads Tintim vs Pipedrive
+app.get('/api/tintim/audit', async (req, res) => {
+  try {
+    if (!TINTIM_API_KEY || !TINTIM_WORKSPACE_ID) {
+      return res.json({
+        success: false,
+        error: 'Tintim não configurado. Acesse Configurações e adicione a API Key e Workspace ID.',
+        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+      });
+    }
+
+    if (!PIPEDRIVE_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
+        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+      });
+    }
+
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    try {
+      // Busca leads do Tintim (conversa com registros de contato)
+      const tintimLeads = await axios.get(
+        `https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/contacts`,
+        {
+          headers: { 'Authorization': `Bearer ${TINTIM_API_KEY}` },
+          timeout: 10000
+        }
+      );
+
+      const tintimContacts = tintimLeads.data?.data || [];
+
+      // Busca deals do Pipedrive para comparar
+      const pipedriveDeals = await getPipedriveDeals(range.since, range.until).catch(() => []);
+
+      // Identifica leads do Tintim que não têm dados de tráfego pago no Pipedrive
+      const leadsWithoutPaidTraffic = tintimContacts
+        .filter(contact => {
+          // Verifica se existe um deal no Pipedrive com origem em tráfego pago
+          const hasPaidTrafficDeal = pipedriveDeals.some(deal => {
+            const dealOrigin = deal[FIELD_ORIGEM] || '';
+            const dealCampaign = deal[FIELD_CAMPANHA] || '';
+            // Se tem origem e campanha, tem tráfego pago
+            return (dealOrigin && dealCampaign) || dealOrigin === 'Meta' || dealOrigin === 'Google Ads';
+          });
+          return !hasPaidTrafficDeal;
+        })
+        .map(contact => ({
+          id: contact.id,
+          name: contact.name || 'Sem nome',
+          email: contact.email || '-',
+          phone: contact.phone || '-',
+          lastInteraction: contact.lastMessageDate || contact.createdAt || '-',
+          source: 'Tintim',
+          status: 'Sem tráfego pago'
+        }));
+
+      res.json({
+        success: true,
+        range,
+        data: {
+          totalLeads: tintimContacts.length,
+          leadsWithoutPaidTraffic: leadsWithoutPaidTraffic.length,
+          leadsWithPaidTraffic: tintimContacts.length - leadsWithoutPaidTraffic.length,
+          leads: leadsWithoutPaidTraffic.slice(0, 100) // Limita a 100 para performance
+        }
+      });
+    } catch (tintimError) {
+      console.error('Erro ao buscar dados do Tintim:', tintimError.message);
+      res.json({
+        success: false,
+        error: `Erro ao conectar com Tintim: ${tintimError.response?.data?.message || tintimError.message}`,
+        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+      });
+    }
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+    });
+  }
 });
 
 // Dashboard legado (preservado)
@@ -2893,6 +3046,7 @@ API: http://localhost:${PORT}/api/audit?since=${range.since}&until=${range.until
 Configuracoes:
    - Meta Accounts: ${FB_AD_ACCOUNT_IDS.length}
    - Pipedrive Token: ${PIPEDRIVE_TOKEN ? PIPEDRIVE_TOKEN.substring(0, 10) + '...' : 'NAO CONFIGURADO'}
+   - Tintim Workspace: ${TINTIM_WORKSPACE_ID ? TINTIM_WORKSPACE_ID : 'NAO CONFIGURADO'}
    - Pipeline Inbound ID: ${INBOUND_PIPELINE_ID}
    - Periodo padrao: ${range.since} a ${range.until}
 

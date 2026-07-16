@@ -17,7 +17,7 @@ const api = axios.create({
 export const filterService = {
   async getFilterOptions(): Promise<FilterOptions> {
     try {
-      const response = await api.get('/api/filters/options');
+      const response = await api.get('/filters/options');
       return response.data;
     } catch (error) {
       console.error('Erro ao carregar opções de filtro:', error);
@@ -26,8 +26,8 @@ export const filterService = {
         procedures: ['Limpeza', 'Restauração', 'Implante', 'Ortodontia'],
         professionals: ['Dr. João', 'Dr. Maria', 'Dra. Silva', 'Dr. Costa'],
         sdrs: ['Agda', 'Helenice'],
-        campaigns: ['Google Ads', 'Meta Ads', 'YouTube'],
-        adSets: ['Conjunto 1', 'Conjunto 2', 'Conjunto 3'],
+        campaigns: [],
+        adSets: [],
         pipelines: ['Inbound', 'Outbound', 'Referência'],
         statuses: ['Aberto', 'Em negociação', 'Ganha', 'Perdida'],
       };
