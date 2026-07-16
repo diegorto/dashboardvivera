@@ -972,7 +972,11 @@ const _addDays = (iso, n) => { const x = _d(iso); x.setUTCDate(x.getUTCDate() + 
 // GET /api/dashboard/executive/origins - Leads por origem (Google, Instagram, Meta, Indicação) com ROAS
 app.get('/api/dashboard/executive/origins', async (req, res) => {
   try {
-    const range = parseRange(req.query.since, req.query.until);
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
     const [adsResult, dealsResult] = await Promise.allSettled([
       getMetaAds(range.since, range.until).catch(() => []),
       getPipedriveDeals(null, null).catch(() => [])
