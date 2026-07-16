@@ -978,19 +978,64 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const [dealsResult, stagesResult] = await Promise.allSettled([
-      getPipedriveDeals(null, null).catch(() => []),
-      fetchPipedriveStagesUncached().catch(() => [])
-    ]);
+    // Buscar stages de todos os pipelines e mapear stage_id -> name
+    const stageMap = {};
+    try {
+      const stagesResponse = await axios.get('https://api.pipedrive.com/v1/stages', {
+        params: { api_token: PIPEDRIVE_TOKEN, limit: 500 }
+      });
+      if (stagesResponse.data.success && stagesResponse.data.data) {
+        stagesResponse.data.data.forEach(stage => {
+          stageMap[stage.id] = stage.name;
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar stages:', error.message);
+    }
 
-    const allDeals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
-    const stages = stagesResult.status === 'fulfilled' ? stagesResult.value : [];
+    // Buscar deals de TODOS os pipelines, não só Inbound
+    const allDeals = [];
+    let start = 0;
+    let hasMore = true;
 
-    // Deals que entraram no período (add_time)
-    const dealsInRange = allDeals.filter(d => {
-      const addDate = (d.addTime || '').slice(0, 10);
-      return addDate >= range.since && addDate <= range.until;
-    });
+    try {
+      while (hasMore) {
+        const url = 'https://api.pipedrive.com/v1/deals';
+        const response = await axios.get(url, {
+          params: { api_token: PIPEDRIVE_TOKEN, limit: 500, start }
+        });
+
+        if (response.data.success && response.data.data) {
+          response.data.data.forEach(deal => {
+            const addDate = (deal.add_time || '').slice(0, 10);
+            if (addDate >= range.since && addDate <= range.until) {
+              allDeals.push({
+                id: deal.id,
+                title: deal.title,
+                status: deal.status,
+                stageName: deal.stage_id ? stageMap[deal.stage_id] || `Stage ${deal.stage_id}` : 'Sem estágio',
+                addTime: deal.add_time || '',
+                rawValue: deal.value || 0,
+                pipeline_id: deal.pipeline_id,
+                person_name: deal.person_name || (deal.person_id && deal.person_id.name) || '',
+                [FIELD_CAMPANHA]: deal[FIELD_CAMPANHA] || '-',
+                wonTime: deal.won_time || '',
+                stageChangeTime: deal.stage_change_time || ''
+              });
+            }
+          });
+
+          hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
+          start = response.data.additional_data?.pagination?.next_start || 0;
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar deals para funnel:', error.message);
+    }
+
+    const dealsInRange = allDeals;
 
     // Mapa de pipeline_id => pipeline_name
     const pipelineMap = { '1': 'Inbound', '2': 'Outbound', '3': 'Referência' };
@@ -1363,18 +1408,56 @@ app.get('/api/dashboard/funnel', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const deals = await getPipedriveDeals(null, null);
+    // Buscar stages de todos os pipelines
+    const stageIdToName = {};
+    try {
+      const stagesResponse = await axios.get('https://api.pipedrive.com/v1/stages', {
+        params: { api_token: PIPEDRIVE_TOKEN, limit: 500 }
+      });
+      if (stagesResponse.data.success && stagesResponse.data.data) {
+        stagesResponse.data.data.forEach(stage => {
+          stageIdToName[stage.id] = stage.name;
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar stages para funnel:', error.message);
+    }
 
-    // Deals que entraram no período
-    const dealsInRange = deals.filter(d => {
-      const addDate = (d.addTime || '').slice(0, 10);
-      return addDate >= range.since && addDate <= range.until;
-    });
+    // Buscar deals de TODOS os pipelines
+    const dealsInRange = [];
+    let start = 0;
+    let hasMore = true;
+
+    try {
+      while (hasMore) {
+        const response = await axios.get('https://api.pipedrive.com/v1/deals', {
+          params: { api_token: PIPEDRIVE_TOKEN, limit: 500, start }
+        });
+
+        if (response.data.success && response.data.data) {
+          response.data.data.forEach(deal => {
+            const addDate = (deal.add_time || '').slice(0, 10);
+            if (addDate >= range.since && addDate <= range.until) {
+              dealsInRange.push({
+                stageName: deal.stage_id ? stageIdToName[deal.stage_id] || `Stage ${deal.stage_id}` : 'Sem estágio'
+              });
+            }
+          });
+
+          hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
+          start = response.data.additional_data?.pagination?.next_start || 0;
+        } else {
+          hasMore = false;
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar deals para funnel:', error.message);
+    }
 
     // Agrupa por stageName (estágio real do Pipedrive)
     const stageMap = {};
     dealsInRange.forEach(deal => {
-      const stage = deal.stageName || 'Sem estágio';
+      const stage = deal.stageName;
       if (!stageMap[stage]) {
         stageMap[stage] = 0;
       }
