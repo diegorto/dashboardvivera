@@ -34,26 +34,26 @@ apiClient.interceptors.response.use(
 // Executive Dashboard APIs
 export const executiveAPI = {
   getKPIs: async (period: 'day' | 'week' | 'month' | 'year') => {
-    const response = await apiClient.get<ApiResponse<any>>(`/executive/kpis`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/executive`, {
       params: { period },
     });
     return response.data;
   },
 
   getChartData: async (type: 'revenue' | 'funnel' | 'origin' | 'procedure', period: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/executive/charts/${type}`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/executive/${type}`, {
       params: { period },
     });
     return response.data;
   },
 
   getAlerts: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/executive/alerts`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/alerts`);
     return response.data;
   },
 
   getAIInsights: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/executive/ai-insights`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/ai-summary`);
     return response.data;
   },
 };
@@ -61,21 +61,21 @@ export const executiveAPI = {
 // Marketing APIs
 export const marketingAPI = {
   getCampaigns: async (page = 1, limit = 10) => {
-    const response = await apiClient.get<PaginatedResponse<any>>(`/marketing/campaigns`, {
+    const response = await apiClient.get<PaginatedResponse<any>>(`/dashboard/marketing/campaigns`, {
       params: { page, limit },
     });
     return response.data;
   },
 
   getCreatives: async (campaignId?: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/marketing/creatives`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/marketing/creatives`, {
       params: { campaignId },
     });
     return response.data;
   },
 
   getPerformance: async (period: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/marketing/performance`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/marketing/trend`, {
       params: { period },
     });
     return response.data;
@@ -85,19 +85,19 @@ export const marketingAPI = {
 // Commercial APIs
 export const commercialAPI = {
   getConversionData: async (period: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/commercial/conversion`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/commercial/conversions`, {
       params: { period },
     });
     return response.data;
   },
 
   getSDRPerformance: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/commercial/sdr-performance`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/sdr-panel`);
     return response.data;
   },
 
   getObjections: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/commercial/objections`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/commercial/reasons`);
     return response.data;
   },
 };
@@ -105,21 +105,21 @@ export const commercialAPI = {
 // CRM APIs
 export const crmAPI = {
   getPipeline: async (filters?: any) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/crm/pipeline`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/crm/pipeline`, {
       params: filters,
     });
     return response.data;
   },
 
   getOpportunities: async (status: 'open' | 'bottleneck' | 'at-risk') => {
-    const response = await apiClient.get<ApiResponse<any>>(`/crm/opportunities`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/crm/recovery`, {
       params: { status },
     });
     return response.data;
   },
 
   getJourney: async (patientId: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/crm/patient/${patientId}/journey`);
+    const response = await apiClient.get<ApiResponse<any>>(`/governance/patient-journey/${patientId}`);
     return response.data;
   },
 };
@@ -147,14 +147,14 @@ export const patientAPI = {
 // WhatsApp APIs
 export const whatsappAPI = {
   getAnalytics: async (period: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/whatsapp/analytics`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/whatsapp/kpis`, {
       params: { period },
     });
     return response.data;
   },
 
   getMessages: async (page = 1, limit = 10) => {
-    const response = await apiClient.get<PaginatedResponse<any>>(`/whatsapp/messages`, {
+    const response = await apiClient.get<PaginatedResponse<any>>(`/dashboard/whatsapp/ranking`, {
       params: { page, limit },
     });
     return response.data;
@@ -164,17 +164,17 @@ export const whatsappAPI = {
 // Professional APIs
 export const professionalAPI = {
   getProfessionals: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/professionals`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/professionals/ranking`);
     return response.data;
   },
 
   getProfessionalDetails: async (id: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/professionals/${id}`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/professionals/ranking`);
     return response.data;
   },
 
   getSchedule: async (id: string, date: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/professionals/${id}/schedule`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/agenda/appointments`, {
       params: { date },
     });
     return response.data;
@@ -184,14 +184,14 @@ export const professionalAPI = {
 // Financial APIs
 export const financialAPI = {
   getMetrics: async (period: string) => {
-    const response = await apiClient.get<ApiResponse<any>>(`/financial/metrics`, {
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/financial/kpis`, {
       params: { period },
     });
     return response.data;
   },
 
   getRevenueBySources: async () => {
-    const response = await apiClient.get<ApiResponse<any>>(`/financial/revenue-sources`);
+    const response = await apiClient.get<ApiResponse<any>>(`/dashboard/financial/monthly`);
     return response.data;
   },
 };
