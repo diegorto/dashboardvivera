@@ -1,4 +1,5 @@
 import axios, { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface AppSettings {
   pipedriveToken: string;
@@ -29,8 +30,6 @@ export interface ConnectionTestResult {
 }
 
 class SettingsService {
-  private baseUrl = '/api';
-
   private extractError(error: unknown): string {
     if (error instanceof AxiosError) {
       return error.response?.data?.error || error.message;
@@ -40,8 +39,8 @@ class SettingsService {
 
   async getSettings(): Promise<AppSettings> {
     try {
-      const response = await axios.get<{ success: boolean; data: AppSettings }>(
-        `${this.baseUrl}/settings`
+      const response = await api.get<{ success: boolean; data: AppSettings }>(
+        '/settings'
       );
       if (!response.data.success) throw new Error('Erro ao buscar configurações');
       return response.data.data;
@@ -52,8 +51,8 @@ class SettingsService {
 
   async saveSettings(settings: Partial<Omit<AppSettings, 'configured'>>): Promise<string> {
     try {
-      const response = await axios.post<{ success: boolean; message: string }>(
-        `${this.baseUrl}/settings`,
+      const response = await api.post<{ success: boolean; message: string }>(
+        '/settings',
         settings
       );
       if (!response.data.success) throw new Error('Erro ao salvar configurações');
@@ -65,8 +64,8 @@ class SettingsService {
 
   async testConnections(): Promise<ConnectionTestResult> {
     try {
-      const response = await axios.post<{ success: boolean; data: ConnectionTestResult }>(
-        `${this.baseUrl}/settings/test`
+      const response = await api.post<{ success: boolean; data: ConnectionTestResult }>(
+        '/settings/test'
       );
       if (!response.data.success) throw new Error('Erro ao testar conexões');
       return response.data.data;
