@@ -17,6 +17,8 @@ const navItems: NavItem[] = [
   { id: 'commercial', label: 'Commercial Intelligence', icon: '◉', group: 'Intelligence', path: '/comercial' },
   { id: 'crm', label: 'CRM Intelligence', icon: '⬡', group: 'Intelligence', path: '/crm' },
   { id: 'financial', label: 'Finance', icon: '◑', group: 'Intelligence', path: '/financeiro' },
+  { id: 'google-ads', label: 'Google Ads', icon: '🔍', group: 'Media', path: '/google-ads' },
+  { id: 'meta-ads', label: 'Meta Ads', icon: '📱', group: 'Media', path: '/meta-ads' },
   { id: 'campaigns', label: 'Campaigns', icon: '▣', group: 'Media', path: '/campanhas' },
   { id: 'creatives', label: 'Creatives', icon: '▤', group: 'Media', path: '/criativos' },
   { id: 'agenda', label: 'Agenda', icon: '▦', group: 'Operations', path: '/agenda' },
