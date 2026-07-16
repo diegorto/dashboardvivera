@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ChevronDown, Download, Bell, Calendar, Sun, Moon, X } from 'lucide-react';
+import { ChevronDown, Download, Bell, Calendar, Sun, Moon, X, Menu } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFilters } from '../contexts/FilterContext';
@@ -31,7 +31,7 @@ const filterDefs: FilterDef[] = [
 
 const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb, right }) => {
   const location = useLocation();
-  const { notifications } = useAppStore();
+  const { notifications, sidebarOpen, toggleSidebar } = useAppStore();
   const { mode, toggleTheme } = useTheme();
   const { filters, setFilter, setFilters, getPeriodLabel } = useFilters();
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -122,6 +122,19 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
         transition: 'background-color 200ms',
       }}
     >
+      {/* Mobile Menu Button */}
+      <button
+        onClick={toggleSidebar}
+        className="lg:hidden p-2 rounded-lg transition-colors"
+        style={{
+          backgroundColor: hoverBg,
+          color: textColor
+        }}
+        title="Menu"
+      >
+        <Menu size={20} />
+      </button>
+
       {/* Breadcrumb + Title */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div

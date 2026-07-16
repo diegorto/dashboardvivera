@@ -10,7 +10,7 @@ import dashboardService, {
 } from '../services/dashboardService';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
-import axios from 'axios';
+import { api } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
 
@@ -75,13 +75,13 @@ const ExecutiveDashboard: React.FC = () => {
       setLoadingRevenueByFunnel(true);
       try {
         const [originsResponse, funnelRevenueResponse] = await Promise.all([
-          axios.get('/api/dashboard/executive/origins', {
+          api.get('/dashboard/executive/origins', {
             params: {
               since: dateRange.since,
               until: dateRange.until
             }
           }),
-          axios.get('/api/dashboard/executive/funnel', {
+          api.get('/dashboard/executive/funnel', {
             params: {
               since: dateRange.since,
               until: dateRange.until
@@ -500,7 +500,11 @@ const ExecutiveDashboard: React.FC = () => {
       <div className="mb-6">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-6">
           <h3 className="text-[13px] font-semibold text-[#0f172a]">Receita por Funil</h3>
-          <p className="text-[11px] text-[#94a3b8] mt-1">Inbound, Outbound, Referência</p>
+          {revenueByFunnel.length > 0 && (
+            <p className="text-[11px] text-[#94a3b8] mt-1">
+              {revenueByFunnel.map(f => f.funnel).join(', ')}
+            </p>
+          )}
           <div className="mt-4">
             <RevenueByFunnelCard
               data={revenueByFunnel}
