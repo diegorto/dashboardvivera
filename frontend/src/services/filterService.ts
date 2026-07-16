@@ -11,7 +11,7 @@ export interface FilterOptions {
 }
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8001',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
 });
 
 export const filterService = {
