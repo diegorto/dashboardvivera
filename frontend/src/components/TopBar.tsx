@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ChevronDown, Download, Bell, Calendar } from 'lucide-react';
+import { ChevronDown, Download, Bell, Calendar, Sun, Moon } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFilters } from '../contexts/FilterContext';
@@ -17,7 +17,7 @@ const filterOptions = ['Procedimento', 'Profissional', 'SDR', 'Campanha', 'Ad Se
 const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb, right }) => {
   const location = useLocation();
   const { notifications } = useAppStore();
-  const { mode } = useTheme();
+  const { mode, toggleTheme } = useTheme();
   const { filters, setFilter, setFilters, getPeriodLabel } = useFilters();
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStart, setCustomStart] = useState('');
@@ -288,6 +288,24 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
             Export
           </button>
         )}
+
+        {/* Aparência clara/escura */}
+        <button
+          onClick={toggleTheme}
+          style={{
+            padding: '8px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            transition: 'background-color 200ms',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = hoverBg)}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          title={mode === 'light' ? 'Mudar para aparência escura' : 'Mudar para aparência clara'}
+        >
+          {mode === 'light' ? <Sun size={18} color={secondaryText} /> : <Moon size={18} color={secondaryText} />}
+        </button>
 
         {/* Notifications */}
         <button

@@ -56,16 +56,22 @@ const Sidebar: React.FC = () => {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[#1e293b]">
-          <div className="w-7 h-7 rounded-md bg-[#6366f1] flex items-center justify-center">
-            <span className="text-white text-xs font-bold">V</span>
+        {/* Logo Vivera - Orofacial Avançada */}
+        <div className="px-5 py-4 border-b border-[#1e293b]">
+          <div
+            className="text-white font-extrabold uppercase leading-none"
+            style={{ fontSize: '22px', letterSpacing: '0.02em', fontStretch: 'condensed' }}
+          >
+            VIVERA
           </div>
-          <div>
-            <div className="text-white text-sm font-semibold tracking-tight">Vivera</div>
-            <div className="text-[#475569] text-[10px] font-medium tracking-widest uppercase">
-              Command Center
-            </div>
+          <div
+            className="text-[#94a3b8] font-medium uppercase mt-1"
+            style={{ fontSize: '8.5px', letterSpacing: '0.32em' }}
+          >
+            Orofacial Avançada
+          </div>
+          <div className="text-[#475569] text-[9px] font-medium tracking-widest uppercase mt-1.5">
+            Command Center
           </div>
         </div>
 
@@ -105,10 +111,10 @@ const Sidebar: React.FC = () => {
         {/* User */}
         <div className="px-5 py-4 border-t border-[#1e293b] flex items-center gap-3">
           <div className="w-7 h-7 rounded-full bg-[#6366f1]/20 flex items-center justify-center text-[#6366f1] text-xs font-bold">
-            DR
+            DD
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-white text-xs font-medium truncate">Dr. Ramos</div>
+            <div className="text-white text-xs font-medium truncate">Dr. Diego</div>
             <div className="text-[#475569] text-[10px]">Diretor Geral</div>
           </div>
         </div>

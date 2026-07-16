@@ -34,14 +34,16 @@ const ExecutiveDashboard: React.FC = () => {
   // Drill-down: qual KPI está "explodido" no drawer lateral
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
-  // Carregar dados quando filtros mudam
+  // Carregar dados quando filtros mudam + atualizacao automatica a cada 5 minutos
   useEffect(() => {
     loadDashboardData();
-  }, [filters.period, filters.dateRange]); // Recarregar quando período muda
+    const interval = setInterval(() => loadDashboardData(true), 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [filters.period, filters.dateRange]);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
 
       // Calcular data range baseado no filtro de período
@@ -83,7 +85,7 @@ const ExecutiveDashboard: React.FC = () => {
             <h2 className="text-lg font-semibold text-red-900 mb-2">Erro ao carregar dashboard</h2>
             <p className="text-red-700 mb-4">{error}</p>
             <button
-              onClick={loadDashboardData}
+              onClick={() => loadDashboardData()}
               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
             >
               Tentar novamente

@@ -75,15 +75,64 @@ function maskSecret(value) {
 }
 
 // ============================================
-// Cache em memoria para chamadas externas (Meta/Pipedrive)
-// Evita refazer as mesmas chamadas a cada carregamento de tela
+// "Memoria" de numeros: cache em memoria + persistido em disco (data/cache.json)
+// - Reload da pagina serve na hora o ultimo valor conhecido (stale-while-revalidate)
+// - Atualizacao automatica do Pipedrive/Meta a cada 5 minutos (warmCache)
+// - Sobrevive a restart do container (data/ e um bind mount no VPS)
 // ============================================
-const CACHE_TTL_MS = 60 * 1000; // 60s
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 const _cache = new Map();
+const CACHE_FILE = path.join(__dirname, 'data', 'cache.json');
+
+function loadCacheFromDisk() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+      Object.entries(raw).forEach(([k, v]) => _cache.set(k, v));
+      console.log(`Memoria carregada do disco: ${_cache.size} conjuntos de numeros`);
+    }
+  } catch (e) {
+    console.error('Erro ao carregar memoria do disco:', e.message);
+  }
+}
+
+let _saveTimer = null;
+function saveCacheToDisk() {
+  if (_saveTimer) return; // debounce
+  _saveTimer = setTimeout(() => {
+    _saveTimer = null;
+    try {
+      fs.mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
+      fs.writeFileSync(CACHE_FILE, JSON.stringify(Object.fromEntries(_cache)), 'utf8');
+    } catch (e) {
+      console.error('Erro ao salvar memoria em disco:', e.message);
+    }
+  }, 2000);
+}
+
+const _refreshing = new Set();
+async function refreshKey(key, fn) {
+  if (_refreshing.has(key)) return;
+  _refreshing.add(key);
+  try {
+    const value = await fn();
+    _cache.set(key, { at: Date.now(), value });
+    saveCacheToDisk();
+  } catch (e) {
+    console.error(`Erro ao atualizar '${key}':`, e.message);
+  } finally {
+    _refreshing.delete(key);
+  }
+}
 
 async function cached(key, fn) {
   const hit = _cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+    return hit.value;
+  }
+  // Stale-while-revalidate: devolve o ultimo valor NA HORA e atualiza em background
+  if (hit) {
+    refreshKey(key, fn);
     return hit.value;
   }
   const value = await fn();
@@ -93,6 +142,7 @@ async function cached(key, fn) {
     const oldest = [..._cache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
     if (oldest) _cache.delete(oldest[0]);
   }
+  saveCacheToDisk();
   return value;
 }
 
@@ -2372,6 +2422,43 @@ if (fs.existsSync(DIST_DIR)) {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
+
+// ============================================
+// Atualizacao automatica dos numeros (Pipedrive + Meta) a cada 5 minutos
+// Mantem a "memoria" sempre quente: o dashboard abre instantaneo em qualquer reload
+// ============================================
+async function warmCache() {
+  try {
+    const today = new Date();
+    const fmt = d => d.toISOString().slice(0, 10);
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const prevMonthLastDay = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+    const prevStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const prevEnd = new Date(
+      today.getFullYear(),
+      today.getMonth() - 1,
+      Math.min(today.getDate(), prevMonthLastDay)
+    );
+    const def = defaultDateRange();
+
+    await Promise.all([
+      refreshKey(`deals:null:null:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveDealsUncached(null, null)),
+      refreshKey('activities:null:null', () => fetchPipedriveActivitiesUncached(null, null)),
+      refreshKey(`stages:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveStagesUncached()),
+      // Meta: range padrao "este mes" + mesmo trecho do mes anterior (comparacao) + range default
+      refreshKey(`meta:${fmt(monthStart)}:${fmt(today)}`, () => fetchMetaAdsUncached(fmt(monthStart), fmt(today))),
+      refreshKey(`meta:${fmt(prevStart)}:${fmt(prevEnd)}`, () => fetchMetaAdsUncached(fmt(prevStart), fmt(prevEnd))),
+      refreshKey(`meta:${def.since}:${def.until}`, () => fetchMetaAdsUncached(def.since, def.until))
+    ]);
+    console.log(`[memoria] Numeros do Pipedrive/Meta atualizados às ${new Date().toLocaleTimeString('pt-BR')}`);
+  } catch (e) {
+    console.error('[memoria] Erro na atualizacao automatica:', e.message);
+  }
+}
+
+loadCacheFromDisk();
+setInterval(warmCache, 5 * 60 * 1000);   // a cada 5 minutos
+setTimeout(warmCache, 3000);              // primeira carga logo apos subir
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
