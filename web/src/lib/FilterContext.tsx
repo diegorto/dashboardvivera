@@ -51,8 +51,18 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setError(null)
     fetchDashboard(since, until)
-      .then(res => { if (!cancelled) setData(res) })
-      .catch(err => { if (!cancelled) setError(err.message) })
+      .then(res => {
+        if (!cancelled) {
+          console.log('Dashboard data loaded:', res)
+          setData(res)
+        }
+      })
+      .catch(err => {
+        if (!cancelled) {
+          console.error('Dashboard fetch error:', err)
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [since, until, reloadTick])

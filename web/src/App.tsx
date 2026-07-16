@@ -13,27 +13,36 @@ import { OutrasFontesPage } from '@/pages/OutrasFontesPage'
 import { LeadsParadosPage } from '@/pages/LeadsParadosPage'
 import { TintimAuditoriaPage } from '@/pages/TintimAuditoriaPage'
 import { ReuniaoPage } from '@/pages/ReuniaoPage'
+import { Suspense } from 'react'
+
+const appRoutes = [
+  { path: '/', element: HomePage },
+  { path: '/campanhas', element: CampanhasPage },
+  { path: '/funil', element: FunilPage },
+  { path: '/pipeline', element: PipelinePage },
+  { path: '/pacientes', element: PacientesPage },
+  { path: '/recepcao', element: RecepcaoPage },
+  { path: '/insights', element: InsightsPage },
+  { path: '/sem-origem', element: SemOrigemPage },
+  { path: '/outras-fontes', element: OutrasFontesPage },
+  { path: '/pipeline/parados', element: LeadsParadosPage },
+  { path: '/auditoria-tintim', element: TintimAuditoriaPage },
+]
 
 export default function App() {
   return (
     <FilterProvider>
       <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/campanhas" element={<CampanhasPage />} />
-            <Route path="/funil" element={<FunilPage />} />
-            <Route path="/pipeline" element={<PipelinePage />} />
-            <Route path="/pacientes" element={<PacientesPage />} />
-            <Route path="/recepcao" element={<RecepcaoPage />} />
-            <Route path="/insights" element={<InsightsPage />} />
-            <Route path="/sem-origem" element={<SemOrigemPage />} />
-            <Route path="/outras-fontes" element={<OutrasFontesPage />} />
-            <Route path="/pipeline/parados" element={<LeadsParadosPage />} />
-            <Route path="/auditoria-tintim" element={<TintimAuditoriaPage />} />
-          </Route>
-          <Route path="/reuniao" element={<ReuniaoPage />} />
-        </Routes>
+        <Suspense fallback={<div className="p-4">Carregando...</div>}>
+          <Routes>
+            <Route element={<Layout />}>
+              {appRoutes.map(route => (
+                <Route key={route.path} path={route.path} element={<route.element />} />
+              ))}
+            </Route>
+            <Route path="/reuniao" element={<ReuniaoPage />} />
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </FilterProvider>
   )
