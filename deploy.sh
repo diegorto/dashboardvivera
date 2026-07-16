@@ -11,8 +11,9 @@ echo "🔨 Rebuild dos containers..."
 docker-compose build
 
 echo "🚀 Subindo..."
-# Remove containers antigos antes de recriar (evita bug 'ContainerConfig' do compose 1.29)
-docker rm -f dashboardvivera-backend dashboardvivera-frontend 2>/dev/null || true
+# Remove TODOS os containers do projeto antes de recriar, inclusive renomeados
+# (evita bug 'ContainerConfig' do compose 1.29; nao toca nos containers do n8n)
+docker ps -a --filter "name=dashboardvivera" -q | xargs -r docker rm -f
 docker-compose up -d
 
 echo "⏳ Aguardando serviços..."
