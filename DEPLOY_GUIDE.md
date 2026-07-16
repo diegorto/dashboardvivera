@@ -79,7 +79,7 @@ NODE_ENV=production node server.js &
 Depois que fizer deploy, verifique que tudo está funcionando:
 
 ### 1. Abas no Sidebar
-- Abra http://seu-servidor:3000
+- Abra http://seu-servidor:8000
 - Verify que Google Ads e Meta Ads aparecem no menu lateral esquerdo
 
 ### 2. Google Ads Dashboard
@@ -91,11 +91,11 @@ Depois que fizer deploy, verifique que tudo está funcionando:
 - Mesmo layout que Google Ads mas com dados do Meta
 
 ### 4. Sistema de Attendance (DEBUG)
-- Chame: `GET http://seu-servidor:3000/api/attendance/diagnostic`
+- Chame: `GET http://seu-servidor:8000/api/attendance/diagnostic`
 - Deve mostrar coverage rate de attendance para hoje
 
 ### 5. Verificação de SDR
-- Chame: `GET http://seu-servidor:3000/api/attendance/sdr-verification`
+- Chame: `GET http://seu-servidor:8000/api/attendance/sdr-verification`
 - Deve mostrar dados de Agda e Helenice
 
 ## Sync de Attendance Faltando
@@ -104,12 +104,12 @@ Se você tem agendamentos sem attendance registrados (Agda/Helenice):
 
 ### Passo 1: Ver o que falta
 ```bash
-curl http://seu-servidor:3000/api/attendance/pending
+curl http://seu-servidor:8000/api/attendance/pending
 ```
 
 ### Passo 2: Registrar attendance
 ```bash
-curl -X POST http://seu-servidor:3000/api/attendance/sync-bulk \
+curl -X POST http://seu-servidor:8000/api/attendance/sync-bulk \
   -H "Content-Type: application/json" \
   -d '{
     "appointments": [

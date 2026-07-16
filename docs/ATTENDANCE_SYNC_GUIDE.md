@@ -201,19 +201,19 @@ Content-Type: application/json
 
 ### Passo 1: Verificar Cobertura Atual
 ```bash
-curl http://localhost:3000/api/attendance/diagnostic
+curl http://localhost:8000/api/attendance/diagnostic
 ```
 
 ### Passo 2: Listar Agendamentos Sem Attendance
 ```bash
-curl http://localhost:3000/api/attendance/pending
+curl http://localhost:8000/api/attendance/pending
 ```
 
 ### Passo 3: Registrar Attendances Faltando
 
 Opção A - Individual:
 ```bash
-curl -X POST http://localhost:3000/api/attendance/sync \
+curl -X POST http://localhost:8000/api/attendance/sync \
   -H "Content-Type: application/json" \
   -d '{
     "dealId": 789,
@@ -227,7 +227,7 @@ curl -X POST http://localhost:3000/api/attendance/sync \
 
 Opção B - Bulk (Recomendado para múltiplos):
 ```bash
-curl -X POST http://localhost:3000/api/attendance/sync-bulk \
+curl -X POST http://localhost:8000/api/attendance/sync-bulk \
   -H "Content-Type: application/json" \
   -d '{
     "appointments": [
@@ -239,7 +239,7 @@ curl -X POST http://localhost:3000/api/attendance/sync-bulk \
 
 ### Passo 4: Verificar Resultado
 ```bash
-curl http://localhost:3000/api/attendance/diagnostic
+curl http://localhost:8000/api/attendance/diagnostic
 ```
 
 Agora o `coverageRate` deve ser 100% e os comparecimentos devem aparecer no painel de SDRs.

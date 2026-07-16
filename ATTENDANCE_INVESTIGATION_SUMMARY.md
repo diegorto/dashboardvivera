@@ -128,7 +128,7 @@ Status atual e instruções de uso.
 
 #### Passo 1: Ver o Que Falta
 ```bash
-curl http://localhost:3000/api/attendance/pending
+curl http://localhost:8000/api/attendance/pending
 ```
 
 Isso mostra todos os agendamentos de hoje que ainda não têm attendance/falta registrados.
@@ -137,7 +137,7 @@ Isso mostra todos os agendamentos de hoje que ainda não têm attendance/falta r
 
 Se Agda teve 3 agendamentos e todos foram attended:
 ```bash
-curl -X POST http://localhost:3000/api/attendance/sync-bulk \
+curl -X POST http://localhost:8000/api/attendance/sync-bulk \
   -H "Content-Type: application/json" \
   -d '{
     "appointments": [
@@ -171,7 +171,7 @@ curl -X POST http://localhost:3000/api/attendance/sync-bulk \
 
 #### Passo 3: Verificar Que Funcionou
 ```bash
-curl http://localhost:3000/api/attendance/sdr-verification
+curl http://localhost:8000/api/attendance/sdr-verification
 ```
 
 Agora o painel de SDRs deve mostrar:
@@ -221,20 +221,20 @@ Para confirmar que tudo está funcionando:
 
 1. **Verifique o diagnostic:**
    ```bash
-   curl http://localhost:3000/api/attendance/diagnostic
+   curl http://localhost:8000/api/attendance/diagnostic
    ```
    Deve mostrar coverage rate < 100% se há agendamentos sem attendance.
 
 2. **Registre um attendance de teste:**
    ```bash
-   curl -X POST http://localhost:3000/api/attendance/sync \
+   curl -X POST http://localhost:8000/api/attendance/sync \
      -H "Content-Type: application/json" \
      -d '{"dealId": 1, "personId": 1, "userId": 1, "dueDate": "2026-07-16", "status": "attended"}'
    ```
 
 3. **Verifique que apareceu:**
    ```bash
-   curl http://localhost:3000/api/attendance/sdr-verification
+   curl http://localhost:8000/api/attendance/sdr-verification
    ```
    O attendance deve aparecer agora.
 

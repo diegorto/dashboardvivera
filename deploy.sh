@@ -77,7 +77,7 @@ echo ""
 # Test health
 if command -v curl &> /dev/null; then
   echo "Testando health check..."
-  if curl -s http://localhost:3000/api/health > /dev/null; then
+  if curl -s http://localhost:8000/api/health > /dev/null; then
     echo "✅ Health check OK"
   else
     echo "⚠️  Health check falhou - servidor pode estar ainda inicializando"
@@ -85,7 +85,7 @@ if command -v curl &> /dev/null; then
 
   echo ""
   echo "Testando attendance system..."
-  if curl -s http://localhost:3000/api/attendance/diagnostic > /dev/null 2>&1; then
+  if curl -s http://localhost:8000/api/attendance/diagnostic > /dev/null 2>&1; then
     echo "✅ Sistema de attendance operacional"
   else
     echo "⚠️  Sistema de attendance não respondeu"
@@ -98,7 +98,7 @@ echo ""
 echo "✅ Deploy finalizado!"
 echo ""
 echo "Próximas etapas:"
-echo "1. Verifique http://seu-servidor:3000 no navegador"
+echo "1. Verifique http://seu-servidor:8000 no navegador"
 echo "2. Confirme que Google Ads e Meta Ads aparecem no menu lateral"
 echo "3. Se precisar sync de attendance, use:"
-echo "   curl http://localhost:3000/api/attendance/pending"
+echo "   curl http://localhost:8000/api/attendance/pending"
