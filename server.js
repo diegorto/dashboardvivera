@@ -626,6 +626,21 @@ app.get('/api/dashboard/executive', async (req, res) => {
       };
     };
 
+    // Fetch stages to map stageId -> stageName for qualified count
+    const stageIdToName = {};
+    try {
+      const stagesResp = await axios.get('https://api.pipedrive.com/v1/stages', {
+        params: { api_token: PIPEDRIVE_TOKEN, limit: 500 }
+      });
+      if (stagesResp.data.success && stagesResp.data.data) {
+        stagesResp.data.data.forEach(s => {
+          stageIdToName[s.id] = s.name;
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao buscar stages para count qualified:', error.message);
+    }
+
     const cur = aggregate(range, adsData);
     const prev = prevRange ? aggregate(prevRange, prevAdsData) : null;
 
@@ -699,8 +714,13 @@ app.get('/api/dashboard/executive', async (req, res) => {
         change: pct(cur.leads, prev && prev.leads)
       },
       qualified: {
-        value: Math.floor(cur.leads * 0.48), // ~48% são qualificados
-        change: pct(cur.leads, prev && prev.leads)
+        // Contar deals reais no estágio "Qualificado" dentro do período
+        value: dealsData.filter(d => {
+          const addDate = (d.addDate || '').slice(0, 10);
+          const stageName = stageIdToName[d.stageId] || '';
+          return addDate >= range.since && addDate <= range.until && stageName.includes('Qualificado');
+        }).length,
+        change: pct(cur.dealsWon, prev && prev.dealsWon)
       },
       sales: {
         value: cur.dealsWon,
