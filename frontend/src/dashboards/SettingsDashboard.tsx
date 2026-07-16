@@ -227,6 +227,14 @@ const SettingsDashboard: React.FC = () => {
                 placeholder="Cole o developer token do Google Ads"
                 className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
               />
+              <div className="text-[10px] text-[#64748b] mt-1.5 bg-[#f0f4f8] p-2.5 rounded-lg">
+                <div className="font-semibold mb-1">📖 Como obter as credenciais:</div>
+                <ul className="space-y-0.5 ml-4">
+                  <li>• <strong>Customer ID:</strong> Acesse ads.google.com → ⚙️ Configurações → "ID da conta de cliente"</li>
+                  <li>• <strong>Developer Token:</strong> Google Cloud Console → Ative "Google Ads API" → Gere token na seção Credenciais</li>
+                  <li>• Pode levar 24-48h para o Developer Token ser aprovado</li>
+                </ul>
+              </div>
             </div>
 
             <div>

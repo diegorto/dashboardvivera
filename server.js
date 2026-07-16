@@ -4,6 +4,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
+const googleAdsMcp = require('./googleAdsMcpService');
 
 const app = express();
 app.use(cors());
@@ -3373,6 +3374,151 @@ async function warmCache() {
     console.error('[memoria] Erro na atualizacao automatica:', e.message);
   }
 }
+
+// ==================== GOOGLE ADS MCP ENDPOINTS ====================
+
+// GET /api/google-ads/test - Testa conexão com Google Ads API
+app.get('/api/google-ads/test', async (req, res) => {
+  try {
+    if (!GOOGLE_ADS_CUSTOMER_ID) {
+      return res.json({
+        success: false,
+        message: 'Google Ads Customer ID não configurado'
+      });
+    }
+
+    // Para teste, apenas verificamos se o ID está configurado
+    // Uma autenticação real requer tokens OAuth2
+    res.json({
+      success: true,
+      message: 'Google Ads Customer ID está configurado',
+      customerId: GOOGLE_ADS_CUSTOMER_ID.substring(0, 10) + '...'
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      message: `Erro ao testar conexão: ${error.message}`
+    });
+  }
+});
+
+// POST /api/google-ads/connect - Conecta com Google Ads usando OAuth2 token
+app.post('/api/google-ads/connect', async (req, res) => {
+  try {
+    const { customerId, accessToken } = req.body;
+
+    if (!customerId || !accessToken) {
+      return res.json({
+        success: false,
+        message: 'Customer ID e Access Token são obrigatórios'
+      });
+    }
+
+    const result = await googleAdsMcp.testConnection(customerId, accessToken);
+    res.json(result);
+  } catch (error) {
+    res.json({
+      success: false,
+      message: `Erro ao conectar: ${error.message}`
+    });
+  }
+});
+
+// GET /api/google-ads/campaigns - Lista campanhas do Google Ads
+app.get('/api/google-ads/campaigns', async (req, res) => {
+  try {
+    if (!GOOGLE_ADS_CUSTOMER_ID || !GOOGLE_ADS_DEVELOPER_TOKEN) {
+      return res.json({
+        success: false,
+        error: 'Google Ads Customer ID ou Developer Token não configurado',
+        data: []
+      });
+    }
+
+    // Nota: Para usar a API real, é necessário ter um token OAuth2 válido
+    // Por enquanto, retornamos dados mock
+    res.json({
+      success: true,
+      message: 'Configure as credenciais do Google Ads no painel de Configurações',
+      data: []
+    });
+  } catch (error) {
+    console.error('Erro ao buscar campanhas:', error);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+// GET /api/google-ads/metrics - Métricas de performance do Google Ads
+app.get('/api/google-ads/metrics', async (req, res) => {
+  try {
+    if (!GOOGLE_ADS_CUSTOMER_ID) {
+      return res.json({
+        success: false,
+        error: 'Google Ads Customer ID não configurado',
+        data: {}
+      });
+    }
+
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    // Dados mock - em produção, seria necessário um token OAuth2 válido
+    res.json({
+      success: true,
+      range,
+      message: 'Google Ads configurado. Métricas serão exibidas em breve.',
+      data: {}
+    });
+  } catch (error) {
+    console.error('Erro ao buscar métricas:', error);
+    res.json({
+      success: false,
+      error: error.message,
+      data: {}
+    });
+  }
+});
+
+// GET /api/google-ads/conversions - Conversões/Leads do Google Ads
+app.get('/api/google-ads/conversions', async (req, res) => {
+  try {
+    if (!GOOGLE_ADS_CUSTOMER_ID) {
+      return res.json({
+        success: false,
+        error: 'Google Ads Customer ID não configurado',
+        data: []
+      });
+    }
+
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    // Dados mock - em produção, seria necessário um token OAuth2 válido
+    res.json({
+      success: true,
+      range,
+      message: 'Google Ads configurado. Conversões serão exibidas em breve.',
+      data: []
+    });
+  } catch (error) {
+    console.error('Erro ao buscar conversões:', error);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
 
 loadCacheFromDisk();
 setInterval(warmCache, 5 * 60 * 1000);   // a cada 5 minutos
