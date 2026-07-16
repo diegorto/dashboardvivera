@@ -5,6 +5,7 @@ const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
 const googleAdsMcp = require('./googleAdsMcpService');
+const metaAdsMcp = require('./metaAdsMcpService');
 
 const app = express();
 app.use(cors());
@@ -3499,6 +3500,144 @@ app.get('/api/google-ads/conversions', async (req, res) => {
     res.json({
       success: true,
       customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      date_range: dateRange,
+      total_with_conversions: conversions.length,
+      data: conversions
+    });
+  } catch (error) {
+    console.error('Erro ao buscar conversões:', error.message);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+// ==================== META ADS MCP ENDPOINTS ====================
+
+// GET /api/meta-ads/test - Testa conexão com Pipeboard Meta Ads MCP
+app.get('/api/meta-ads/test', async (req, res) => {
+  try {
+    console.log('Testando conexão Meta Ads MCP...');
+    const result = await metaAdsMcp.testConnection();
+    res.json(result);
+  } catch (error) {
+    console.error('Erro no teste:', error);
+    res.json({
+      success: false,
+      message: `Erro ao testar conexão: ${error.message}`
+    });
+  }
+});
+
+// GET /api/meta-ads/accounts - Lista contas do Meta Ads via MCP
+app.get('/api/meta-ads/accounts', async (req, res) => {
+  try {
+    console.log('Buscando contas do Meta Ads...');
+    const accounts = await metaAdsMcp.getAccounts();
+
+    res.json({
+      success: true,
+      total_accounts: accounts.length,
+      data: accounts
+    });
+  } catch (error) {
+    console.error('Erro ao buscar contas:', error.message);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+// GET /api/meta-ads/campaigns - Lista campanhas do Meta Ads via MCP
+app.get('/api/meta-ads/campaigns', async (req, res) => {
+  try {
+    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+
+    if (!accountId) {
+      return res.json({
+        success: false,
+        error: 'Account ID não configurado',
+        data: []
+      });
+    }
+
+    console.log('Buscando campanhas do Meta Ads...');
+    const campaigns = await metaAdsMcp.getCampaigns(accountId);
+
+    res.json({
+      success: true,
+      account_id: accountId,
+      total_campaigns: campaigns.length,
+      data: campaigns
+    });
+  } catch (error) {
+    console.error('Erro ao buscar campanhas:', error.message);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+// GET /api/meta-ads/metrics - Métricas de performance do Meta Ads via MCP
+app.get('/api/meta-ads/metrics', async (req, res) => {
+  try {
+    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+    const dateRange = req.query.date_range || 'LAST_30_DAYS';
+
+    if (!accountId) {
+      return res.json({
+        success: false,
+        error: 'Account ID não configurado',
+        data: []
+      });
+    }
+
+    console.log(`Buscando métricas do Meta Ads (período: ${dateRange})...`);
+    const metrics = await metaAdsMcp.getMetrics(accountId, dateRange);
+
+    res.json({
+      success: true,
+      account_id: accountId,
+      date_range: dateRange,
+      total_campaigns: metrics.length,
+      data: metrics
+    });
+  } catch (error) {
+    console.error('Erro ao buscar métricas:', error.message);
+    res.json({
+      success: false,
+      error: error.message,
+      data: []
+    });
+  }
+});
+
+// GET /api/meta-ads/conversions - Conversões/Leads do Meta Ads via MCP
+app.get('/api/meta-ads/conversions', async (req, res) => {
+  try {
+    const accountId = req.query.account_id || FB_AD_ACCOUNT_IDS?.split(',')[0];
+    const dateRange = req.query.date_range || 'LAST_30_DAYS';
+
+    if (!accountId) {
+      return res.json({
+        success: false,
+        error: 'Account ID não configurado',
+        data: []
+      });
+    }
+
+    console.log('Buscando conversões do Meta Ads...');
+    const conversions = await metaAdsMcp.getConversions(accountId, dateRange);
+
+    res.json({
+      success: true,
+      account_id: accountId,
       date_range: dateRange,
       total_with_conversions: conversions.length,
       data: conversions
