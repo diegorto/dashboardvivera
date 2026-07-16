@@ -11,7 +11,7 @@ echo "🔨 Rebuild dos containers..."
 docker-compose build
 
 echo "🚀 Subindo..."
-docker-compose up -d
+docker-compose up -d --force-recreate
 
 echo "⏳ Aguardando serviços..."
 sleep 5
