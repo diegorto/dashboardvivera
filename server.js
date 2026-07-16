@@ -311,6 +311,7 @@ async function fetchPipedriveDealsUncached(since, until) {
             lostReason: deal.lost_reason || '',
             wonTime: deal.won_time || '',
             lostTime: deal.lost_time || '',
+            updateTime: deal.update_time || '',
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
             palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
@@ -880,6 +881,199 @@ app.get('/api/dashboard/executive/drilldown', async (req, res) => {
     }
 
     res.json({ success: true, range, metric, data: payload });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// Painel SDR (Agda e Helenice)
+// 3 janelas fixas: Hoje (vs ontem), Esta Semana (vs semana anterior),
+// Este Mês (vs mesmo trecho do mês anterior) + metas por dias úteis (seg-sex)
+// ============================================
+
+// Metas DIÁRIAS por SDR (semanal = x5 dias úteis; mensal = x dias úteis do mês)
+const SDR_DAILY_GOALS = {
+  leadsReceived: 8,
+  callsMade: 180,          // ligações realizadas (tentativas + atendidas)
+  callsAnswered: 15,
+  appointments: 7,
+  attendances: 4,
+  opportunitiesValue: 24000,
+  closingsValue: 12000
+};
+
+const SDR_NAMES = ['Agda', 'Helenice'];
+
+// Tipos de ligação (tentativas): Primeiro Contato + Ligação + 1ª..13ª Ligação Telefônica
+const CALL_ATTEMPT_TYPES = new Set(['call', 'ligacao_']);
+const isCallAttempt = t =>
+  CALL_ATTEMPT_TYPES.has(t) || /ligacao_telefonica/.test(t);
+const ACTIVITY_TYPE_ANSWERED = 'ligacao_atendida_';
+// Desmarques: detecta automaticamente qualquer tipo com "desmarc" no key
+// (criar o tipo "Desmarcou" no Pipedrive para começar a contar)
+const isCancellation = t => /desmarc/.test(t || '');
+
+async function fetchPipedriveUsersUncached() {
+  try {
+    const r = await axios.get('https://api.pipedrive.com/v1/users', {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+    return (r.data.data || []).map(u => ({ id: u.id, name: u.name, active: !!u.active_flag }));
+  } catch (e) {
+    console.error('Erro ao buscar usuarios Pipedrive:', e.message);
+    return [];
+  }
+}
+function getPipedriveUsers() {
+  return cached('users', fetchPipedriveUsersUncached);
+}
+
+function businessDaysInMonth(year, month1based) {
+  const last = new Date(Date.UTC(year, month1based, 0)).getUTCDate();
+  let n = 0;
+  for (let day = 1; day <= last; day++) {
+    const wd = new Date(Date.UTC(year, month1based - 1, day)).getUTCDay();
+    if (wd !== 0 && wd !== 6) n++;
+  }
+  return n;
+}
+
+// Datas no fuso de Brasília (evita virar o dia às 21h)
+function spTodayISO() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+const _d = iso => new Date(iso + 'T12:00:00Z');
+const _iso = dt => dt.toISOString().slice(0, 10);
+const _addDays = (iso, n) => { const x = _d(iso); x.setUTCDate(x.getUTCDate() + n); return _iso(x); };
+
+app.get('/api/dashboard/sdr-panel', async (req, res) => {
+  try {
+    const [users, allDeals, allActivities] = await Promise.all([
+      getPipedriveUsers(),
+      getPipedriveDeals(null, null),
+      getPipedriveActivities(null, null)
+    ]);
+
+    const sdrs = SDR_NAMES.map(name => {
+      const u = users.find(x => x.name.toLowerCase().includes(name.toLowerCase()));
+      return { key: name.toLowerCase(), name, id: u ? u.id : null };
+    });
+
+    // Janelas: hoje, esta semana (domingo->hoje), este mês (01->hoje)
+    const today = spTodayISO();
+    const dow = _d(today).getUTCDay(); // 0=domingo
+    const y = +today.slice(0, 4);
+    const m = +today.slice(5, 7);
+    const day = +today.slice(8, 10);
+
+    const weekSince = _addDays(today, -dow);
+    const monthSince = `${y}-${String(m).padStart(2, '0')}-01`;
+    const prevMonthLastDay = new Date(Date.UTC(y, m - 1, 0)).getUTCDate();
+    const pmY = m === 1 ? y - 1 : y;
+    const pmM = m === 1 ? 12 : m - 1;
+    const prevMonthSince = `${pmY}-${String(pmM).padStart(2, '0')}-01`;
+    const prevMonthUntil = `${pmY}-${String(pmM).padStart(2, '0')}-${String(Math.min(day, prevMonthLastDay)).padStart(2, '0')}`;
+
+    const bizDays = businessDaysInMonth(y, m);
+
+    const windows = {
+      today: {
+        label: 'Hoje', prevLabel: 'Ontem',
+        range: { since: today, until: today },
+        prevRange: { since: _addDays(today, -1), until: _addDays(today, -1) },
+        goalMult: 1
+      },
+      week: {
+        label: 'Esta Semana', prevLabel: 'Semana Anterior',
+        range: { since: weekSince, until: today },
+        prevRange: { since: _addDays(weekSince, -7), until: _addDays(today, -7) },
+        goalMult: 5
+      },
+      month: {
+        label: 'Este Mês', prevLabel: 'Mês Anterior',
+        range: { since: monthSince, until: today },
+        prevRange: { since: prevMonthSince, until: prevMonthUntil },
+        goalMult: bizDays
+      }
+    };
+
+    // Metricas de um SDR em um range
+    const metricsFor = (sdrId, r) => {
+      const deals = allDeals.filter(d => d.userId === sdrId);
+      const acts = allActivities.filter(a => a.userId === sdrId &&
+        a.dueDate >= r.since && a.dueDate <= r.until);
+
+      const dealsAdded = deals.filter(d => d.addDate >= r.since && d.addDate <= r.until);
+      const dealsWon = deals.filter(d => {
+        if (d.status !== 'won') return false;
+        const wd = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+        return wd >= r.since && wd <= r.until;
+      });
+
+      const answered = acts.filter(a => a.type === ACTIVITY_TYPE_ANSWERED).length;
+      const attempts = acts.filter(a => isCallAttempt(a.type)).length;
+
+      return {
+        leadsReceived: dealsAdded.length,
+        callsMade: attempts + answered, // tentativas + atendidas somadas
+        callsAnswered: answered,
+        appointments: acts.filter(a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done).length,
+        attendances: acts.filter(a => a.type === ACTIVITY_TYPE_ATTENDED && a.done).length,
+        cancellations: acts.filter(a => isCancellation(a.type) && a.done).length,
+        noShows: acts.filter(a => a.type === ACTIVITY_TYPE_MISSED && a.done).length,
+        closingsCount: dealsWon.length,
+        // Oportunidades (regra do painel SDR legado): negocios com valor > 0,
+        // ainda nao ganhos, movimentados (update_time) no periodo
+        opportunitiesValue: deals
+          .filter(d => (d.rawValue || 0) > 0 && d.status !== 'won' &&
+            (d.updateTime || '').slice(0, 10) >= r.since &&
+            (d.updateTime || '').slice(0, 10) <= r.until)
+          .reduce((s, d) => s + (d.rawValue || 0), 0),
+        closingsValue: dealsWon.reduce((s, d) => s + (d.rawValue || 0), 0)
+      };
+    };
+
+    const variation = (cur, prev) => {
+      const out = {};
+      Object.keys(cur).forEach(k => {
+        out[k] = prev[k] > 0 ? parseFloat((((cur[k] - prev[k]) / prev[k]) * 100).toFixed(1)) : null;
+      });
+      return out;
+    };
+
+    const result = {};
+    Object.entries(windows).forEach(([key, w]) => {
+      const goals = {};
+      Object.entries(SDR_DAILY_GOALS).forEach(([k, daily]) => {
+        goals[k] = daily * w.goalMult;
+      });
+
+      result[key] = {
+        label: w.label,
+        prevLabel: w.prevLabel,
+        range: w.range,
+        prevRange: w.prevRange,
+        goals,
+        sdrs: sdrs.map(s => {
+          const current = s.id ? metricsFor(s.id, w.range) : null;
+          const previous = s.id ? metricsFor(s.id, w.prevRange) : null;
+          return {
+            name: s.name,
+            current,
+            previous,
+            variation: current && previous ? variation(current, previous) : null
+          };
+        })
+      };
+    });
+
+    res.json({
+      success: true,
+      today,
+      businessDaysInMonth: bizDays,
+      data: result
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -2363,15 +2557,21 @@ app.post('/api/settings/test', async (req, res) => {
   }
 
   if (FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0) {
-    try {
-      const r = await axios.get(`https://graph.facebook.com/v18.0/act_${FB_AD_ACCOUNT_IDS[0]}`, {
-        params: { access_token: FB_ACCESS_TOKEN, fields: 'name' }, timeout: 8000
-      });
-      results.meta.ok = !!r.data.name;
-      results.meta.message = r.data.name ? `Conta: ${r.data.name}` : 'Resposta inesperada';
-    } catch (e) {
-      results.meta.message = e.response?.data?.error?.message || e.message;
-    }
+    // Testa TODAS as contas de anuncio configuradas, nao so a primeira
+    const accountResults = await Promise.all(
+      FB_AD_ACCOUNT_IDS.map(async id => {
+        try {
+          const r = await axios.get(`https://graph.facebook.com/v18.0/act_${id}`, {
+            params: { access_token: FB_ACCESS_TOKEN, fields: 'name' }, timeout: 8000
+          });
+          return r.data.name ? `✅ ${r.data.name}` : `❌ ${id}: resposta inesperada`;
+        } catch (e) {
+          return `❌ ${id}: ${e.response?.data?.error?.message || e.message}`;
+        }
+      })
+    );
+    results.meta.ok = accountResults.every(m => m.startsWith('✅'));
+    results.meta.message = `${accountResults.length} conta(s): ${accountResults.join(' · ')}`;
   } else {
     results.meta.message = 'Token ou conta de anúncio não configurados';
   }
