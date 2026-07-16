@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface WhatsAppKPIs {
   messagesSent: number;
@@ -48,8 +49,8 @@ class WhatsAppDashboardService {
 
   async getWhatsAppKPIs(since: string, until: string): Promise<WhatsAppKPIs> {
     try {
-      const response = await axios.get<APIResponse<WhatsAppKPIs>>(
-        `${this.baseUrl}/whatsapp/kpis`,
+      const response = await api.get<APIResponse<WhatsAppKPIs>>(
+        `/dashboard/whatsapp/kpis`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar KPIs do WhatsApp');
@@ -61,8 +62,8 @@ class WhatsAppDashboardService {
 
   async getRanking(since: string, until: string): Promise<AttendantRanking[]> {
     try {
-      const response = await axios.get<APIResponse<AttendantRanking[]>>(
-        `${this.baseUrl}/whatsapp/ranking`,
+      const response = await api.get<APIResponse<AttendantRanking[]>>(
+        `/dashboard/whatsapp/ranking`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar ranking');

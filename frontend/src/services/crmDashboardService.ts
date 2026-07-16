@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface CRMKPIs {
   openDeals: number;
@@ -69,8 +70,8 @@ class CRMDashboardService {
 
   async getCRMKPIs(since: string, until: string): Promise<CRMKPIs> {
     try {
-      const response = await axios.get<APIResponse<CRMKPIs>>(
-        `${this.baseUrl}/crm/kpis`,
+      const response = await api.get<APIResponse<CRMKPIs>>(
+        `/dashboard/crm/kpis`,
         { params: { since, until } }
       );
 
@@ -86,8 +87,8 @@ class CRMDashboardService {
 
   async getPipeline(since: string, until: string): Promise<PipelineStage[]> {
     try {
-      const response = await axios.get<APIResponse<PipelineStage[]>>(
-        `${this.baseUrl}/crm/pipeline`,
+      const response = await api.get<APIResponse<PipelineStage[]>>(
+        `/dashboard/crm/pipeline`,
         { params: { since, until } }
       );
 
@@ -103,8 +104,8 @@ class CRMDashboardService {
 
   async getRecoveryOpportunities(since: string, until: string): Promise<RecoveryOpportunity[]> {
     try {
-      const response = await axios.get<APIResponse<RecoveryOpportunity[]>>(
-        `${this.baseUrl}/crm/recovery`,
+      const response = await api.get<APIResponse<RecoveryOpportunity[]>>(
+        `/dashboard/crm/recovery`,
         { params: { since, until } }
       );
 

@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface FinancialKPIs {
   revenue: number;
@@ -44,8 +45,8 @@ class FinancialDashboardService {
 
   async getFinancialKPIs(since: string, until: string): Promise<FinancialKPIs> {
     try {
-      const response = await axios.get<APIResponse<FinancialKPIs>>(
-        `${this.baseUrl}/financial/kpis`,
+      const response = await api.get<APIResponse<FinancialKPIs>>(
+        `/dashboard/financial/kpis`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar KPIs financeiros');
@@ -57,8 +58,8 @@ class FinancialDashboardService {
 
   async getMonthlyData(since: string, until: string): Promise<MonthlyFinancialData[]> {
     try {
-      const response = await axios.get<APIResponse<MonthlyFinancialData[]>>(
-        `${this.baseUrl}/financial/monthly`,
+      const response = await api.get<APIResponse<MonthlyFinancialData[]>>(
+        `/dashboard/financial/monthly`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar dados mensais');

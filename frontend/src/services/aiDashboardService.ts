@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export type InsightSeverity = 'success' | 'info' | 'warning' | 'critical';
 export type InsightTrend = 'up' | 'down' | 'stable';
@@ -48,8 +49,8 @@ class AIDashboardService {
 
   async getInsights(since: string, until: string): Promise<AIInsight[]> {
     try {
-      const response = await axios.get<APIResponse<AIInsight[]>>(
-        `${this.baseUrl}/ai/insights`,
+      const response = await api.get<APIResponse<AIInsight[]>>(
+        `/dashboard/ai/insights`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar insights');
@@ -61,8 +62,8 @@ class AIDashboardService {
 
   async getNarrative(since: string, until: string): Promise<AINarrative> {
     try {
-      const response = await axios.get<APIResponse<AINarrative>>(
-        `${this.baseUrl}/ai/narrative`,
+      const response = await api.get<APIResponse<AINarrative>>(
+        `/dashboard/ai/narrative`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar narrativa');

@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface ProfessionalsKPIs {
   totalProfessionals: number;
@@ -48,8 +49,8 @@ class ProfessionalsDashboardService {
 
   async getProfessionalsKPIs(since: string, until: string): Promise<ProfessionalsKPIs> {
     try {
-      const response = await axios.get<APIResponse<ProfessionalsKPIs>>(
-        `${this.baseUrl}/professionals/kpis`,
+      const response = await api.get<APIResponse<ProfessionalsKPIs>>(
+        `/dashboard/professionals/kpis`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar KPIs de profissionais');
@@ -61,8 +62,8 @@ class ProfessionalsDashboardService {
 
   async getRanking(since: string, until: string): Promise<ProfessionalRanking[]> {
     try {
-      const response = await axios.get<APIResponse<ProfessionalRanking[]>>(
-        `${this.baseUrl}/professionals/ranking`,
+      const response = await api.get<APIResponse<ProfessionalRanking[]>>(
+        `/dashboard/professionals/ranking`,
         { params: { since, until } }
       );
       if (!response.data.success) throw new Error('Erro ao buscar ranking');

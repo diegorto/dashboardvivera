@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface CommercialKPIs {
   leads: number;
@@ -51,8 +52,8 @@ class CommercialDashboardService {
 
   async getCommercialKPIs(since: string, until: string): Promise<CommercialKPIs> {
     try {
-      const response = await axios.get<APIResponse<CommercialKPIs>>(
-        `${this.baseUrl}/commercial/kpis`,
+      const response = await api.get<APIResponse<CommercialKPIs>>(
+        `/dashboard/commercial/kpis`,
         { params: { since, until } }
       );
 
@@ -76,8 +77,8 @@ class CommercialDashboardService {
     until: string
   ): Promise<ProfessionalConversion[]> {
     try {
-      const response = await axios.get<APIResponse<ProfessionalConversion[]>>(
-        `${this.baseUrl}/commercial/conversions`,
+      const response = await api.get<APIResponse<ProfessionalConversion[]>>(
+        `/dashboard/commercial/conversions`,
         { params: { since, until } }
       );
 
@@ -98,8 +99,8 @@ class CommercialDashboardService {
 
   async getLossReasons(since: string, until: string): Promise<LossReason[]> {
     try {
-      const response = await axios.get<APIResponse<LossReason[]>>(
-        `${this.baseUrl}/commercial/reasons`,
+      const response = await api.get<APIResponse<LossReason[]>>(
+        `/dashboard/commercial/reasons`,
         { params: { since, until } }
       );
 
