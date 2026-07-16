@@ -18,18 +18,38 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
   const location = useLocation();
   const { notifications } = useAppStore();
   const { mode } = useTheme();
-  const { filters, setFilter, getPeriodLabel } = useFilters();
+  const { filters, setFilter, setFilters, getPeriodLabel } = useFilters();
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   const periodOptions = [
     { value: 'today', label: 'Hoje' },
     { value: 'week', label: 'Esta semana' },
+    { value: 'lastWeek', label: 'Semana passada' },
     { value: 'month', label: 'Este mês' },
+    { value: 'lastMonth', label: 'Mês passado' },
+    { value: 'last30', label: 'Últimos 30 dias' },
     { value: 'year', label: 'Este ano' },
   ];
 
   const handlePeriodChange = (periodValue: string) => {
     setFilter('period', periodValue);
+    setShowDatePicker(false);
+  };
+
+  // Datas do input (YYYY-MM-DD) viram Date no fuso LOCAL (não UTC)
+  const parseLocalDate = (s: string) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const applyCustomRange = () => {
+    if (!customStart || !customEnd) return;
+    const startDate = parseLocalDate(customStart);
+    const endDate = parseLocalDate(customEnd);
+    if (startDate > endDate) return;
+    setFilters({ period: 'custom', dateRange: { startDate, endDate } });
     setShowDatePicker(false);
   };
 
@@ -157,6 +177,64 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
                 {option.label}
               </button>
             ))}
+
+            {/* Range personalizado */}
+            <div style={{ borderTop: `1px solid ${borderColor}`, padding: '10px 12px' }}>
+              <div
+                style={{
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: filters.period === 'custom' ? '#6366f1' : secondaryText,
+                  marginBottom: '6px',
+                }}
+              >
+                Personalizado
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  style={{
+                    fontSize: '12px',
+                    padding: '5px 8px',
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '6px',
+                    color: textColor,
+                    backgroundColor: bgColor,
+                  }}
+                />
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  style={{
+                    fontSize: '12px',
+                    padding: '5px 8px',
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '6px',
+                    color: textColor,
+                    backgroundColor: bgColor,
+                  }}
+                />
+                <button
+                  onClick={applyCustomRange}
+                  disabled={!customStart || !customEnd}
+                  style={{
+                    padding: '6px 8px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: 'white',
+                    backgroundColor: customStart && customEnd ? '#6366f1' : '#c7d2fe',
+                    cursor: customStart && customEnd ? 'pointer' : 'not-allowed',
+                  }}
+                >
+                  Aplicar
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

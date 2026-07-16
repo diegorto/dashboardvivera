@@ -33,14 +33,22 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const getPeriodLabel = useCallback(() => {
+    if (filters.period === 'custom' && filters.dateRange) {
+      const f = (d: Date) =>
+        new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+      return `${f(filters.dateRange.startDate)} – ${f(filters.dateRange.endDate)}`;
+    }
     const labels: Record<string, string> = {
       today: 'Hoje',
       week: 'Esta semana',
+      lastWeek: 'Semana passada',
       month: 'Este mês',
+      lastMonth: 'Mês passado',
+      last30: 'Últimos 30 dias',
       year: 'Este ano',
     };
     return labels[filters.period] || 'Período personalizado';
-  }, [filters.period]);
+  }, [filters.period, filters.dateRange]);
 
   return (
     <FilterContext.Provider

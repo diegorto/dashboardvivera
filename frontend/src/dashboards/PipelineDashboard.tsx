@@ -13,14 +13,14 @@ const PipelineDashboard: React.FC = () => {
   const load = async () => {
     try {
       setLoading(true); setError(null);
-      const { since, until } = getDateRange(filters.period);
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
       setPipeline(await crmDashboardService.getPipeline(since, until));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar');
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [filters.period]);
+  useEffect(() => { load(); }, [filters.period, filters.dateRange]);
 
   if (error) return <ErrorScreen title="Pipeline" error={error} onRetry={load} />;
   if (loading) return <LoadingScreen title="Pipeline" />;

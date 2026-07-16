@@ -9,7 +9,7 @@ import dashboardService, {
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ExportButton } from '../utils/dashboardHelpers';
+import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
 
 // Valores monetários em milhares: 17500 -> "R$ 17.5k", 500000 -> "R$ 500k"
 const fmtK = (v: number): string => {
@@ -35,7 +35,7 @@ const ExecutiveDashboard: React.FC = () => {
   // Carregar dados quando filtros mudam
   useEffect(() => {
     loadDashboardData();
-  }, [filters.period]); // Recarregar quando período muda
+  }, [filters.period, filters.dateRange]); // Recarregar quando período muda
 
   const loadDashboardData = async () => {
     try {
@@ -43,12 +43,14 @@ const ExecutiveDashboard: React.FC = () => {
       setError(null);
 
       // Calcular data range baseado no filtro de período
-      const dateRange = getDateRange(filters.period);
+      const dateRange = getDateRange(filters.period, filters.dateRange);
 
-      // Buscar todos os dados em paralelo
+      // Buscar todos os dados em paralelo (com período anterior para comparação)
       const data = await dashboardService.getFullExecutiveDashboard(
         dateRange.since,
-        dateRange.until
+        dateRange.until,
+        dateRange.prevSince,
+        dateRange.prevUntil
       );
 
       setKpis(data.kpis);
@@ -70,28 +72,6 @@ const ExecutiveDashboard: React.FC = () => {
     }
   };
 
-  const getDateRange = (period: string) => {
-    const until = new Date();
-    const since = new Date();
-
-    switch (period) {
-      case 'today':
-        since.setDate(since.getDate());
-        break;
-      case 'week':
-        since.setDate(since.getDate() - 7);
-        break;
-      case 'year':
-        since.setFullYear(since.getFullYear() - 1);
-        break;
-      case 'month':
-      default:
-        since.setDate(since.getDate() - 30);
-    }
-
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    return { since: fmt(since), until: fmt(until) };
-  };
 
   if (error) {
     return (

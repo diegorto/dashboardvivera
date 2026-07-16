@@ -166,7 +166,7 @@ export interface PaginatedResponse<T> {
 
 // Filter Types
 export interface GlobalFilters {
-  period: 'today' | 'week' | 'month' | 'year';
+  period: 'today' | 'week' | 'lastWeek' | 'month' | 'lastMonth' | 'last30' | 'year' | 'custom';
   procedure?: string;
   professional?: string;
   sdr?: string;

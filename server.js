@@ -501,99 +501,109 @@ app.get('/api/dashboard/executive', async (req, res) => {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
+    // Periodo anterior equivalente (calculado pelo frontend conforme o filtro selecionado)
+    const prevRange = (req.query.prevSince && req.query.prevUntil)
+      ? { since: req.query.prevSince, until: req.query.prevUntil }
+      : null;
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const tomorrowDate = new Date();
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
 
-    const [ads, allDeals, allActivities] = await Promise.all([
+    const [ads, prevAds, allDeals, allActivities] = await Promise.all([
       getMetaAds(range.since, range.until),
+      prevRange ? getMetaAds(prevRange.since, prevRange.until) : Promise.resolve([]),
       getPipedriveDeals(null, null),      // todos os deals; filtramos por won_time abaixo
       getPipedriveActivities(null, null)  // todas as atividades; filtramos por tipo/data abaixo
     ]);
 
-    // Agregações básicas
-    const totalSpend = ads.reduce((sum, ad) => sum + ad.spend, 0);
-    const totalLeads = ads.reduce((sum, ad) => sum + ad.leads, 0);
+    // Agrega todas as metricas de um periodo (usado para o atual e o anterior)
+    const aggregate = (r, adsArr) => {
+      const spend = adsArr.reduce((sum, ad) => sum + ad.spend, 0);
+      const leads = adsArr.reduce((sum, ad) => sum + ad.leads, 0);
+      // Receita = orcamentos FECHADOS (won) no periodo, pela data de fechamento (won_time)
+      const won = allDeals.filter(d => {
+        if (d.status !== 'won') return false;
+        const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+        return wonDate >= r.since && wonDate <= r.until;
+      });
+      const revenue = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+      // Agenda: atividades CONCLUIDAS por tipo (padrao Pipedrive da Vivera)
+      const attended = allActivities.filter(
+        a => a.type === ACTIVITY_TYPE_ATTENDED && a.done &&
+          a.dueDate >= r.since && a.dueDate <= r.until
+      ).length;
+      const missed = allActivities.filter(
+        a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
+          a.dueDate >= r.since && a.dueDate <= r.until
+      ).length;
+      return {
+        spend,
+        leads,
+        revenue,
+        dealsWon: won.length,
+        roi: spend > 0 ? (revenue / spend) * 100 : 0,
+        roas: spend > 0 ? revenue / spend : 0,
+        cac: leads > 0 ? spend / leads : 0,
+        avgTicket: won.length > 0 ? revenue / won.length : 0,
+        attended,
+        missed,
+        attendanceRate: (attended + missed) > 0 ? (attended / (attended + missed)) * 100 : 0
+      };
+    };
 
-    // Receita = orcamentos FECHADOS (won) no periodo, pela data de fechamento (won_time)
-    const wonInPeriod = allDeals.filter(d => {
-      if (d.status !== 'won') return false;
-      const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
-      return wonDate >= range.since && wonDate <= range.until;
-    });
-    const totalRevenue = wonInPeriod.reduce((sum, d) => sum + (d.rawValue || 0), 0);
-    const totalDealsWon = wonInPeriod.length;
+    const cur = aggregate(range, ads);
+    const prev = prevRange ? aggregate(prevRange, prevAds) : null;
 
-    // Agenda real: atividades CONCLUIDAS por tipo (padrao Pipedrive da Vivera)
-    // - "Agendamento Realizado" concluida = agendamento feito no dia
-    // - "Compareceu" concluida = paciente compareceu
-    // - "Faltou - Reagendar" concluida = falta (no-show)
+    // Variacao % vs periodo anterior; undefined (omitido no JSON) quando nao ha base
+    const pct = (curVal, prevVal) => {
+      if (!prev || !isFinite(prevVal) || prevVal === 0) return undefined;
+      return parseFloat((((curVal - prevVal) / prevVal) * 100).toFixed(1));
+    };
+
     const scheduledToday = allActivities.filter(
       a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && a.dueDate === todayStr
     );
     const scheduledTomorrow = allActivities.filter(
       a => a.type === ACTIVITY_TYPE_SCHEDULED && a.dueDate === tomorrowStr
     );
-    const attendedInPeriod = allActivities.filter(
-      a => a.type === ACTIVITY_TYPE_ATTENDED && a.done &&
-        a.dueDate >= range.since && a.dueDate <= range.until
-    );
-    const missedInPeriod = allActivities.filter(
-      a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
-        a.dueDate >= range.since && a.dueDate <= range.until
-    );
-    const attendanceTotal = attendedInPeriod.length + missedInPeriod.length;
-    const attendanceRate = attendanceTotal > 0
-      ? (attendedInPeriod.length / attendanceTotal) * 100
-      : 0;
 
-    // KPIs calculados
+    // KPIs calculados (todos os dados vem do Pipedrive/Meta; variacoes = vs periodo anterior)
     const kpis = {
       revenue: {
-        value: totalRevenue,
-        change: 12.5, // TODO: calcular vs período anterior
-        sub: 'vs. mês anterior'
+        value: cur.revenue,
+        change: pct(cur.revenue, prev && prev.revenue),
+        sub: 'vs. período anterior'
       },
       goal: {
         // META: usa valor configurado na tela de Configuracoes; fallback receita+15%
-        value: MONTHLY_GOAL > 0 ? MONTHLY_GOAL : totalRevenue * 1.15,
-        change: null
+        value: MONTHLY_GOAL > 0 ? MONTHLY_GOAL : cur.revenue * 1.15
       },
       goalPct: {
         value: MONTHLY_GOAL > 0
-          ? ((totalRevenue / MONTHLY_GOAL) * 100).toFixed(1)
-          : ((totalRevenue / (totalRevenue * 1.15 || 1)) * 100).toFixed(1),
-        change: null
+          ? ((cur.revenue / MONTHLY_GOAL) * 100).toFixed(1)
+          : ((cur.revenue / (cur.revenue * 1.15 || 1)) * 100).toFixed(1)
       },
       forecast: {
-        value: totalRevenue * 1.20, // FORECAST = receita + 20%
-        change: 5.8
-      },
-      profit: {
-        value: totalRevenue * 0.35, // LUCRO = 35% da receita (ajustar conforme margem real)
-        change: 8.3
-      },
-      margin: {
-        value: 37.2, // Margem percentual
-        change: 2.1
+        value: cur.revenue * 1.20, // FORECAST = receita + 20%
+        change: pct(cur.revenue, prev && prev.revenue)
       },
       roi: {
-        value: totalSpend > 0 ? ((totalRevenue / totalSpend) * 100).toFixed(0) : 0,
-        change: 18.5
+        value: cur.roi.toFixed(0),
+        change: pct(cur.roi, prev && prev.roi)
       },
       roas: {
-        value: totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : 0,
-        change: 12.3
+        value: cur.roas.toFixed(2),
+        change: pct(cur.roas, prev && prev.roas)
       },
       cac: {
-        value: totalLeads > 0 ? (totalSpend / totalLeads).toFixed(2) : 0,
-        change: -5.2
+        value: cur.cac.toFixed(2),
+        change: pct(cur.cac, prev && prev.cac)
       },
       avgTicket: {
-        value: totalDealsWon > 0 ? (totalRevenue / totalDealsWon).toFixed(2) : 0,
-        change: 6.8
+        value: cur.avgTicket.toFixed(2),
+        change: pct(cur.avgTicket, prev && prev.avgTicket)
       },
       appointmentsToday: {
         value: scheduledToday.length,
@@ -604,30 +614,31 @@ app.get('/api/dashboard/executive', async (req, res) => {
         sub: 'agendadas'
       },
       attendance: {
-        value: parseFloat(attendanceRate.toFixed(1)),
-        change: null
+        value: parseFloat(cur.attendanceRate.toFixed(1)),
+        change: pct(cur.attendanceRate, prev && prev.attendanceRate)
       },
       noShow: {
-        value: missedInPeriod.length,
-        change: null
+        value: cur.missed,
+        change: pct(cur.missed, prev && prev.missed)
       },
       leads: {
-        value: totalLeads,
-        change: 15.2
+        value: cur.leads,
+        change: pct(cur.leads, prev && prev.leads)
       },
       qualified: {
-        value: Math.floor(totalLeads * 0.48), // ~48% são qualificados
-        change: 11.8
+        value: Math.floor(cur.leads * 0.48), // ~48% são qualificados
+        change: pct(cur.leads, prev && prev.leads)
       },
       sales: {
-        value: totalDealsWon,
-        change: 9.4
+        value: cur.dealsWon,
+        change: pct(cur.dealsWon, prev && prev.dealsWon)
       }
     };
 
     res.json({
       success: true,
       range,
+      prevRange,
       data: kpis
     });
   } catch (error) {

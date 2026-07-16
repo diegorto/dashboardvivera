@@ -2,24 +2,141 @@ import React from 'react';
 import { Layout } from '../components';
 
 // ===== Datas =====
-export const getDateRange = (period: string) => {
-  const until = new Date();
-  const since = new Date();
+// Formata em YYYY-MM-DD usando o fuso LOCAL (nunca toISOString, que usa UTC)
+const fmtDate = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const addDays = (d: Date, n: number) => {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
+};
+
+export interface PeriodRange {
+  since: string;
+  until: string;
+  prevSince: string;
+  prevUntil: string;
+}
+
+/**
+ * Regras de período da Vivera (semana começa no DOMINGO):
+ * - today:     hoje
+ * - week:      "Esta semana"    = domingo desta semana até hoje
+ * - lastWeek:  "Semana passada" = domingo a sábado da semana anterior
+ * - month:     "Este mês"       = dia 01 do mês corrente até hoje (PADRÃO)
+ * - lastMonth: "Mês passado"    = mês anterior completo
+ * - last30:    "Últimos 30 dias"
+ * - year:      "Este ano"       = 01/01 até hoje
+ * - custom:    range personalizado (dateRange)
+ *
+ * prevSince/prevUntil = mesmo período anterior equivalente, para comparação.
+ */
+export const getDateRange = (
+  period: string,
+  dateRange?: { startDate: Date; endDate: Date }
+): PeriodRange => {
+  const today = new Date();
+  let since: Date;
+  let until: Date;
+  let prevSince: Date;
+  let prevUntil: Date;
+
   switch (period) {
     case 'today':
+      since = today;
+      until = today;
+      prevSince = addDays(today, -1);
+      prevUntil = addDays(today, -1);
       break;
-    case 'week':
-      since.setDate(since.getDate() - 7);
+
+    case 'week': {
+      // Domingo desta semana até hoje
+      since = addDays(today, -today.getDay());
+      until = today;
+      // Mesmo trecho da semana anterior
+      prevSince = addDays(since, -7);
+      prevUntil = addDays(until, -7);
       break;
-    case 'year':
-      since.setFullYear(since.getFullYear() - 1);
+    }
+
+    case 'lastWeek': {
+      // Domingo a sábado da semana passada
+      const thisSunday = addDays(today, -today.getDay());
+      since = addDays(thisSunday, -7);
+      until = addDays(thisSunday, -1);
+      // Semana anterior a essa
+      prevSince = addDays(since, -7);
+      prevUntil = addDays(until, -7);
       break;
+    }
+
+    case 'lastMonth': {
+      // Mês anterior completo
+      since = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      until = new Date(today.getFullYear(), today.getMonth(), 0);
+      // Mês anterior a esse, completo
+      prevSince = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+      prevUntil = new Date(today.getFullYear(), today.getMonth() - 1, 0);
+      break;
+    }
+
+    case 'last30': {
+      since = addDays(today, -29);
+      until = today;
+      prevSince = addDays(today, -59);
+      prevUntil = addDays(today, -30);
+      break;
+    }
+
+    case 'year': {
+      since = new Date(today.getFullYear(), 0, 1);
+      until = today;
+      prevSince = new Date(today.getFullYear() - 1, 0, 1);
+      prevUntil = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+      break;
+    }
+
+    case 'custom': {
+      if (dateRange?.startDate && dateRange?.endDate) {
+        since = new Date(dateRange.startDate);
+        until = new Date(dateRange.endDate);
+        const lenDays = Math.round((until.getTime() - since.getTime()) / 86400000) + 1;
+        prevUntil = addDays(since, -1);
+        prevSince = addDays(prevUntil, -(lenDays - 1));
+      } else {
+        // Sem range definido: cai no padrão "este mês"
+        since = new Date(today.getFullYear(), today.getMonth(), 1);
+        until = today;
+        prevSince = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        prevUntil = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate());
+      }
+      break;
+    }
+
     case 'month':
-    default:
-      since.setDate(since.getDate() - 30);
+    default: {
+      // Dia 01 do mês corrente até hoje (padrão do dashboard)
+      since = new Date(today.getFullYear(), today.getMonth(), 1);
+      until = today;
+      // Mesmo trecho do mês anterior (dia 01 até o mesmo dia; clampa no fim do mês)
+      const prevMonthLastDay = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+      prevSince = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      prevUntil = new Date(
+        today.getFullYear(),
+        today.getMonth() - 1,
+        Math.min(today.getDate(), prevMonthLastDay)
+      );
+      break;
+    }
   }
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-  return { since: fmt(since), until: fmt(until) };
+
+  return {
+    since: fmtDate(since),
+    until: fmtDate(until),
+    prevSince: fmtDate(prevSince),
+    prevUntil: fmtDate(prevUntil)
+  };
 };
 
 // ===== Formatação =====

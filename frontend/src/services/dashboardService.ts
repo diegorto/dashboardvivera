@@ -11,8 +11,6 @@ export interface ExecutiveKPIs {
   goal: KPIValue;
   goalPct: KPIValue;
   forecast: KPIValue;
-  profit: KPIValue;
-  margin: KPIValue;
   roi: KPIValue;
   roas: KPIValue;
   cac: KPIValue;
@@ -67,10 +65,17 @@ class DashboardService {
   /**
    * Busca todos os KPIs do Executive Dashboard
    */
-  async getExecutiveKPIs(since?: string, until?: string): Promise<ExecutiveKPIs> {
+  async getExecutiveKPIs(
+    since?: string,
+    until?: string,
+    prevSince?: string,
+    prevUntil?: string
+  ): Promise<ExecutiveKPIs> {
     const params = new URLSearchParams();
     if (since) params.append('since', since);
     if (until) params.append('until', until);
+    if (prevSince) params.append('prevSince', prevSince);
+    if (prevUntil) params.append('prevUntil', prevUntil);
 
     const response = await api.get(`/dashboard/executive?${params.toString()}`);
     return response.data.data;
@@ -136,9 +141,9 @@ class DashboardService {
    * Busca todos os dados do Executive Dashboard de forma paralela
    * Útil para carregar tudo de uma vez com melhor performance
    */
-  async getFullExecutiveDashboard(since?: string, until?: string) {
+  async getFullExecutiveDashboard(since?: string, until?: string, prevSince?: string, prevUntil?: string) {
     const [kpis, revenueChart, funnel, agenda, alerts, aiSummary] = await Promise.all([
-      this.getExecutiveKPIs(since, until),
+      this.getExecutiveKPIs(since, until, prevSince, prevUntil),
       this.getRevenueChart(since, until),
       this.getFunnel(since, until),
       this.getAgenda(),

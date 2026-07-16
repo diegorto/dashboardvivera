@@ -26,7 +26,7 @@ const ObjectionsDashboard: React.FC = () => {
   const load = async () => {
     try {
       setLoading(true); setError(null);
-      const { since, until } = getDateRange(filters.period);
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
       const [r, p] = await Promise.all([
         commercialDashboardService.getLossReasons(since, until),
         axios.get('/api/dashboard/patients', { params: { since, until } })
@@ -38,7 +38,7 @@ const ObjectionsDashboard: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [filters.period]);
+  useEffect(() => { load(); }, [filters.period, filters.dateRange]);
 
   if (error) return <ErrorScreen title="Objeções" error={error} onRetry={load} />;
   if (loading) return <LoadingScreen title="Objeções" />;

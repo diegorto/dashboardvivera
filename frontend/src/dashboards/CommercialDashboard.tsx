@@ -4,7 +4,7 @@ import commercialDashboardService, { CommercialKPIs, ProfessionalConversion, Los
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { ExportButton } from '../utils/dashboardHelpers';
+import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
 
 const CommercialDashboard: React.FC = () => {
   const { filters } = useFilters();
@@ -20,14 +20,14 @@ const CommercialDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [filters.period]);
+  }, [filters.period, filters.dateRange]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const dateRange = getDateRange(filters.period);
+      const dateRange = getDateRange(filters.period, filters.dateRange);
       const data = await commercialDashboardService.getFullCommercialDashboard(
         dateRange.since,
         dateRange.until
@@ -46,28 +46,6 @@ const CommercialDashboard: React.FC = () => {
     }
   };
 
-  const getDateRange = (period: string) => {
-    const until = new Date();
-    const since = new Date();
-
-    switch (period) {
-      case 'today':
-        since.setDate(since.getDate());
-        break;
-      case 'week':
-        since.setDate(since.getDate() - 7);
-        break;
-      case 'year':
-        since.setFullYear(since.getFullYear() - 1);
-        break;
-      case 'month':
-      default:
-        since.setDate(since.getDate() - 30);
-    }
-
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    return { since: fmt(since), until: fmt(until) };
-  };
 
   const formatValue = (value: number, type: 'currency' | 'number' | 'percentage' | 'time' = 'number') => {
     switch (type) {

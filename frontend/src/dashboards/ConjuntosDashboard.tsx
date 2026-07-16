@@ -25,7 +25,7 @@ const ConjuntosDashboard: React.FC = () => {
   const load = async () => {
     try {
       setLoading(true); setError(null);
-      const { since, until } = getDateRange(filters.period);
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
       const r = await axios.get('/api/dashboard/marketing/adsets', { params: { since, until } });
       setAdsets(r.data.data);
     } catch (e) {
@@ -33,7 +33,7 @@ const ConjuntosDashboard: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [filters.period]);
+  useEffect(() => { load(); }, [filters.period, filters.dateRange]);
 
   if (error) return <ErrorScreen title="Conjuntos" error={error} onRetry={load} />;
   if (loading) return <LoadingScreen title="Conjuntos" />;

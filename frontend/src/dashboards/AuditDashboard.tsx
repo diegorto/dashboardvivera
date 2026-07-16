@@ -17,7 +17,7 @@ const AuditDashboard: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [filters.period]);
+  }, [filters.period, filters.dateRange]);
 
   const loadDashboardData = async () => {
     try {

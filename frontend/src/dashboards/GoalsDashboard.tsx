@@ -22,7 +22,7 @@ const GoalsDashboard: React.FC = () => {
   const load = async () => {
     try {
       setLoading(true); setError(null);
-      const { since, until } = getDateRange(filters.period);
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
       const r = await axios.get('/api/dashboard/executive', { params: { since, until } });
       const k = r.data.data;
       setData({
@@ -37,7 +37,7 @@ const GoalsDashboard: React.FC = () => {
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [filters.period]);
+  useEffect(() => { load(); }, [filters.period, filters.dateRange]);
 
   if (error) return <ErrorScreen title="Metas" error={error} onRetry={load} />;
   if (loading || !data) return <LoadingScreen title="Metas" />;
