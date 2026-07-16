@@ -429,6 +429,332 @@ async function fetchPipedriveStagesUncached() {
   }
 }
 
+// Cria ou atualiza uma atividade de attendance no Pipedrive
+// type: ACTIVITY_TYPE_ATTENDED ('compareceu') ou ACTIVITY_TYPE_MISSED ('faltou_reagendar')
+// personId: pessoa (contato/paciente)
+// dealId: negocio
+// userId: profissional/SDR que fez o agendamento
+// dueDate: data da atividade (YYYY-MM-DD)
+// dueTime: hora da atividade (HH:MM)
+async function createAttendanceActivity(type, { personId, dealId, userId, dueDate, dueTime, subject }) {
+  try {
+    const payload = {
+      type,
+      person_id: personId,
+      deal_id: dealId,
+      user_id: userId,
+      due_date: dueDate,
+      due_time: dueTime || '09:00',
+      done: 1,  // marcado como feito
+      marked_as_done_time: new Date().toISOString(),
+      subject: subject || (type === ACTIVITY_TYPE_ATTENDED ? 'Comparecimento Confirmado' : 'Faltou - Reagendar')
+    };
+
+    const response = await axios.post('https://api.pipedrive.com/v1/activities', payload, {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+
+    if (response.data.success) {
+      console.log(`[Attendance] ${type === ACTIVITY_TYPE_ATTENDED ? 'Comparecimento' : 'Falta'} criada: ${response.data.data.id}`);
+      return response.data.data;
+    } else {
+      console.error(`[Attendance] Erro ao criar atividade: ${response.data.error}`);
+      return null;
+    }
+  } catch (error) {
+    console.error(`[Attendance] Erro ao criar atividade Pipedrive:`, error.response?.data?.error || error.message);
+    return null;
+  }
+}
+
+// POST /api/attendance/sync - Sincroniza comparecimento/falta de um agendamento
+// Body: { dealId, personId, userId, dueDate, dueTime, status: 'attended'|'missed'|'rescheduled', subject? }
+app.post('/api/attendance/sync', async (req, res) => {
+  try {
+    const { dealId, personId, userId, dueDate, dueTime, status, subject } = req.body;
+
+    if (!dealId || !personId || !userId || !dueDate || !status) {
+      return res.status(400).json({
+        success: false,
+        error: 'Parâmetros obrigatórios faltando: dealId, personId, userId, dueDate, status'
+      });
+    }
+
+    // Valida o status
+    if (!['attended', 'missed', 'rescheduled'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: `Status inválido: ${status}. Use: attended, missed, rescheduled`
+      });
+    }
+
+    let activityType = status === 'attended' ? ACTIVITY_TYPE_ATTENDED : ACTIVITY_TYPE_MISSED;
+    const result = await createAttendanceActivity(activityType, {
+      personId,
+      dealId,
+      userId,
+      dueDate,
+      dueTime,
+      subject
+    });
+
+    if (result) {
+      // Invalida o cache para refletir os novos dados
+      invalidateCache();
+      return res.json({
+        success: true,
+        message: `Atividade de ${status} criada com sucesso`,
+        data: result
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        error: 'Falha ao criar atividade de attendance'
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET /api/attendance/sync-today - Sincroniza automaticamente comparecimentos de hoje
+// (para ser chamado por um webhook/cron job do sistema de Agenda)
+app.get('/api/attendance/sync-today', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Busca todos os agendamentos de hoje que ainda nao tem comparecimento/falta marcados
+    const activities = await getPipedriveActivities(today, today);
+    const scheduled = activities.filter(a => a.type === ACTIVITY_TYPE_SCHEDULED);
+    const alreadyAttended = activities.filter(a => a.type === ACTIVITY_TYPE_ATTENDED);
+    const alreadyMissed = activities.filter(a => a.type === ACTIVITY_TYPE_MISSED);
+
+    // Aqui voce deveria consultar o sistema de Agenda real para ver quais foram attended/missed
+    // Por enquanto, apenas retornamos os agendamentos que precisam de sync
+    // Exemplo: seu sistema de Agenda deveria chamar /api/attendance/sync para cada one
+
+    res.json({
+      success: true,
+      message: 'Endpoint preparado para sincronização de attendance',
+      stats: {
+        totalScheduledToday: scheduled.length,
+        alreadyAttendedToday: alreadyAttended.length,
+        alreadyMissedToday: alreadyMissed.length,
+        needsSync: Math.max(0, scheduled.length - alreadyAttended.length - alreadyMissed.length)
+      },
+      note: 'Chame POST /api/attendance/sync para registrar comparecimento/falta individual',
+      example: {
+        method: 'POST',
+        endpoint: '/api/attendance/sync',
+        body: {
+          dealId: 123,
+          personId: 456,
+          userId: 789,
+          dueDate: today,
+          dueTime: '10:00',
+          status: 'attended',
+          subject: 'Comparecimento Confirmado'
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET /api/attendance/pending - Lista agendamentos de hoje que não têm comparecimento/falta registrados
+app.get('/api/attendance/pending', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const range = req.query.range || 'today'; // today, week, month
+
+    let since = today;
+    let until = today;
+
+    if (range === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      since = weekAgo.toISOString().slice(0, 10);
+      until = today;
+    } else if (range === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setDate(monthAgo.getDate() - 30);
+      since = monthAgo.toISOString().slice(0, 10);
+      until = today;
+    }
+
+    const activities = await getPipedriveActivities(since, until);
+
+    // Agendamentos que já têm comparecimento/falta marcado
+    const withAttendance = new Set();
+    activities.forEach(a => {
+      if ((a.type === ACTIVITY_TYPE_ATTENDED || a.type === ACTIVITY_TYPE_MISSED) && a.dealId) {
+        withAttendance.add(`${a.dealId}-${a.userId}`);
+      }
+    });
+
+    // Agendamentos que AINDA NÃO têm comparecimento/falta
+    const scheduled = activities.filter(a => {
+      if (a.type !== ACTIVITY_TYPE_SCHEDULED) return false;
+      const key = `${a.dealId}-${a.userId}`;
+      return !withAttendance.has(key);
+    });
+
+    res.json({
+      success: true,
+      range: { since, until },
+      totalPending: scheduled.length,
+      appointments: scheduled.map(a => ({
+        activityId: a.id,
+        date: a.dueDate,
+        time: a.dueTime,
+        sdr: a.userName,
+        userId: a.userId,
+        patient: a.personName,
+        dealTitle: a.dealTitle,
+        dealId: a.dealId,
+        subject: a.subject,
+        syncUrl: `/api/attendance/sync (POST) com dealId=${a.dealId}, userId=${a.userId}`
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// GET /api/attendance/diagnostic - Diagnóstico detalhado de attendance (para DEBUG)
+app.get('/api/attendance/diagnostic', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const activities = await getPipedriveActivities(today, today);
+
+    // Agrupa por tipo
+    const scheduled = activities.filter(a => a.type === ACTIVITY_TYPE_SCHEDULED);
+    const attended = activities.filter(a => a.type === ACTIVITY_TYPE_ATTENDED);
+    const missed = activities.filter(a => a.type === ACTIVITY_TYPE_MISSED);
+
+    // Agrupa por SDR
+    const bySDR = {};
+    scheduled.forEach(a => {
+      const sdr = a.userName || 'Unknown';
+      if (!bySDR[sdr]) {
+        bySDR[sdr] = {
+          sdr,
+          userId: a.userId,
+          scheduled: 0,
+          attended: 0,
+          missed: 0,
+          appointments: []
+        };
+      }
+      bySDR[sdr].scheduled += 1;
+      bySDR[sdr].appointments.push({
+        id: a.id,
+        patient: a.personName,
+        date: a.dueDate,
+        time: a.dueTime,
+        deal: a.dealTitle,
+        subject: a.subject,
+        done: a.done,
+        personId: a.personId,
+        dealId: a.dealId,
+        userId: a.userId
+      });
+    });
+
+    attended.forEach(a => {
+      const sdr = a.userName || 'Unknown';
+      if (bySDR[sdr]) bySDR[sdr].attended += 1;
+    });
+
+    missed.forEach(a => {
+      const sdr = a.userName || 'Unknown';
+      if (bySDR[sdr]) bySDR[sdr].missed += 1;
+    });
+
+    res.json({
+      success: true,
+      date: today,
+      summary: {
+        totalScheduled: scheduled.length,
+        totalAttended: attended.length,
+        totalMissed: missed.length,
+        coverageRate: scheduled.length > 0 ? (((attended.length + missed.length) / scheduled.length) * 100).toFixed(1) : '0'
+      },
+      bySDR: Object.values(bySDR),
+      note: 'Se Coverage Rate < 100%, existem agendamentos sem comparecimento/falta marcados',
+      nextStep: 'Use POST /api/attendance/sync para registrar os comparecimentos/faltas faltando'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// POST /api/attendance/sync-bulk - Sincroniza múltiplos attendance de uma vez
+// Body: { appointments: [{ dealId, personId, userId, dueDate, dueTime, status }, ...] }
+app.post('/api/attendance/sync-bulk', async (req, res) => {
+  try {
+    const { appointments } = req.body;
+
+    if (!Array.isArray(appointments)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Body deve conter array "appointments"'
+      });
+    }
+
+    const results = [];
+    for (const apt of appointments) {
+      const { dealId, personId, userId, dueDate, dueTime, status } = apt;
+
+      if (!dealId || !personId || !userId || !dueDate || !status) {
+        results.push({ ...apt, success: false, error: 'Parâmetros faltando' });
+        continue;
+      }
+
+      const activityType = status === 'attended' ? ACTIVITY_TYPE_ATTENDED : ACTIVITY_TYPE_MISSED;
+      const result = await createAttendanceActivity(activityType, {
+        personId,
+        dealId,
+        userId,
+        dueDate,
+        dueTime,
+        subject: apt.subject
+      });
+
+      results.push({
+        ...apt,
+        success: !!result,
+        activityId: result?.id
+      });
+    }
+
+    invalidateCache();
+    res.json({
+      success: true,
+      totalProcessed: appointments.length,
+      results
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Endpoint: Audit completo (aceita ?since=YYYY-MM-DD&until=YYYY-MM-DD)
 app.get('/api/audit', async (req, res) => {
   try {
