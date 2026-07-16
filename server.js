@@ -42,6 +42,8 @@ let FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
   .filter(Boolean);
 let TINTIM_API_KEY = process.env.TINTIM_API_KEY;
 let TINTIM_WORKSPACE_ID = process.env.TINTIM_WORKSPACE_ID;
+let GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
+let GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 
 // Pipeline "Inbound" (onde entram os leads de trafego pago)
 let INBOUND_PIPELINE_ID = 1;
@@ -57,6 +59,8 @@ function applySettings(s) {
   }
   if (s.tintimApiKey) TINTIM_API_KEY = s.tintimApiKey;
   if (s.tintimWorkspaceId) TINTIM_WORKSPACE_ID = s.tintimWorkspaceId;
+  if (s.googleAdsCustomerId) GOOGLE_ADS_CUSTOMER_ID = s.googleAdsCustomerId;
+  if (s.googleAdsDeveloperToken) GOOGLE_ADS_DEVELOPER_TOKEN = s.googleAdsDeveloperToken;
   if (s.openaiApiKey) process.env.OPENAI_API_KEY = s.openaiApiKey;
   if (s.inboundPipelineId) INBOUND_PIPELINE_ID = parseInt(s.inboundPipelineId, 10) || 1;
   if (s.monthlyGoal !== undefined) MONTHLY_GOAL = parseFloat(s.monthlyGoal) || 0;
@@ -2740,6 +2744,8 @@ app.get('/api/settings', (req, res) => {
       fbAdAccountIds: s.fbAdAccountIds || process.env.FB_AD_ACCOUNT_IDS || '',
       tintimApiKey: maskSecret(s.tintimApiKey || process.env.TINTIM_API_KEY),
       tintimWorkspaceId: s.tintimWorkspaceId || process.env.TINTIM_WORKSPACE_ID || '',
+      googleAdsCustomerId: maskSecret(s.googleAdsCustomerId || process.env.GOOGLE_ADS_CUSTOMER_ID),
+      googleAdsDeveloperToken: maskSecret(s.googleAdsDeveloperToken || process.env.GOOGLE_ADS_DEVELOPER_TOKEN),
       openaiApiKey: maskSecret(s.openaiApiKey || process.env.OPENAI_API_KEY),
       inboundPipelineId: INBOUND_PIPELINE_ID,
       monthlyGoal: MONTHLY_GOAL,
@@ -2747,6 +2753,7 @@ app.get('/api/settings', (req, res) => {
         pipedrive: !!PIPEDRIVE_TOKEN,
         meta: !!FB_ACCESS_TOKEN && FB_AD_ACCOUNT_IDS.length > 0,
         tintim: !!TINTIM_API_KEY && !!TINTIM_WORKSPACE_ID,
+        googleAds: !!GOOGLE_ADS_CUSTOMER_ID && !!GOOGLE_ADS_DEVELOPER_TOKEN,
         openai: !!process.env.OPENAI_API_KEY
       }
     }
@@ -2757,7 +2764,7 @@ app.get('/api/settings', (req, res) => {
 app.post('/api/settings', (req, res) => {
   try {
     const current = loadSettingsFile();
-    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'tintimApiKey', 'tintimWorkspaceId', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
+    const allowed = ['pipedriveToken', 'fbAccessToken', 'fbAdAccountIds', 'tintimApiKey', 'tintimWorkspaceId', 'googleAdsCustomerId', 'googleAdsDeveloperToken', 'openaiApiKey', 'inboundPipelineId', 'monthlyGoal'];
     const updates = {};
 
     allowed.forEach(key => {
@@ -2785,6 +2792,7 @@ app.post('/api/settings/test', async (req, res) => {
     pipedrive: { ok: false, message: '' },
     meta: { ok: false, message: '' },
     tintim: { ok: false, message: '' },
+    googleAds: { ok: false, message: '' },
     openai: { ok: false, message: '' }
   };
 
@@ -2836,6 +2844,19 @@ app.post('/api/settings/test', async (req, res) => {
     }
   } else {
     results.tintim.message = 'API Key ou Workspace ID não configurados';
+  }
+
+  if (GOOGLE_ADS_CUSTOMER_ID && GOOGLE_ADS_DEVELOPER_TOKEN) {
+    try {
+      // Valida apenas se as credenciais estão preenchidas
+      // A validação completa requer mais passos (refresh token, etc)
+      results.googleAds.ok = true;
+      results.googleAds.message = `Credenciais configuradas para ${GOOGLE_ADS_CUSTOMER_ID}`;
+    } catch (e) {
+      results.googleAds.message = 'Erro ao validar credenciais Google Ads';
+    }
+  } else {
+    results.googleAds.message = 'Customer ID ou Developer Token não configurados';
   }
 
   if (process.env.OPENAI_API_KEY) {

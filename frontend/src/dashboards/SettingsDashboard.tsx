@@ -16,6 +16,10 @@ const SettingsDashboard: React.FC = () => {
     pipedriveToken: '',
     fbAccessToken: '',
     fbAdAccountIds: '',
+    tintimApiKey: '',
+    tintimWorkspaceId: '',
+    googleAdsCustomerId: '',
+    googleAdsDeveloperToken: '',
     openaiApiKey: '',
     inboundPipelineId: 1,
     monthlyGoal: 0
@@ -34,6 +38,10 @@ const SettingsDashboard: React.FC = () => {
         pipedriveToken: data.pipedriveToken,
         fbAccessToken: data.fbAccessToken,
         fbAdAccountIds: data.fbAdAccountIds,
+        tintimApiKey: data.tintimApiKey || '',
+        tintimWorkspaceId: data.tintimWorkspaceId || '',
+        googleAdsCustomerId: data.googleAdsCustomerId || '',
+        googleAdsDeveloperToken: data.googleAdsDeveloperToken || '',
         openaiApiKey: data.openaiApiKey,
         inboundPipelineId: data.inboundPipelineId,
         monthlyGoal: data.monthlyGoal
@@ -98,7 +106,7 @@ const SettingsDashboard: React.FC = () => {
     <Layout title="Configurações" breadcrumb={['Dashboard', 'Configurações']}>
       <div className="max-w-3xl">
         {/* Status geral */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">Pipedrive</div>
             {statusBadge(!!settings?.configured.pipedrive)}
@@ -106,6 +114,14 @@ const SettingsDashboard: React.FC = () => {
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">Meta Ads</div>
             {statusBadge(!!settings?.configured.meta)}
+          </div>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">Google Ads</div>
+            {statusBadge(!!settings?.configured.googleAds)}
+          </div>
+          <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">Tintim</div>
+            {statusBadge(!!settings?.configured.tintim)}
           </div>
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-4">
             <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2">IA (OpenAI)</div>
@@ -157,6 +173,58 @@ const SettingsDashboard: React.FC = () => {
                 value={form.fbAdAccountIds}
                 onChange={(e) => setField('fbAdAccountIds', e.target.value)}
                 placeholder="123456789, 987654321"
+                className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
+                Tintim API Key
+              </label>
+              <input
+                type="text"
+                value={form.tintimApiKey}
+                onChange={(e) => setField('tintimApiKey', e.target.value)}
+                placeholder="Cole a API Key do Tintim"
+                className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
+                Tintim Workspace ID
+              </label>
+              <input
+                type="text"
+                value={form.tintimWorkspaceId}
+                onChange={(e) => setField('tintimWorkspaceId', e.target.value)}
+                placeholder="ID do workspace do Tintim"
+                className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
+                Google Ads Customer ID
+              </label>
+              <input
+                type="text"
+                value={form.googleAdsCustomerId}
+                onChange={(e) => setField('googleAdsCustomerId', e.target.value)}
+                placeholder="XXX-XXX-XXXX"
+                className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-1.5">
+                Google Ads Developer Token
+              </label>
+              <input
+                type="text"
+                value={form.googleAdsDeveloperToken}
+                onChange={(e) => setField('googleAdsDeveloperToken', e.target.value)}
+                placeholder="Cole o developer token do Google Ads"
                 className="w-full text-[12px] font-mono border border-[#e2e8f0] rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1]"
               />
             </div>
@@ -232,10 +300,12 @@ const SettingsDashboard: React.FC = () => {
           <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
             <h3 className="text-[13px] font-semibold text-[#0f172a] mb-3">Resultado do Teste</h3>
             <div className="space-y-2">
-              {(['pipedrive', 'meta', 'openai'] as const).map(service => (
+              {(['pipedrive', 'meta', 'googleAds', 'tintim', 'openai'] as const).map(service => (
                 <div key={service} className="flex items-center gap-2">
                   <span className="text-[14px]">{testResult[service].ok ? '✅' : '❌'}</span>
-                  <span className="text-[12px] font-semibold text-[#0f172a] capitalize w-20">{service}</span>
+                  <span className="text-[12px] font-semibold text-[#0f172a] capitalize w-20">
+                    {service === 'googleAds' ? 'Google Ads' : service}
+                  </span>
                   <span className="text-[12px] text-[#64748b]">{testResult[service].message}</span>
                 </div>
               ))}

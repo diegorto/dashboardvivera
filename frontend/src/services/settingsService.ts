@@ -6,6 +6,8 @@ export interface AppSettings {
   fbAdAccountIds: string;
   tintimApiKey: string;
   tintimWorkspaceId: string;
+  googleAdsCustomerId: string;
+  googleAdsDeveloperToken: string;
   openaiApiKey: string;
   inboundPipelineId: number;
   monthlyGoal: number;
@@ -13,6 +15,7 @@ export interface AppSettings {
     pipedrive: boolean;
     meta: boolean;
     tintim: boolean;
+    googleAds: boolean;
     openai: boolean;
   };
 }
@@ -21,6 +24,7 @@ export interface ConnectionTestResult {
   pipedrive: { ok: boolean; message: string };
   meta: { ok: boolean; message: string };
   tintim: { ok: boolean; message: string };
+  googleAds: { ok: boolean; message: string };
   openai: { ok: boolean; message: string };
 }
 
