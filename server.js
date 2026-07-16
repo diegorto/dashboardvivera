@@ -3067,7 +3067,7 @@ API: http://localhost:${PORT}/api/audit?since=${range.since}&until=${range.until
 Configuracoes:
    - Meta Accounts: ${FB_AD_ACCOUNT_IDS.length}
    - Pipedrive Token: ${PIPEDRIVE_TOKEN ? PIPEDRIVE_TOKEN.substring(0, 10) + '...' : 'NAO CONFIGURADO'}
-   - Tintim Workspace: ${TINTIM_WORKSPACE_ID ? TINTIM_WORKSPACE_ID : 'NAO CONFIGURADO'}
+   - Tintim Account: ${TINTIM_ACCOUNT_CODE ? TINTIM_ACCOUNT_CODE.substring(0, 10) + '...' : 'NAO CONFIGURADO'}
    - Pipeline Inbound ID: ${INBOUND_PIPELINE_ID}
    - Periodo padrao: ${range.since} a ${range.until}
 
