@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { ChevronDown, Download, Bell, Calendar, Sun, Moon } from 'lucide-react';
+import { ChevronDown, Download, Bell, Calendar, Sun, Moon, X } from 'lucide-react';
 import { useAppStore } from '../stores/appStore';
 import { useTheme } from '../contexts/ThemeContext';
 import { useFilters } from '../contexts/FilterContext';
 import { routes } from '../router/routes';
+import filterService, { FilterOptions } from '../services/filterService';
 
 interface TopBarProps {
   title?: string;
@@ -12,7 +13,21 @@ interface TopBarProps {
   right?: React.ReactNode;
 }
 
-const filterOptions = ['Procedimento', 'Profissional', 'SDR', 'Campanha', 'Ad Set', 'Pipeline', 'Status'];
+interface FilterDef {
+  key: string;
+  label: string;
+  filterKey: keyof import('../types').GlobalFilters;
+}
+
+const filterDefs: FilterDef[] = [
+  { key: 'procedure', label: 'Procedimento', filterKey: 'procedure' },
+  { key: 'professional', label: 'Profissional', filterKey: 'professional' },
+  { key: 'sdr', label: 'SDR', filterKey: 'sdr' },
+  { key: 'campaign', label: 'Campanha', filterKey: 'campaign' },
+  { key: 'adSet', label: 'Ad Set', filterKey: 'creative' },
+  { key: 'pipeline', label: 'Pipeline', filterKey: 'pipeline' },
+  { key: 'status', label: 'Status', filterKey: 'status' },
+];
 
 const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb, right }) => {
   const location = useLocation();
@@ -22,6 +37,12 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    filterService.getFilterOptions().then(setFilterOptions);
+  }, []);
 
   const periodOptions = [
     { value: 'today', label: 'Hoje' },
@@ -32,6 +53,26 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
     { value: 'last30', label: 'Últimos 30 dias' },
     { value: 'year', label: 'Este ano' },
   ];
+
+  const getFilterOptionsForKey = (key: string): string[] => {
+    if (!filterOptions) return [];
+    const optionMap: Record<string, string[]> = {
+      procedure: filterOptions.procedures,
+      professional: filterOptions.professionals,
+      sdr: filterOptions.sdrs,
+      campaign: filterOptions.campaigns,
+      adSet: filterOptions.adSets,
+      pipeline: filterOptions.pipelines,
+      status: filterOptions.statuses,
+    };
+    return optionMap[key] || [];
+  };
+
+  const getActiveFilterValue = (filterKey: string): string | undefined => {
+    const def = filterDefs.find(d => d.key === filterKey);
+    if (!def) return undefined;
+    return filters[def.filterKey] as string | undefined;
+  };
 
   const handlePeriodChange = (periodValue: string) => {
     setFilter('period', periodValue);
@@ -240,27 +281,143 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-        {filterOptions.map((f) => (
-          <button
-            key={f}
-            style={{
-              padding: '6px 10px',
-              border: `1px solid ${borderColor}`,
-              borderRadius: '6px',
-              fontSize: '11px',
-              color: '#64748b',
-              backgroundColor: bgColor,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              transition: 'background-color 200ms',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = hoverBg)}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgColor)}
-          >
-            {f} <ChevronDown size={12} style={{ display: 'inline-block', marginLeft: '4px' }} />
-          </button>
-        ))}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}>
+        {filterDefs.map((def) => {
+          const isOpen = openFilter === def.key;
+          const activeValue = getActiveFilterValue(def.key);
+          const options = getFilterOptionsForKey(def.key);
+
+          return (
+            <div key={def.key} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setOpenFilter(isOpen ? null : def.key)}
+                style={{
+                  padding: '6px 10px',
+                  border: `1px solid ${activeValue ? '#6366f1' : borderColor}`,
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  color: activeValue ? '#6366f1' : '#64748b',
+                  backgroundColor: activeValue ? '#f0f4ff' : bgColor,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 200ms',
+                  fontWeight: activeValue ? 600 : 400,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+                onMouseEnter={(e) => {
+                  if (!activeValue) e.currentTarget.style.backgroundColor = hoverBg;
+                }}
+                onMouseLeave={(e) => {
+                  if (!activeValue) e.currentTarget.style.backgroundColor = bgColor;
+                }}
+              >
+                {def.label}
+                {activeValue && (
+                  <span style={{ fontSize: '9px', opacity: 0.7 }}>
+                    ({activeValue.slice(0, 10)}...)
+                  </span>
+                )}
+                <ChevronDown
+                  size={12}
+                  style={{
+                    display: 'inline-block',
+                    transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 200ms',
+                  }}
+                />
+              </button>
+
+              {/* Dropdown Menu */}
+              {isOpen && options.length > 0 && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '8px',
+                    backgroundColor: bgColor,
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: '8px',
+                    boxShadow: mode === 'dark'
+                      ? '0 4px 12px rgba(0, 0, 0, 0.4)'
+                      : '0 4px 12px rgba(0, 0, 0, 0.1)',
+                    zIndex: 100,
+                    minWidth: '200px',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderBottom: `1px solid ${borderColor}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: textColor }}>
+                      {def.label}
+                    </span>
+                    {activeValue && (
+                      <button
+                        onClick={() => {
+                          setFilter(def.filterKey, undefined);
+                          setOpenFilter(null);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: '2px',
+                        }}
+                        title="Limpar filtro"
+                      >
+                        <X size={14} color={secondaryText} />
+                      </button>
+                    )}
+                  </div>
+                  {options.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setFilter(def.filterKey, option);
+                        setOpenFilter(null);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        padding: '10px 12px',
+                        border: 'none',
+                        backgroundColor:
+                          activeValue === option ? '#f0f4ff' : 'transparent',
+                        color: activeValue === option ? '#6366f1' : textColor,
+                        fontSize: '13px',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'background-color 200ms',
+                        fontWeight: activeValue === option ? 600 : 400,
+                      }}
+                      onMouseEnter={(e) => {
+                        if (activeValue !== option) {
+                          e.currentTarget.style.backgroundColor = hoverBg;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor =
+                          activeValue === option ? '#f0f4ff' : 'transparent';
+                      }}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Actions */}

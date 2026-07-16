@@ -2482,6 +2482,121 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
 });
 
 // ============================================
+// Filtros (opcoes de dropdown globais)
+// ============================================
+
+app.get('/api/filters/options', async (req, res) => {
+  try {
+    const allDeals = await cached('deals', async () => {
+      const deals = await Promise.all(
+        PIPEDRIVE_TOKEN ? [
+          axios.get(`https://api.pipedrive.com/v1/deals?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
+        ] : []
+      );
+      return deals[0]?.data?.success ? deals[0].data.data : [];
+    });
+
+    const allActivities = await cached('activities', async () => {
+      const activities = await Promise.all(
+        PIPEDRIVE_TOKEN ? [
+          axios.get(`https://api.pipedrive.com/v1/activities?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
+        ] : []
+      );
+      return activities[0]?.data?.success ? activities[0].data.data : [];
+    });
+
+    const allPeople = await cached('people', async () => {
+      const people = await Promise.all(
+        PIPEDRIVE_TOKEN ? [
+          axios.get(`https://api.pipedrive.com/v1/persons?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
+        ] : []
+      );
+      return people[0]?.data?.success ? people[0].data.data : [];
+    });
+
+    // Extrair opções únicas
+    const procedures = new Set(
+      allDeals
+        .map(d => d.title)
+        .filter(t => t && typeof t === 'string')
+    );
+
+    const professionals = new Set(
+      allDeals
+        .filter(d => d.user_id)
+        .map(d => {
+          // Tentar encontrar o nome do usuário
+          const person = allPeople.find(p => p.owner_id === d.user_id);
+          return person?.name || `Profissional ${d.user_id}`;
+        })
+    );
+
+    const sdrs = new Set(['Agda', 'Helenice']); // SDRs conhecidas
+
+    const campaigns = new Set(
+      allDeals
+        .filter(d => d[FIELD_CAMPANHA])
+        .map(d => d[FIELD_CAMPANHA])
+    );
+
+    const adSets = new Set(
+      allDeals
+        .filter(d => d[FIELD_CONJUNTO])
+        .map(d => d[FIELD_CONJUNTO])
+    );
+
+    const pipelines = new Set(
+      allDeals
+        .filter(d => d.pipeline_id)
+        .map(d => {
+          const pipelineMap: Record<string, string> = {
+            '1': 'Inbound',
+            '2': 'Outbound',
+            '3': 'Referência',
+          };
+          return pipelineMap[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
+        })
+    );
+
+    const statusMap: Record<string, string> = {
+      'open': 'Aberto',
+      'won': 'Ganho',
+      'lost': 'Perdido',
+      'deleted': 'Deletado',
+    };
+
+    const statuses = new Set(
+      allDeals
+        .filter(d => d.status)
+        .map(d => statusMap[d.status] || d.status)
+    );
+
+    res.json({
+      success: true,
+      procedures: Array.from(procedures).filter(Boolean),
+      professionals: Array.from(professionals).filter(Boolean),
+      sdrs: Array.from(sdrs).filter(Boolean),
+      campaigns: Array.from(campaigns).filter(Boolean),
+      adSets: Array.from(adSets).filter(Boolean),
+      pipelines: Array.from(pipelines).filter(Boolean),
+      statuses: Array.from(statuses).filter(Boolean),
+    });
+  } catch (error) {
+    console.error('Erro ao carregar opções de filtro:', error.message);
+    res.json({
+      success: false,
+      procedures: [],
+      professionals: [],
+      sdrs: ['Agda', 'Helenice'],
+      campaigns: [],
+      adSets: [],
+      pipelines: ['Inbound', 'Outbound', 'Referência'],
+      statuses: ['Aberto', 'Ganho', 'Perdido'],
+    });
+  }
+});
+
+// ============================================
 // Settings (configuracao pelo proprio SaaS)
 // ============================================
 
