@@ -139,18 +139,6 @@ const ExecutiveDashboard: React.FC = () => {
       'Descrição': kpis.goal.sub || 'Meta'
     },
     {
-      'Métrica': 'Lucro',
-      'Valor': kpis.profit.value,
-      'Mudança': kpis.profit.change,
-      'Descrição': 'Lucro líquido'
-    },
-    {
-      'Métrica': 'Margem',
-      'Valor': `${kpis.margin.value}%`,
-      'Mudança': kpis.margin.change,
-      'Descrição': 'Margem de lucro'
-    },
-    {
       'Métrica': 'ROI',
       'Valor': `${kpis.roi.value}%`,
       'Mudança': kpis.roi.change,
@@ -217,8 +205,8 @@ const ExecutiveDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Row 1 (9 cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-9 gap-3 mb-6">
+      {/* KPI Row 1 (7 cards) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 mb-6">
         <KPICard
           label="Receita"
           value={fmtK(kpis.revenue.value as number)}
@@ -245,18 +233,6 @@ const ExecutiveDashboard: React.FC = () => {
           change={kpis.forecast.change}
           sub="projetado"
           accent="#6366f1"
-        />
-        <KPICard
-          label="Lucro"
-          value={fmtK(kpis.profit.value as number)}
-          change={kpis.profit.change}
-          accent="#10b981"
-        />
-        <KPICard
-          label="Margem"
-          value={`${kpis.margin.value}%`}
-          change={kpis.margin.change}
-          accent="#10b981"
         />
         <KPICard
           label="ROI"
