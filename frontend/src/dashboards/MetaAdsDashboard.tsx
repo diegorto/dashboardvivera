@@ -3,7 +3,7 @@ import { Layout } from '../components';
 import { useFilters } from '../contexts/FilterContext';
 import { useAppStore } from '../stores/appStore';
 import { api } from '../services/api';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
 
 interface Campaign {
@@ -17,7 +17,6 @@ interface Campaign {
   conversions?: number;
   ctr?: number;
   cpc?: number;
-  keywords?: string[];
 }
 
 interface Metric {
@@ -30,17 +29,15 @@ interface Metric {
   ctr: number;
   cpc: number;
   roas?: number;
-  keywords?: string[];
 }
 
-const GoogleAdsDashboard: React.FC = () => {
+const MetaAdsDashboard: React.FC = () => {
   const { filters } = useFilters();
   const { addNotification } = useAppStore();
 
   const [loading, setLoading] = useState(true);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [pipelineLeads, setPipelineLeads] = useState(0);
   const [totalStats, setTotalStats] = useState({
     investment: 0,
     revenue: 0,
@@ -52,7 +49,6 @@ const GoogleAdsDashboard: React.FC = () => {
     ctr: 0,
     cpc: 0
   });
-  const [keywords, setKeywords] = useState<Array<{ keyword: string; cost: number; conversions: number }>>([]);
 
   useEffect(() => {
     loadData();
@@ -64,19 +60,14 @@ const GoogleAdsDashboard: React.FC = () => {
       const dateRangeParam = 'LAST_30_DAYS';
 
       const [campaignsRes, metricsRes, conversionsRes] = await Promise.allSettled([
-        api.get<any>('/google-ads/campaigns'),
-        api.get<any>('/google-ads/metrics', { params: { date_range: dateRangeParam } }),
-        api.get<any>('/google-ads/conversions', { params: { date_range: dateRangeParam } })
+        api.get<any>('/meta-ads/campaigns'),
+        api.get<any>('/meta-ads/metrics', { params: { date_range: dateRangeParam } }),
+        api.get<any>('/meta-ads/conversions', { params: { date_range: dateRangeParam } })
       ]);
 
       if (campaignsRes.status === 'fulfilled' && campaignsRes.value.data.success) {
         const campaignsData = campaignsRes.value.data.data || [];
         setCampaigns(campaignsData);
-
-        const allKeywords = campaignsData
-          .flatMap((c: any) => c.keywords || [])
-          .map((kw: string) => ({ keyword: kw, cost: 0, conversions: 0 }));
-        setKeywords(allKeywords.slice(0, 10)); // Top 10 keywords
       }
 
       if (metricsRes.status === 'fulfilled' && metricsRes.value.data.success) {
@@ -95,7 +86,7 @@ const GoogleAdsDashboard: React.FC = () => {
         );
 
         const platformLeads = totals.conversions;
-        const realPipelineLeads = Math.max(platformLeads * 0.65, 1); // Estimativa: 65% de conversão plataforma → pipeline
+        const realPipelineLeads = Math.max(platformLeads * 0.65, 1);
         const cpl = platformLeads > 0 ? totals.cost / platformLeads : 0;
         const roi = totals.cost > 0 ? ((totals.revenue - totals.cost) / totals.cost) * 100 : 0;
 
@@ -110,17 +101,11 @@ const GoogleAdsDashboard: React.FC = () => {
           ctr: totals.impressions > 0 ? (totals.clicks / totals.impressions) * 100 : 0,
           cpc: totals.clicks > 0 ? totals.cost / totals.clicks : 0
         });
-
-        setPipelineLeads(realPipelineLeads);
-      }
-
-      if (conversionsRes.status === 'fulfilled' && conversionsRes.value.data.success) {
-        // Dados de conversões já inclusos nas métricas
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro ao carregar dados';
-      addNotification('error', `Erro ao carregar Google Ads: ${message}`);
-      console.error('Erro ao carregar Google Ads:', err);
+      addNotification('error', `Erro ao carregar Meta Ads: ${message}`);
+      console.error('Erro ao carregar Meta Ads:', err);
     } finally {
       setLoading(false);
     }
@@ -140,11 +125,11 @@ const GoogleAdsDashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <Layout title="Google Ads">
+      <Layout title="Meta Ads">
         <div className="flex items-center justify-center h-full">
           <div className="text-center">
             <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-600">Carregando dados do Google Ads...</p>
+            <p className="text-gray-600">Carregando dados do Meta Ads...</p>
           </div>
         </div>
       </Layout>
@@ -152,7 +137,7 @@ const GoogleAdsDashboard: React.FC = () => {
   }
 
   return (
-    <Layout title="Google Ads" breadcrumb={['Dashboards', 'Google Ads']}>
+    <Layout title="Meta Ads" breadcrumb={['Dashboards', 'Meta Ads']}>
       {/* Principais KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Investimento */}
@@ -190,7 +175,7 @@ const GoogleAdsDashboard: React.FC = () => {
         <div className="bg-white border border-[#e2e8f0] rounded-lg p-5">
           <div className="text-[11px] text-[#64748b] font-semibold uppercase mb-2">Leads Plataforma</div>
           <div className="text-[22px] font-bold text-[#f59e0b]">{formatNumber(totalStats.platformLeads)}</div>
-          <div className="text-[10px] text-[#94a3b8] mt-2">Conversões reportadas por Google Ads</div>
+          <div className="text-[10px] text-[#94a3b8] mt-2">Conversões reportadas por Meta</div>
         </div>
 
         {/* Leads Real (Pipeline) */}
@@ -231,22 +216,6 @@ const GoogleAdsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Palavras-chave Principal */}
-      {keywords.length > 0 && (
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-6 mb-6">
-          <h3 className="text-[13px] font-semibold text-[#0f172a] mb-4">Top Palavras-chave</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {keywords.map((kw, i) => (
-              <div key={i} className="bg-gradient-to-br from-[#f8fafc] to-[#f1f5f9] border border-[#e2e8f0] rounded-lg p-3">
-                <div className="text-[11px] text-[#64748b] font-semibold mb-2 truncate">{kw.keyword}</div>
-                <div className="text-[12px] font-bold text-[#0f172a]">{formatCurrency(kw.cost)}</div>
-                <div className="text-[10px] text-[#94a3b8]">{formatNumber(kw.conversions)} conversões</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Campanhas Table */}
       {campaigns.length > 0 && (
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-6 mb-6">
@@ -269,9 +238,9 @@ const GoogleAdsDashboard: React.FC = () => {
                     <td className="py-3 px-3 text-[#0f172a] font-medium">{campaign.name}</td>
                     <td className="text-right py-3 px-3">
                       <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${
-                        campaign.status === 'ENABLED' ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#fee2e2] text-[#dc2626]'
+                        campaign.status === 'ACTIVE' ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#fee2e2] text-[#dc2626]'
                       }`}>
-                        {campaign.status === 'ENABLED' ? '✓ Ativa' : '✕ Pausada'}
+                        {campaign.status === 'ACTIVE' ? '✓ Ativa' : '✕ Pausada'}
                       </span>
                     </td>
                     <td className="text-right py-3 px-3 text-[#0f172a] font-semibold">{formatCurrency(campaign.cost || 0)}</td>
@@ -308,4 +277,4 @@ const GoogleAdsDashboard: React.FC = () => {
   );
 };
 
-export default GoogleAdsDashboard;
+export default MetaAdsDashboard;
