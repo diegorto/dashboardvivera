@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+npm-debug.log
+.env.local
+.DS_Store
+*.md
+BACKUP_*.md
+FIX_*.md
+README_*.txt
+data/
+.claude/
