@@ -969,6 +969,106 @@ const _d = iso => new Date(iso + 'T12:00:00Z');
 const _iso = dt => dt.toISOString().slice(0, 10);
 const _addDays = (iso, n) => { const x = _d(iso); x.setUTCDate(x.getUTCDate() + n); return _iso(x); };
 
+// GET /api/dashboard/executive/funnel - Funil REAL por estágio + Receita por Funil (CORRIGIDO)
+app.get('/api/dashboard/executive/funnel', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const range = {
+      since: req.query.since || defaults.since,
+      until: req.query.until || defaults.until
+    };
+
+    const [dealsResult, stagesResult] = await Promise.allSettled([
+      getPipedriveDeals(null, null).catch(() => []),
+      fetchPipedriveStagesUncached().catch(() => [])
+    ]);
+
+    const allDeals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
+    const stages = stagesResult.status === 'fulfilled' ? stagesResult.value : [];
+
+    // Deals que entraram no período (add_time)
+    const dealsInRange = allDeals.filter(d => {
+      const addDate = (d.addTime || '').slice(0, 10);
+      return addDate >= range.since && addDate <= range.until;
+    });
+
+    // Mapa de pipeline_id => pipeline_name
+    const pipelineMap = { '1': 'Inbound', '2': 'Outbound', '3': 'Referência' };
+
+    // Agrupa deals por estágio (stageName)
+    const dealsByStage = {};
+    dealsInRange.forEach(d => {
+      const stage = d.stageName || 'Sem estágio';
+      if (!dealsByStage[stage]) dealsByStage[stage] = [];
+      dealsByStage[stage].push(d);
+    });
+
+    // Funil com dados REAIS (não % hardcoded!)
+    const funnel = Object.keys(dealsByStage).map(stageName => {
+      const stageDeals = dealsByStage[stageName];
+      return {
+        stage: stageName,
+        value: stageDeals.length,
+        deals: stageDeals.map(d => ({
+          id: d.id,
+          title: d.title,
+          value: d.rawValue || 0,
+          status: d.status,
+          pipeline: pipelineMap[String(d.pipeline_id)] || 'Outro',
+          campaign: d[FIELD_CAMPANHA] || '-',
+          personName: d.person_name || (d.person_id && d.person_id.name) || '-'
+        }))
+      };
+    }).sort((a, b) => b.value - a.value);
+
+    // Receita por Funil (apenas deals WON)
+    const wonDeals = allDeals.filter(d => {
+      if (d.status !== 'won') return false;
+      const wonDate = (d.wonTime || d.stageChangeTime || d.addDate || '').slice(0, 10);
+      return wonDate >= range.since && wonDate <= range.until;
+    });
+
+    const revenueByPipeline = {};
+    wonDeals.forEach(d => {
+      const pipeline = pipelineMap[String(d.pipeline_id)] || 'Outro';
+      if (!revenueByPipeline[pipeline]) {
+        revenueByPipeline[pipeline] = { revenue: 0, count: 0, deals: [] };
+      }
+      revenueByPipeline[pipeline].revenue += d.rawValue || 0;
+      revenueByPipeline[pipeline].count += 1;
+      revenueByPipeline[pipeline].deals.push({
+        id: d.id,
+        title: d.title,
+        value: d.rawValue,
+        personName: d.person_name || (d.person_id && d.person_id.name) || '-',
+        campaign: d[FIELD_CAMPANHA] || '-'
+      });
+    });
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        funnel: funnel,
+        revenue: {
+          byPipeline: Object.keys(revenueByPipeline).map(pipeline => ({
+            pipeline,
+            ...revenueByPipeline[pipeline]
+          })),
+          total: wonDeals.reduce((sum, d) => sum + (d.rawValue || 0), 0),
+          count: wonDeals.length
+        }
+      }
+    });
+  } catch (error) {
+    res.json({
+      success: false,
+      error: error.message,
+      data: { funnel: [], revenue: { byPipeline: [], total: 0, count: 0 } }
+    });
+  }
+});
+
 // GET /api/dashboard/executive/origins - Leads por origem (Google, Instagram, Meta, Indicação) com ROAS
 app.get('/api/dashboard/executive/origins', async (req, res) => {
   try {
