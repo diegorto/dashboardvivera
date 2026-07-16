@@ -1,4 +1,5 @@
-import axios, { AxiosError } from 'axios';
+import { AxiosError } from 'axios';
+import { api } from './api';
 
 export interface AgendaKPIs {
   today: number;
@@ -50,7 +51,7 @@ class AgendaDashboardService {
 
   async getAgendaKPIs(): Promise<AgendaKPIs> {
     try {
-      const response = await axios.get<APIResponse<AgendaKPIs>>(`${this.baseUrl}/agenda/kpis`);
+      const response = await api.get<APIResponse<AgendaKPIs>>(`/dashboard/agenda/kpis`);
       if (!response.data.success) throw new Error('Erro ao buscar KPIs da agenda');
       return response.data.data;
     } catch (error) {
@@ -60,8 +61,8 @@ class AgendaDashboardService {
 
   async getAppointments(since?: string, until?: string): Promise<Appointment[]> {
     try {
-      const response = await axios.get<APIResponse<Appointment[]>>(
-        `${this.baseUrl}/agenda/appointments`,
+      const response = await api.get<APIResponse<Appointment[]>>(
+        `/dashboard/agenda/appointments`,
         { params: since && until ? { since, until } : {} }
       );
       if (!response.data.success) throw new Error('Erro ao buscar compromissos');
