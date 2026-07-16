@@ -1,2 +1,9 @@
 node_modules/
 .env
+.env.local
+dist/
+*.log
+.DS_Store
+.vercel/
+web/node_modules/
+web/dist/
