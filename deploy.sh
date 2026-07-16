@@ -11,7 +11,9 @@ echo "🔨 Rebuild dos containers..."
 docker-compose build
 
 echo "🚀 Subindo..."
-docker-compose up -d --force-recreate
+# Remove containers antigos antes de recriar (evita bug 'ContainerConfig' do compose 1.29)
+docker rm -f dashboardvivera-backend dashboardvivera-frontend 2>/dev/null || true
+docker-compose up -d
 
 echo "⏳ Aguardando serviços..."
 sleep 5
