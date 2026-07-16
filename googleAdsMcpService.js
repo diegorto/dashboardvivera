@@ -1,39 +1,45 @@
 const axios = require('axios');
 
+const PIPEBOARD_API_KEY = process.env.PIPEBOARD_API_KEY || '';
+const PIPEBOARD_GOOGLE_ADS_BASE_URL = 'https://google-ads.mcp.pipeboard.co/';
+
+// Criar client com autenticação Bearer token
+const googleAdsClient = axios.create({
+  baseURL: PIPEBOARD_GOOGLE_ADS_BASE_URL,
+  headers: {
+    'Authorization': `Bearer ${PIPEBOARD_API_KEY}`,
+    'Content-Type': 'application/json'
+  }
+});
+
 /**
- * Conecta ao Pipeboard Google Ads via autenticação
- * Usa as credenciais do Google Ads para acessar a API
+ * Conecta ao Pipeboard Google Ads via MCP autenticado
  */
-async function testConnection(customerId, accessToken) {
+async function testConnection() {
   try {
-    if (!customerId || !accessToken) {
+    if (!PIPEBOARD_API_KEY) {
       return {
         success: false,
-        message: 'Customer ID e Access Token são obrigatórios'
+        message: 'Pipeboard API Key não configurada'
       };
     }
 
-    // Teste simples - tentar buscar uma campanha
-    const response = await axios.get(
-      'https://googleads.googleapis.com/v17/customers/' + customerId.replace('-', '') + '/googleAds:search',
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Developer-Token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
-        },
-        data: {
-          query: 'SELECT campaign.id, campaign.name FROM campaign LIMIT 1'
-        }
-      }
-    );
+    console.log('Testando conexão com Pipeboard Google Ads MCP...');
+
+    // Teste simples - tentar listar clientes
+    const response = await googleAdsClient.post('/', {
+      method: 'list_google_ads_customers'
+    });
+
+    console.log('✅ Conexão com Pipeboard Google Ads MCP bem-sucedida');
 
     return {
       success: true,
-      message: 'Conectado ao Google Ads API',
+      message: 'Conectado ao Pipeboard Google Ads MCP',
       data: response.data
     };
   } catch (error) {
-    console.error('Erro ao testar conexão:', error.message);
+    console.error('❌ Erro ao testar conexão:', error.message);
     return {
       success: false,
       message: `Erro ao conectar: ${error.message}`
@@ -42,97 +48,91 @@ async function testConnection(customerId, accessToken) {
 }
 
 /**
- * Busca campanhas do Google Ads
+ * Busca campanhas do Google Ads via Pipeboard MCP
  */
-async function getCampaigns(customerId, accessToken) {
+async function getCampaigns(customerId) {
   try {
-    const response = await axios.post(
-      `https://googleads.googleapis.com/v17/customers/${customerId.replace('-', '')}/googleAds:search`,
-      {
-        query: `SELECT campaign.id, campaign.name, campaign.status FROM campaign ORDER BY campaign.id DESC LIMIT 100`
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Developer-Token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
-        }
-      }
-    );
+    if (!customerId) {
+      throw new Error('Customer ID é obrigatório');
+    }
 
-    return response.data.results?.map(result => result.campaign) || [];
+    console.log(`Buscando campanhas para customer: ${customerId}`);
+
+    const response = await googleAdsClient.post('/', {
+      method: 'get_google_ads_campaigns',
+      params: {
+        customer_id: customerId.toString()
+      }
+    });
+
+    console.log(`✅ ${response.data.total_campaigns} campanhas encontradas`);
+    return response.data.campaigns || [];
   } catch (error) {
-    console.error('Erro ao buscar campanhas:', error.message);
+    console.error('Erro ao buscar campanhas:', error.response?.data || error.message);
     throw error;
   }
 }
 
 /**
- * Busca métricas de performance do Google Ads
+ * Busca métricas de performance do Google Ads via Pipeboard MCP
  */
-async function getMetrics(customerId, accessToken, dateRange) {
+async function getMetrics(customerId, dateRange = 'LAST_30_DAYS') {
   try {
-    const response = await axios.post(
-      `https://googleads.googleapis.com/v17/customers/${customerId.replace('-', '')}/googleAds:search`,
-      {
-        query: `
-          SELECT
-            campaign.name,
-            metrics.impressions,
-            metrics.clicks,
-            metrics.cost_micros,
-            metrics.conversions,
-            metrics.conversion_value
-          FROM campaign
-          WHERE segments.date BETWEEN '${dateRange.since}' AND '${dateRange.until}'
-          ORDER BY campaign.name
-        `
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Developer-Token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
-        }
-      }
-    );
+    if (!customerId) {
+      throw new Error('Customer ID é obrigatório');
+    }
 
-    return response.data.results || [];
+    console.log(`Buscando métricas para customer: ${customerId}, período: ${dateRange}`);
+
+    const response = await googleAdsClient.post('/', {
+      method: 'get_google_ads_campaign_metrics',
+      params: {
+        customer_id: customerId.toString(),
+        date_range: dateRange,
+        time_breakdown: 'day',
+        status_filter: 'ENABLED'
+      }
+    });
+
+    console.log(`✅ Métricas carregadas para ${response.data.returned_campaigns} campanhas`);
+    return response.data.campaigns || [];
   } catch (error) {
-    console.error('Erro ao buscar métricas:', error.message);
+    console.error('Erro ao buscar métricas:', error.response?.data || error.message);
     throw error;
   }
 }
 
 /**
- * Busca conversões/leads do Google Ads
+ * Busca conversões/leads do Google Ads via Pipeboard MCP
  */
-async function getConversions(customerId, accessToken, dateRange) {
+async function getConversions(customerId, dateRange = 'LAST_30_DAYS') {
   try {
-    const response = await axios.post(
-      `https://googleads.googleapis.com/v17/customers/${customerId.replace('-', '')}/googleAds:search`,
-      {
-        query: `
-          SELECT
-            campaign.name,
-            metrics.conversions,
-            metrics.conversion_value,
-            segments.date
-          FROM campaign
-          WHERE segments.date BETWEEN '${dateRange.since}' AND '${dateRange.until}'
-          AND metrics.conversions > 0
-          ORDER BY segments.date DESC
-        `
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Developer-Token': process.env.GOOGLE_ADS_DEVELOPER_TOKEN || ''
-        }
-      }
-    );
+    if (!customerId) {
+      throw new Error('Customer ID é obrigatório');
+    }
 
-    return response.data.results || [];
+    console.log(`Buscando conversões para customer: ${customerId}`);
+
+    const metrics = await getMetrics(customerId, dateRange);
+
+    // Filtrar apenas campanhas com conversões
+    const conversions = metrics
+      .filter(campaign => campaign.conversions > 0)
+      .map(campaign => ({
+        campaign_id: campaign.id,
+        campaign_name: campaign.name,
+        conversions: campaign.conversions,
+        conversion_value: campaign.conversion_value,
+        cost: campaign.cost_micros / 1000000,
+        impressions: campaign.impressions,
+        clicks: campaign.clicks,
+        cpc: campaign.average_cpc / 1000000
+      }));
+
+    console.log(`✅ ${conversions.length} campanhas com conversões`);
+    return conversions;
   } catch (error) {
-    console.error('Erro ao buscar conversões:', error.message);
+    console.error('Erro ao buscar conversões:', error.response?.data || error.message);
     throw error;
   }
 }

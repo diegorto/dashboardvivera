@@ -3377,24 +3377,14 @@ async function warmCache() {
 
 // ==================== GOOGLE ADS MCP ENDPOINTS ====================
 
-// GET /api/google-ads/test - Testa conexão com Google Ads API
+// GET /api/google-ads/test - Testa conexão com Pipeboard Google Ads MCP
 app.get('/api/google-ads/test', async (req, res) => {
   try {
-    if (!GOOGLE_ADS_CUSTOMER_ID) {
-      return res.json({
-        success: false,
-        message: 'Google Ads Customer ID não configurado'
-      });
-    }
-
-    // Para teste, apenas verificamos se o ID está configurado
-    // Uma autenticação real requer tokens OAuth2
-    res.json({
-      success: true,
-      message: 'Google Ads Customer ID está configurado',
-      customerId: GOOGLE_ADS_CUSTOMER_ID.substring(0, 10) + '...'
-    });
+    console.log('Testando conexão Google Ads MCP...');
+    const result = await googleAdsMcp.testConnection();
+    res.json(result);
   } catch (error) {
+    console.error('Erro no teste:', error);
     res.json({
       success: false,
       message: `Erro ao testar conexão: ${error.message}`
@@ -3424,26 +3414,28 @@ app.post('/api/google-ads/connect', async (req, res) => {
   }
 });
 
-// GET /api/google-ads/campaigns - Lista campanhas do Google Ads
+// GET /api/google-ads/campaigns - Lista campanhas do Google Ads via MCP
 app.get('/api/google-ads/campaigns', async (req, res) => {
   try {
-    if (!GOOGLE_ADS_CUSTOMER_ID || !GOOGLE_ADS_DEVELOPER_TOKEN) {
+    if (!GOOGLE_ADS_CUSTOMER_ID) {
       return res.json({
         success: false,
-        error: 'Google Ads Customer ID ou Developer Token não configurado',
+        error: 'Google Ads Customer ID não configurado. Acesse Configurações → Google Ads',
         data: []
       });
     }
 
-    // Nota: Para usar a API real, é necessário ter um token OAuth2 válido
-    // Por enquanto, retornamos dados mock
+    console.log('Buscando campanhas do Google Ads...');
+    const campaigns = await googleAdsMcp.getCampaigns(GOOGLE_ADS_CUSTOMER_ID);
+
     res.json({
       success: true,
-      message: 'Configure as credenciais do Google Ads no painel de Configurações',
-      data: []
+      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      total_campaigns: campaigns.length,
+      data: campaigns
     });
   } catch (error) {
-    console.error('Erro ao buscar campanhas:', error);
+    console.error('Erro ao buscar campanhas:', error.message);
     res.json({
       success: false,
       error: error.message,
@@ -3452,41 +3444,40 @@ app.get('/api/google-ads/campaigns', async (req, res) => {
   }
 });
 
-// GET /api/google-ads/metrics - Métricas de performance do Google Ads
+// GET /api/google-ads/metrics - Métricas de performance do Google Ads via MCP
 app.get('/api/google-ads/metrics', async (req, res) => {
   try {
     if (!GOOGLE_ADS_CUSTOMER_ID) {
       return res.json({
         success: false,
         error: 'Google Ads Customer ID não configurado',
-        data: {}
+        data: []
       });
     }
 
-    const defaults = defaultDateRange();
-    const range = {
-      since: req.query.since || defaults.since,
-      until: req.query.until || defaults.until
-    };
+    const dateRange = req.query.date_range || 'LAST_30_DAYS';
+    console.log(`Buscando métricas do Google Ads (período: ${dateRange})...`);
 
-    // Dados mock - em produção, seria necessário um token OAuth2 válido
+    const metrics = await googleAdsMcp.getMetrics(GOOGLE_ADS_CUSTOMER_ID, dateRange);
+
     res.json({
       success: true,
-      range,
-      message: 'Google Ads configurado. Métricas serão exibidas em breve.',
-      data: {}
+      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      date_range: dateRange,
+      total_campaigns: metrics.length,
+      data: metrics
     });
   } catch (error) {
-    console.error('Erro ao buscar métricas:', error);
+    console.error('Erro ao buscar métricas:', error.message);
     res.json({
       success: false,
       error: error.message,
-      data: {}
+      data: []
     });
   }
 });
 
-// GET /api/google-ads/conversions - Conversões/Leads do Google Ads
+// GET /api/google-ads/conversions - Conversões/Leads do Google Ads via MCP
 app.get('/api/google-ads/conversions', async (req, res) => {
   try {
     if (!GOOGLE_ADS_CUSTOMER_ID) {
@@ -3497,21 +3488,20 @@ app.get('/api/google-ads/conversions', async (req, res) => {
       });
     }
 
-    const defaults = defaultDateRange();
-    const range = {
-      since: req.query.since || defaults.since,
-      until: req.query.until || defaults.until
-    };
+    const dateRange = req.query.date_range || 'LAST_30_DAYS';
+    console.log(`Buscando conversões do Google Ads (período: ${dateRange})...`);
 
-    // Dados mock - em produção, seria necessário um token OAuth2 válido
+    const conversions = await googleAdsMcp.getConversions(GOOGLE_ADS_CUSTOMER_ID, dateRange);
+
     res.json({
       success: true,
-      range,
-      message: 'Google Ads configurado. Conversões serão exibidas em breve.',
-      data: []
+      customer_id: GOOGLE_ADS_CUSTOMER_ID,
+      date_range: dateRange,
+      total_with_conversions: conversions.length,
+      data: conversions
     });
   } catch (error) {
-    console.error('Erro ao buscar conversões:', error);
+    console.error('Erro ao buscar conversões:', error.message);
     res.json({
       success: false,
       error: error.message,
