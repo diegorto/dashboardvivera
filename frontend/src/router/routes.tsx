@@ -32,6 +32,7 @@ const AuditDashboard = React.lazy(() => import('../dashboards/AuditDashboard'));
 const ComparativesDashboard = React.lazy(() => import('../dashboards/ComparativesDashboard'));
 const SearchPage = React.lazy(() => import('../dashboards/SearchPage'));
 const UserProfilePage = React.lazy(() => import('../dashboards/UserProfilePage'));
+const GoogleAdsDashboard = React.lazy(() => import('../dashboards/GoogleAdsDashboard'));
 
 // Loading component
 const LoadingFallback = () => (
@@ -53,6 +54,7 @@ export const routes: Route[] = [
   // Main dashboards (15 items)
   { id: 'executive', label: 'Executive', path: '/', icon: '📊', component: ExecutiveDashboard },
   { id: 'marketing', label: 'Marketing', path: '/marketing', icon: '📈', component: MarketingDashboard },
+  { id: 'google-ads', label: 'Google Ads', path: '/google-ads', icon: '📱', component: GoogleAdsDashboard },
   { id: 'comercial', label: 'Comercial', path: '/comercial', icon: '🤝', component: CommercialDashboard },
   { id: 'crm', label: 'CRM', path: '/crm', icon: '👥', component: CRMDashboard },
   { id: 'agenda', label: 'Agenda', path: '/agenda', icon: '📅', component: AgendaDashboard },
