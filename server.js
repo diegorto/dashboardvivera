@@ -755,6 +755,72 @@ app.post('/api/attendance/sync-bulk', async (req, res) => {
   }
 });
 
+// GET /api/attendance/sdr-verification - Mostra o que o painel de SDRs está vendo (para verificação)
+// Útil para confirmar que sync de attendance funcionou
+app.get('/api/attendance/sdr-verification', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // Busca os mesmos dados que o painel de SDRs usa
+    const [users, allDeals, allActivities] = await Promise.all([
+      getPipedriveUsers(),
+      getPipedriveDeals(null, null),
+      getPipedriveActivities(null, null)
+    ]);
+
+    // Processa apenas para hoje
+    const todayActivities = allActivities.filter(a => a.dueDate === today);
+
+    // Verifica o que o SDR panel vê para Agda e Helenice especificamente
+    const sdrNames = ['agda', 'helenice'];
+    const verification = {};
+
+    sdrNames.forEach(sdrName => {
+      const user = users.find(u => u.name.toLowerCase().includes(sdrName));
+      if (!user) {
+        verification[sdrName] = { error: 'Usuário não encontrado' };
+        return;
+      }
+
+      const userActivities = todayActivities.filter(a => a.userId === user.id);
+
+      verification[sdrName] = {
+        userId: user.id,
+        userName: user.name,
+        totalActivities: userActivities.length,
+        breakdown: {
+          scheduled: userActivities.filter(a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done).length,
+          attended: userActivities.filter(a => a.type === ACTIVITY_TYPE_ATTENDED && a.done).length,
+          missed: userActivities.filter(a => a.type === ACTIVITY_TYPE_MISSED && a.done).length,
+          other: userActivities.filter(a => ![ACTIVITY_TYPE_SCHEDULED, ACTIVITY_TYPE_ATTENDED, ACTIVITY_TYPE_MISSED].includes(a.type)).length
+        },
+        activities: userActivities.map(a => ({
+          id: a.id,
+          type: a.type,
+          date: a.dueDate,
+          time: a.dueTime,
+          patient: a.personName,
+          deal: a.dealTitle,
+          done: a.done,
+          subject: a.subject
+        }))
+      };
+    });
+
+    res.json({
+      success: true,
+      date: today,
+      note: 'Isso mostra exatamente o que o painel de SDRs está vendo para hoje',
+      verification
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Endpoint: Audit completo (aceita ?since=YYYY-MM-DD&until=YYYY-MM-DD)
 app.get('/api/audit', async (req, res) => {
   try {
