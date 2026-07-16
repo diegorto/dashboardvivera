@@ -33,6 +33,8 @@ const SettingsDashboard: React.FC = () => {
     try {
       setLoading(true);
       const data = await settingsService.getSettings();
+      console.log('✅ Settings loaded:', data);
+      console.log('✅ Configured status:', data.configured);
       setSettings(data);
       setForm({
         pipedriveToken: data.pipedriveToken,
@@ -47,6 +49,7 @@ const SettingsDashboard: React.FC = () => {
         monthlyGoal: data.monthlyGoal
       });
     } catch (err) {
+      console.error('❌ Error loading settings:', err);
       addNotification('error', err instanceof Error ? err.message : 'Erro ao carregar');
     } finally {
       setLoading(false);
