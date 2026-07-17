@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Layout } from '../components';
+import PipelineEventsCard from '../components/PipelineEventsCard';
 import { LoadingScreen, ErrorScreen } from '../utils/dashboardHelpers';
 
 interface SDRMetrics {
@@ -166,6 +167,10 @@ const SDRsDashboard: React.FC = () => {
         <WindowCard data={panel.today} />
         <WindowCard data={panel.week} />
         <WindowCard data={panel.month} />
+      </div>
+
+      <div className="mt-4">
+        <PipelineEventsCard />
       </div>
 
       <div className="mt-4 text-[10px] text-[#94a3b8]">

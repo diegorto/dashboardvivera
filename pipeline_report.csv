@@ -1,0 +1,293 @@
+person_name,phone,deal_id,owner_name,event_type,occurrence,label,entered_at
+Roseli  ✨✨,54899013590,598,Helenice,comparecimento,1,compareceu,2026-03-25 23:06:20
+jc construções,48998443505,885,Agda,nao_compareceu,1,faltou,2026-03-26 13:36:47
+MAGNA,48984818586,915,Agda,comparecimento,1,compareceu,2026-03-26 14:08:49
+Ilene,54899085254,830,Agda,comparecimento,1,compareceu,2026-03-27 14:01:42
+Alice,48999554191,870,Helenice,nao_compareceu,1,faltou,2026-03-27 18:27:39
+Marlene,54899019095,799,Helenice,nao_compareceu,1,faltou,2026-03-27 18:31:03
+jardel,48999363590,886,Helenice,nao_compareceu,1,faltou,2026-03-30 17:27:23
+jc construções,48998443505,885,Agda,comparecimento,1,compareceu,2026-03-30 19:25:22
+jc construções,48998443505,885,Agda,nao_compareceu,2,faltou 2a vez,2026-03-30 19:25:34
+Nando,54899702856,682,Agda,nao_compareceu,1,faltou,2026-03-31 13:20:58
+Nando,54899702856,682,Agda,comparecimento,1,compareceu,2026-03-31 13:21:07
+jardel,48999363590,886,Helenice,nao_compareceu,2,faltou 2a vez,2026-03-31 13:34:49
+Zoe Henschel,48998179151,868,Agda,comparecimento,1,compareceu,2026-03-31 18:36:23
+Maria Cecilia Rodrigues,48988584523,969,Agda,comparecimento,1,compareceu,2026-03-31 19:09:05
+viviane leite,48999806833,933,Helenice,nao_compareceu,1,faltou,2026-03-31 20:03:28
+Thiago Lemos,48984477744,988,Helenice,nao_compareceu,1,faltou,2026-03-31 20:46:05
+maria do carmo,48988604646,928,Helenice,nao_compareceu,1,faltou,2026-04-02 19:55:10
+Thiago Lemos,48984477744,988,Helenice,nao_compareceu,2,faltou 2a vez,2026-04-08 13:34:14
+Giselle,6596689488,957,Agda,nao_compareceu,1,faltou,2026-04-08 13:34:15
+Leticia Decio,5199703421,1042,Agda,comparecimento,1,compareceu,2026-04-08 13:35:25
+mariza carvalho,48999273346,971,Agda,comparecimento,1,compareceu,2026-04-08 19:25:36
+Fábio,48984337119,1073,Agda,comparecimento,1,compareceu,2026-04-08 19:25:40
+Graciela,48991895262,977,Agda,comparecimento,1,compareceu,2026-04-09 21:01:24
+Janira,48991547783,884,Agda,comparecimento,1,compareceu,2026-04-10 20:42:33
+Rosangela,48996605305,1100,Agda,nao_compareceu,1,faltou,2026-04-10 21:00:20
+Débora Zamban,48991130616,1003,Agda,nao_compareceu,1,faltou,2026-04-13 17:20:45
+Débora Zamban,48991130616,1003,Agda,comparecimento,1,compareceu,2026-04-13 17:20:48
+..,48984165006,1122,Agda,comparecimento,1,compareceu,2026-04-13 21:25:11
+marli farias,48991419672,941,Helenice,nao_compareceu,1,faltou,2026-04-14 12:19:56
+..,48984509193,1116,Agda,comparecimento,1,compareceu,2026-04-14 13:07:21
+..,48984509193,1116,Agda,comparecimento,2,compareceu 2a vez,2026-04-14 13:07:29
+..,48984509193,1116,Agda,nao_compareceu,1,faltou,2026-04-14 13:08:16
+Maria Velza,54899599091,785,Helenice,nao_compareceu,1,faltou,2026-04-14 17:13:17
+José Androaldo Lemes,48999387178,1154,Agda,comparecimento,1,compareceu,2026-04-14 17:46:03
+Bete,48996065371,1125,Agda,comparecimento,1,compareceu,2026-04-14 19:14:23
+Gabriela Kowalsky,4796048918,1057,Agda,nao_compareceu,1,faltou,2026-04-15 12:36:50
+Cristiane Mendes ferreira,48991107424,1134,Agda,nao_compareceu,1,faltou,2026-04-16 17:48:22
+..,48984165006,1122,Agda,comparecimento,2,compareceu 2a vez,2026-04-16 22:58:23
+..,49998066217,1129,Agda,comparecimento,1,compareceu,2026-04-17 12:19:31
+fernando martins,41998809168,993,Agda,nao_compareceu,1,faltou,2026-04-17 13:21:33
+Estela Maris Alves,5196351827,1158,Agda,nao_compareceu,1,faltou,2026-04-20 20:48:17
+Elia Kim Diniz,91982510553,1221,Agda,comparecimento,1,compareceu,2026-04-22 20:08:54
+Maria Cecilia Rodrigues,48988584523,1255,Agda,comparecimento,2,compareceu 2a vez,2026-04-23 00:19:37
+Luciane,54884336342,623,Agda,comparecimento,1,compareceu,2026-04-23 12:16:49
+katia pamplona,48988111324,1170,Agda,comparecimento,1,compareceu,2026-04-24 20:55:52
+**,61981237895,1216,Agda,comparecimento,1,compareceu,2026-04-24 20:59:18
+Frederico de Nadai,11993153663,1174,Agda,comparecimento,1,compareceu,2026-04-24 21:00:42
+Jonas Ramos,4896248864,1269,Agda,comparecimento,1,compareceu,2026-04-27 17:19:44
+Juliano Nickel,48984730365,1173,Agda,nao_compareceu,1,faltou,2026-04-27 17:22:27
+Thiago Lemos,48984477744,988,Helenice,comparecimento,1,compareceu,2026-04-27 20:05:03
+Thiago Lemos,48984477744,988,Helenice,nao_compareceu,3,faltou 3a vez,2026-04-27 20:10:22
+CÉLIA  REGINA,48999639052,1117,Agda,nao_compareceu,1,faltou,2026-04-27 21:54:50
+Janete  Barcaro,48991581206,1231,Agda,comparecimento,1,compareceu,2026-04-27 21:55:17
+Marega,48988775226,1204,Helenice,nao_compareceu,1,faltou,2026-04-28 17:29:58
+Larissa machado,4896448170,1278,Agda,nao_compareceu,1,faltou,2026-04-28 17:32:36
+Ana Lopes,54899041338,664,Agda,comparecimento,1,compareceu,2026-04-29 21:25:48
+**,48991324019,1312,Agda,comparecimento,1,compareceu,2026-04-30 14:20:43
+Letícia Antônia Soares,48984654926,1323,Agda,comparecimento,1,compareceu,2026-04-30 14:20:53
+Anynha,48991458094,1233,Agda,nao_compareceu,1,faltou,2026-04-30 20:42:20
+Djalma Moraes Garcia,48999359286,1389,Agda,comparecimento,1,compareceu,2026-04-30 21:29:55
+Paulo Eduardo Barretos,48999359286,1388,Agda,nao_compareceu,1,faltou,2026-05-01 12:13:09
+Caian Magnani,35383211,1369,Helenice,nao_compareceu,1,faltou,2026-05-04 17:40:02
+Natalicia Cristina Soares Roz,48996495679,1398,Agda,comparecimento,1,compareceu,2026-05-04 17:59:12
+Cristina,48988272724,1291,Agda,comparecimento,1,compareceu,2026-05-04 18:27:40
+Eloisa,48991929123,1240,Agda,nao_compareceu,1,faltou,2026-05-04 18:27:52
+Eloisa,48991929123,1240,Agda,comparecimento,1,compareceu,2026-05-04 18:27:56
+**,17742741749,1156,Agda,comparecimento,1,compareceu,2026-05-04 18:28:27
+..,43984983766,1085,Agda,nao_compareceu,1,faltou,2026-05-04 18:30:33
+Cássia Viviane Boscollo Santos,53832079185,1391,Helenice,nao_compareceu,1,faltou,2026-05-04 19:03:41
+Camila Luisa,54797279394,669,Helenice,nao_compareceu,1,faltou,2026-05-04 19:12:31
+Douglas Ventura!,48996885960,1432,Agda,nao_compareceu,1,faltou,2026-05-04 22:12:47
+Eloisa,48991929123,1240,Agda,nao_compareceu,2,faltou 2a vez,2026-05-04 23:10:59
+Maria José,47996529761,1392,Agda,comparecimento,1,compareceu,2026-05-05 16:44:32
+Alice,48999554191,870,Helenice,nao_compareceu,2,faltou 2a vez,2026-05-06 12:01:07
+Gabriela Conde,48991520835,1356,Agda,nao_compareceu,1,faltou,2026-05-06 13:04:00
+**,48999400669,1309,Agda,nao_compareceu,1,faltou,2026-05-06 13:04:13
+flavio,48999914548,924,Agda,nao_compareceu,1,faltou,2026-05-06 13:04:50
+Lisiane Braga,48998094970,1302,Agda,comparecimento,1,compareceu,2026-05-06 19:23:37
+Diovanne Ferreira,48984276531,1474,Helenice,comparecimento,1,compareceu,2026-05-06 19:30:46
+Douglas Ventura!,48996885960,1432,Agda,nao_compareceu,2,faltou 2a vez,2026-05-06 21:01:21
+Alice,48999554191,870,Helenice,nao_compareceu,3,faltou 3a vez,2026-05-07 13:20:20
+Rute Firminio,54885065617,819,Helenice,nao_compareceu,1,faltou,2026-05-07 13:53:00
+Douglas Ventura!,48996885960,1432,Agda,comparecimento,1,compareceu,2026-05-07 18:28:13
+Lauro,48984743553,1320,Agda,comparecimento,1,compareceu,2026-05-07 22:22:53
+Rose,48988757756,1157,Agda,nao_compareceu,1,faltou,2026-05-08 12:48:16
+Cristiano Delatore,4899887775,1107,Agda,nao_compareceu,1,faltou,2026-05-08 12:50:34
+Caroline Villela,47992092332,1338,Agda,nao_compareceu,1,faltou,2026-05-08 12:52:35
+Goreti,48988590577,896,Agda,nao_compareceu,1,faltou,2026-05-08 12:54:26
+Luiz Marcelo,54891919978,814,Agda,nao_compareceu,1,faltou,2026-05-08 12:59:15
+Clara Bezerra da Silva,,1445,Helenice,nao_compareceu,1,faltou,2026-05-08 14:47:58
+Josi,54888306828,722,Helenice,nao_compareceu,1,faltou,2026-05-08 14:48:38
+**,89935050296,1535,Agda,nao_compareceu,1,faltou,2026-05-08 16:41:50
+Rosangela,48996605305,1100,Agda,comparecimento,1,compareceu,2026-05-11 20:54:29
+Cleo Lemos♥️,54891571262,1581,Agda,comparecimento,1,compareceu,2026-05-13 09:29:08
+Ademir Muller,48992049802,1515,Agda,nao_compareceu,1,faltou,2026-05-13 09:29:30
+Mari,21997524148,866,Agda,nao_compareceu,1,faltou,2026-05-13 09:30:58
+Renata Swoboda,54884637087,1623,Helenice,nao_compareceu,1,faltou,2026-05-13 13:37:04
+Jane Fagundes,56182687279,1628,Helenice,comparecimento,1,compareceu,2026-05-13 20:12:23
+**,48992105689,1495,Agda,nao_compareceu,1,faltou,2026-05-15 12:02:18
+João Vitor,52189451004,1655,Agda,comparecimento,1,compareceu,2026-05-15 12:17:53
+João Gabriel Aquino,48988472641,1631,Helenice,comparecimento,1,compareceu,2026-05-15 14:42:40
+Susana,54888472641,641,Helenice,comparecimento,1,compareceu,2026-05-15 14:42:48
+Timóteo Aquino,4888472641,1630,Helenice,comparecimento,1,compareceu,2026-05-15 14:42:54
+Nicole da Silva Sell,15981659887,1669,Agda,comparecimento,1,compareceu,2026-05-15 19:21:27
+Julio Cézar,59981659887,1476,Agda,comparecimento,1,compareceu,2026-05-15 19:22:17
+clecisalete303@gmail.Com,54888230698,1629,Agda,nao_compareceu,1,faltou,2026-05-18 14:46:17
+Pati,89882546666,1551,Agda,nao_compareceu,1,faltou,2026-05-18 14:53:08
+Matheus Bala,48998476739,1296,Agda,comparecimento,1,compareceu,2026-05-18 16:54:13
+Josi,54888306828,722,Helenice,comparecimento,1,compareceu,2026-05-19 12:58:23
+Neli Ribeiro,54896004749,1612,Agda,comparecimento,1,compareceu,2026-05-19 18:32:00
+Cintia😇🧜‍♀️,54896163372,1692,Helenice,nao_compareceu,1,faltou,2026-05-19 19:14:21
+Eose,54898142926,1739,Agda,nao_compareceu,1,faltou,2026-05-20 13:22:53
+Jade,48984667692,1724,Agda,comparecimento,1,compareceu,2026-05-20 17:49:29
+Tainara,48996897711,979,Agda,nao_compareceu,1,faltou,2026-05-20 19:46:28
+Solange Zonatto Rodrigue,54899485744,1687,Helenice,comparecimento,1,compareceu,2026-05-20 21:56:09
+Nilésia,54896981630,1769,Helenice,nao_compareceu,1,faltou,2026-05-21 15:08:27
+Maria Joana,48999621597,1210,Agda,nao_compareceu,1,faltou,2026-05-21 18:03:53
+Morgana,48999099430,1721,Agda,comparecimento,1,compareceu,2026-05-21 18:07:08
+Ângela  Aparecida  Pinto,49988974989,1603,Agda,comparecimento,1,compareceu,2026-05-22 13:51:58
+Orvalina Alves Da Cruz,48988449396,1584,Agda,comparecimento,1,compareceu,2026-05-22 13:52:05
+Rose,4898301795,1502,Agda,comparecimento,1,compareceu,2026-05-22 13:52:25
+Eduardo shimidt,51985286064,1794,Agda,comparecimento,1,compareceu,2026-05-22 17:40:10
+Rosangeles Aparecida Gomes,54884218189,1684,Helenice,comparecimento,1,compareceu,2026-05-22 18:52:36
+Lourdes Maria Gless,54899009700,1771,Helenice,nao_compareceu,1,faltou,2026-05-22 19:07:50
+Daiana Ilha,54896070096,1698,Helenice,comparecimento,1,compareceu,2026-05-25 19:05:04
+Emerson Martins,54896174980,1676,Agda,comparecimento,1,compareceu,2026-05-25 19:22:07
+Luciane,4891637545,1732,Helenice,nao_compareceu,1,faltou,2026-05-26 09:20:50
+Ana Lúcia Pauletti Baldisserotto,54899415048,1922,Helenice,nao_compareceu,1,faltou,2026-05-26 14:31:27
+Rodrigo,54899362123,1609,Helenice,nao_compareceu,1,faltou,2026-05-26 17:08:23
+Michele,48999488650,1885,Helenice,nao_compareceu,1,faltou,2026-05-26 17:08:32
+..,48984056469,1109,Agda,nao_compareceu,1,faltou,2026-05-26 20:19:44
+Marlene Borges,54891508876,1824,Agda,comparecimento,1,compareceu,2026-05-26 20:20:35
+Luciana,54891242226,1979,Helenice,nao_compareceu,1,faltou,2026-05-27 18:16:24
+Edson,54884228450,1850,Agda,comparecimento,1,compareceu,2026-05-28 12:28:23
+Luiz Rosa Junior,54899712913,1929,Helenice,nao_compareceu,1,faltou,2026-05-28 13:41:17
+Nara TeresaSilva daCruz,54888184216,1879,Agda,nao_compareceu,1,faltou,2026-05-28 14:16:55
+Renata L Joaquim,49991520023,2040,Agda,nao_compareceu,1,faltou,2026-05-28 18:16:01
+Bruna Medeiros Domingos,54898180241,1918,Helenice,nao_compareceu,1,faltou,2026-05-29 13:22:13
+Jean Jeferson Reis da Silva,54896225191,1909,Helenice,nao_compareceu,1,faltou,2026-05-31 19:10:59
+Claudemar da Silva Paz,54888412819,1843,Helenice,nao_compareceu,1,faltou,2026-06-01 13:08:01
+Elaine Vieira Saar,52492694778,1830,Helenice,comparecimento,1,compareceu,2026-06-01 20:26:32
+Luciane Dos Santos,54896846796,2051,Agda,nao_compareceu,1,faltou,2026-06-02 11:14:40
+Fernanda Selistre,48999122981,2031,Agda,comparecimento,1,compareceu,2026-06-03 18:03:22
+Rosan.,54898135984,1998,Helenice,nao_compareceu,1,faltou,2026-06-04 19:22:30
+Paulo Castro,54888396069,1956,Agda,comparecimento,1,compareceu,2026-06-05 13:15:29
+Lourdes Maria Gless,54899009700,1771,Helenice,nao_compareceu,2,faltou 2a vez,2026-06-05 14:13:58
+Lourdes Maria Gless,54899009700,1771,Helenice,comparecimento,1,compareceu,2026-06-05 14:16:07
+marli farias,48991419672,941,Helenice,comparecimento,1,compareceu,2026-06-05 14:21:31
+Josilene Protazio Silva,4896093315,2106,Helenice,nao_compareceu,1,faltou,2026-06-05 18:41:09
+Roselma Sagás,54891351996,1606,Agda,comparecimento,1,compareceu,2026-06-05 20:43:52
+marlene,48991945566,973,Agda,comparecimento,1,compareceu,2026-06-05 20:44:01
+Sueli,11955851801,2118,Helenice,nao_compareceu,1,faltou,2026-06-07 11:33:10
+kauã alemão,56892300912,2149,Helenice,nao_compareceu,1,faltou,2026-06-08 17:04:27
+Hilda,4899101234,1066,Agda,nao_compareceu,1,faltou,2026-06-08 19:57:12
+Tamiris Ferreira Polisel,6599616355,1911,Helenice,comparecimento,1,compareceu,2026-06-08 22:09:30
+Rosercy Lescano Ferreira Polisel,56599616355,1841,Helenice,comparecimento,1,compareceu,2026-06-08 22:09:32
+Gilberto Valvito Nascimento,54896362909,2121,Helenice,nao_compareceu,1,faltou,2026-06-08 22:17:05
+Adriana Alves Madalena Candido,54884152017,2042,Helenice,nao_compareceu,1,faltou,2026-06-08 22:17:08
+Silmara,54891596631,1981,Helenice,nao_compareceu,1,faltou,2026-06-08 22:17:09
+Magda Pacheco Rocha,54884598885,1983,Helenice,nao_compareceu,1,faltou,2026-06-08 22:18:15
+marcelo,48984046580,980,Helenice,nao_compareceu,1,faltou,2026-06-08 23:11:48
+Michele Marchi,48991298966,1747,Agda,comparecimento,1,compareceu,2026-06-09 18:43:02
+Alice,54884949892,2158,Agda,nao_compareceu,1,faltou,2026-06-10 12:41:51
+Leandro João de Carvalho,54796726521,1969,Helenice,nao_compareceu,1,faltou,2026-06-10 14:32:23
+Luciane Dos Santos,48996846796,2229,Agda,nao_compareceu,1,faltou,2026-06-10 18:09:46
+Pati,89882546666,1551,Agda,nao_compareceu,2,faltou 2a vez,2026-06-10 18:35:27
+Alex,54891410976,2086,Agda,nao_compareceu,1,faltou,2026-06-10 18:36:47
+Márcio Portela,47988977261,2224,Helenice,comparecimento,1,compareceu,2026-06-10 21:54:02
+Aida Teresinha Godoi de Ataíde Silva,4896289019,2232,Helenice,nao_compareceu,1,faltou,2026-06-11 12:48:58
+Angela Maria Meschke,4899621714,2211,Agda,nao_compareceu,1,faltou,2026-06-11 12:58:38
+Doraci Moreira Costa Demétrio,54891204384,2068,Helenice,comparecimento,1,compareceu,2026-06-11 15:03:07
+Aida Teresinha Godoi de Ataíde Silva,4896289019,2232,Helenice,comparecimento,1,compareceu,2026-06-11 16:25:36
+Cleci Fedatto,48988441125,1079,Agda,nao_compareceu,1,faltou,2026-06-12 11:29:37
+Daniel Ribeiro,,2267,Helenice,nao_compareceu,1,faltou,2026-06-12 20:52:07
+Elizandra Hoffmann,54884314067,1663,Helenice,nao_compareceu,1,faltou,2026-06-12 22:35:36
+Lucia Lobato,48988432062,1411,Helenice,nao_compareceu,1,faltou,2026-06-12 22:35:55
+Cecilia,48999715448,1068,Agda,nao_compareceu,1,faltou,2026-06-16 11:49:05
+Wilton Batalha,4899890882,2302,Helenice,nao_compareceu,1,faltou,2026-06-16 11:59:35
+Eliane,48996808914,1464,Agda,nao_compareceu,1,faltou,2026-06-17 11:58:11
+Kaue Lopes Amaral,51996333740,2325,Agda,comparecimento,1,compareceu,2026-06-17 13:14:57
+Gabriel,48988774174,2215,Agda,comparecimento,1,compareceu,2026-06-17 13:15:14
+Marly,54884116521,740,Agda,nao_compareceu,1,faltou,2026-06-17 13:19:44
+Rosangela Olivia🇧🇷,48984511010,2324,Agda,nao_compareceu,1,faltou,2026-06-17 21:26:22
+Roseli Santos Luiz,48984473741,2305,Helenice,comparecimento,1,compareceu,2026-06-18 14:02:45
+Edmilson Laurindo,,2381,Helenice,comparecimento,1,compareceu,2026-06-18 17:31:23
+Amauri Dornelles,48999804428,2330,Helenice,comparecimento,1,compareceu,2026-06-18 17:31:25
+Sirlei,48999858256,1656,Agda,comparecimento,1,compareceu,2026-06-18 17:46:13
+Branca,11970979083,2403,Agda,nao_compareceu,1,faltou,2026-06-22 13:36:20
+Ivone Dilma Guesser Rosa,48988724352,2335,Agda,nao_compareceu,1,faltou,2026-06-22 16:56:08
+Luis Alencar,48984738456,2399,Agda,nao_compareceu,1,faltou,2026-06-22 19:45:19
+Rosimeri Halfen Fleck,55182565447,1915,Agda,nao_compareceu,1,faltou,2026-06-22 19:46:57
+Fabíola Franzoni Wagner,54884167091,2150,Agda,comparecimento,1,compareceu,2026-06-22 23:47:00
+Denise Patrícia Alves,48999034006,2321,Helenice,nao_compareceu,1,faltou,2026-06-23 11:31:13
+Vanuza Padilha,4899034006,2323,Helenice,nao_compareceu,1,faltou,2026-06-23 11:31:51
+Rosa Alves,48998405520,1078,Agda,nao_compareceu,1,faltou,2026-06-23 16:45:28
+Marilane,54899271267,1776,Agda,nao_compareceu,1,faltou,2026-06-23 19:14:25
+Michele,48996219674,2516,Helenice,nao_compareceu,1,faltou,2026-06-23 21:13:40
+ADRIANA PIRES,,2518,Helenice,nao_compareceu,1,faltou,2026-06-23 21:27:30
+Joyce Nunis,48996356875,2286,Agda,nao_compareceu,1,faltou,2026-06-23 21:39:05
+Patrícia,48984680367,2331,Agda,nao_compareceu,1,faltou,2026-06-24 16:24:51
+Patrícia Íris de Andrade,48984112399,2475,Helenice,nao_compareceu,1,faltou,2026-06-24 19:30:39
+Clarice B. Nieland,67991146440,2566,Helenice,comparecimento,1,compareceu,2026-06-25 15:15:32
+Valter,48988521099,2521,Agda,comparecimento,1,compareceu,2026-06-25 16:54:31
+Andreia Krajeski,55183481926,1933,Helenice,nao_compareceu,1,faltou,2026-06-25 19:34:01
+Daniel Ribeiro,,2267,Helenice,comparecimento,1,compareceu,2026-06-26 15:48:39
+Lucia Lobato,48988432062,1411,Helenice,comparecimento,1,compareceu,2026-06-26 15:48:42
+Wendell,48991541483,2472,Agda,comparecimento,1,compareceu,2026-06-26 18:10:36
+Fabiana Fleck,48996310240,2624,Agda,comparecimento,1,compareceu,2026-06-26 23:45:50
+🤍,48998481156,2513,Agda,comparecimento,1,compareceu,2026-06-27 00:25:54
+Clarice B. Nieland,67991146440,2566,Helenice,comparecimento,2,compareceu 2a vez,2026-06-27 20:48:47
+Bruna Gonçalves,4896510887,2469,Helenice,nao_compareceu,1,faltou,2026-06-29 12:29:23
+Katia Gonçalves,48996510887,2451,Helenice,nao_compareceu,1,faltou,2026-06-29 12:29:25
+Bemia Vasconcelos,48991211596,2423,Agda,nao_compareceu,1,faltou,2026-06-29 17:53:57
+Kelly Silveira Lopes,48984701772,2421,Agda,comparecimento,1,compareceu,2026-06-29 18:00:43
+Kelly Silveira Lopes,48984701772,2421,Agda,nao_compareceu,1,faltou,2026-06-29 18:21:56
+Regina,54898642122,1900,Agda,comparecimento,1,compareceu,2026-06-29 18:22:47
+Maria Aparecida de Siqueira de Souza,48991202913,2463,Helenice,nao_compareceu,1,faltou,2026-06-29 21:51:17
+Marinelci Alves Fagundes,51996227163,2577,Helenice,nao_compareceu,1,faltou,2026-06-29 23:03:45
+Claudia Guth,54898091121,2145,Helenice,nao_compareceu,1,faltou,2026-06-30 14:58:33
+Natália Zinola,4899618259,2537,Helenice,nao_compareceu,1,faltou,2026-06-30 15:01:55
+Kelly Silveira Lopes,48984701772,2421,Agda,nao_compareceu,2,faltou 2a vez,2026-06-30 17:45:57
+Marcos Andre Menegassi Rossi,48999774463,2532,Helenice,comparecimento,1,compareceu,2026-06-30 18:29:04
+Danilo,48991366682,2591,Agda,comparecimento,1,compareceu,2026-07-01 21:14:38
+Solange,48985045617,2735,Helenice,nao_compareceu,1,faltou,2026-07-02 12:43:29
+Natália Zinola,4899618259,2537,Helenice,comparecimento,1,compareceu,2026-07-02 19:07:34
+Marlene Borges,54891508876,1824,Agda,nao_compareceu,1,faltou,2026-07-03 13:30:07
+Janete  Barcaro,48991581206,1231,Agda,nao_compareceu,1,faltou,2026-07-03 13:33:17
+Renato Mendes Viegas,21987240403,2303,Helenice,comparecimento,1,compareceu,2026-07-03 14:40:46
+Roberta Lilian Orru Viegas,52187240403,1965,Helenice,comparecimento,1,compareceu,2026-07-03 14:40:49
+Patrícia Pacheco Cordeiro,48998048690,2687,Helenice,comparecimento,1,compareceu,2026-07-03 16:04:45
+Alfreda Adriana da Conceição,48998282986,2669,Helenice,nao_compareceu,1,faltou,2026-07-03 17:45:59
+Paloma,48998663269,2609,Agda,nao_compareceu,1,faltou,2026-07-03 18:18:00
+Sandra Maria Mafra,,2703,Helenice,comparecimento,1,compareceu,2026-07-06 17:04:31
+MC Ferraz,54898097190,1705,Agda,nao_compareceu,1,faltou,2026-07-06 17:27:10
+Marlene da Silva,48984195052,1679,Helenice,comparecimento,1,compareceu,2026-07-06 18:09:49
+Mônica Oliveira Ferreira,48991131621,2673,Helenice,comparecimento,1,compareceu,2026-07-06 19:53:15
+Patrícia Pacheco Cordeiro,48998048690,2687,Helenice,nao_compareceu,1,faltou,2026-07-06 20:58:13
+Yuri,48996737301,2358,Helenice,nao_compareceu,1,faltou,2026-07-07 13:39:35
+Rosy América Alves,48991382704,2218,Helenice,comparecimento,1,compareceu,2026-07-07 19:05:32
+Patrícia Correa Soares,48991477983,2555,Agda,comparecimento,1,compareceu,2026-07-07 21:13:52
+Marcia Maria Pereira,48984645130,2814,Agda,nao_compareceu,1,faltou,2026-07-08 11:11:20
+68805443207343@lid,48984863346,2271,Agda,nao_compareceu,1,faltou,2026-07-08 11:18:32
+Eduardo Brito Filho,49998340404,2338,Helenice,nao_compareceu,1,faltou,2026-07-08 15:59:09
+Nilsa,4899544991,1034,Agda,comparecimento,1,compareceu,2026-07-08 16:02:52
+Eliane Luiz,48988556858,2866,Helenice,comparecimento,1,compareceu,2026-07-08 17:00:53
+Drica de Mello,48988337670,2262,Helenice,nao_compareceu,1,faltou,2026-07-09 09:53:02
+Izamara,48984090037,2517,Agda,nao_compareceu,1,faltou,2026-07-09 14:08:36
+Cleusane Lourdes Cumerlatto,48996006110,2879,Helenice,nao_compareceu,1,faltou,2026-07-09 14:12:12
+Marcilane Maria Veras,48999471082,2334,Helenice,nao_compareceu,1,faltou,2026-07-09 17:23:43
+Eliane Luiz,48988556858,2866,Helenice,comparecimento,2,compareceu 2a vez,2026-07-09 20:51:20
+bernadetefagundes1965,48999704034,2902,Agda,nao_compareceu,1,faltou,2026-07-09 20:53:42
+Samuka 🤪,48984658253,2865,Agda,nao_compareceu,1,faltou,2026-07-09 21:31:44
+Daiana oliveira brito Martins,48984678038,2868,Agda,nao_compareceu,1,faltou,2026-07-09 21:31:58
+Jaqueline Ficher Lopes,48991104533,2602,Helenice,comparecimento,1,compareceu,2026-07-10 17:01:37
+Maria Aparecida de Siqueira de Souza,48991202913,2463,Helenice,nao_compareceu,2,faltou 2a vez,2026-07-10 18:17:13
+Ana Karla de Jesus,48991458094,2715,Helenice,comparecimento,1,compareceu,2026-07-13 17:08:28
+Carla,4884962639,2778,Helenice,comparecimento,1,compareceu,2026-07-13 17:09:45
+Joseane,48988679745,2437,Helenice,nao_compareceu,1,faltou,2026-07-13 17:10:23
+Vivi,48991130951,2880,Agda,nao_compareceu,1,faltou,2026-07-13 18:17:23
+Ana Paula,48991639263,2736,Agda,nao_compareceu,1,faltou,2026-07-13 18:21:46
+Valdinete Maria Bernades  Nascimento,4884226163,2799,Helenice,nao_compareceu,1,faltou,2026-07-14 12:51:20
+Isabel,48988233331,2859,Agda,nao_compareceu,1,faltou,2026-07-14 13:35:48
+Anelise Búrigo,54896848388,1903,Helenice,nao_compareceu,1,faltou,2026-07-14 20:08:27
+Leunete de Jesus Oliveira,9881825125,2781,Helenice,nao_compareceu,1,faltou,2026-07-15 11:09:52
+Edilaine Terezinha Zomkowsky,41996114125,3084,Helenice,nao_compareceu,1,faltou,2026-07-15 11:10:08
+Maria Salete de Souza,48991877220,2942,Helenice,nao_compareceu,1,faltou,2026-07-15 11:27:29
+Izadora Narci Stempniak Gnecco,4884043311,3040,Helenice,comparecimento,1,compareceu,2026-07-15 12:09:15
+Karinne,48996762480,2690,Agda,nao_compareceu,1,faltou,2026-07-15 12:56:09
+Leraci,48984203073,2587,Agda,comparecimento,1,compareceu,2026-07-15 12:56:48
+Doralice,48991692107,1461,Agda,nao_compareceu,1,faltou,2026-07-15 12:57:58
+emiliasantiago816,48988798861,3003,Agda,nao_compareceu,1,faltou,2026-07-15 12:58:59
+Dr Diego Aguiar,48998364811,2436,Agda,nao_compareceu,1,faltou,2026-07-15 14:11:05
+Dr Diego Aguiar,48998364811,2436,Agda,nao_compareceu,2,faltou 2a vez,2026-07-15 14:12:45
+Dr Diego Aguiar,48998364811,2436,Agda,comparecimento,1,compareceu,2026-07-15 14:35:29
+Dr Diego Aguiar,48998364811,2436,Agda,nao_compareceu,3,faltou 3a vez,2026-07-15 14:43:00
+Izamara,48984090037,2517,Agda,nao_compareceu,2,faltou 2a vez,2026-07-15 17:04:01
+Ida Mendes Melo,48996028090,2406,Helenice,nao_compareceu,1,faltou,2026-07-15 18:39:52
+Nibia de lá Vega,48998604468,2721,Helenice,nao_compareceu,1,faltou,2026-07-15 18:40:40
+Maria Madalena,48984548254,2845,Agda,nao_compareceu,1,faltou,2026-07-15 19:07:10
+Rutinha Tim,47999411862,3110,Helenice,nao_compareceu,1,faltou,2026-07-16 09:42:43
+Ana Karla de Jesus,48991458094,2715,Helenice,nao_compareceu,2,faltou 2a vez,2026-07-16 11:07:47
+Raquel Barreto,48991086444,3034,Helenice,nao_compareceu,1,faltou,2026-07-16 13:44:23
+Cristiane,48984481473,2996,Helenice,nao_compareceu,1,faltou,2026-07-16 14:09:57
+Sandra,4891136226,3071,Helenice,comparecimento,1,compareceu,2026-07-16 14:17:49
+Ana Karla de Jesus,48991458094,2715,Helenice,cancelou,1,cancelou,2026-07-16 15:27:32
+Ida Mendes Melo,48996028090,2406,Helenice,cancelou,1,cancelou,2026-07-16 15:27:35
+Valdinete Maria Bernades  Nascimento,4884226163,2799,Helenice,cancelou,1,cancelou,2026-07-16 15:27:45
+Cleusane Lourdes Cumerlatto,48996006110,2879,Helenice,cancelou,1,cancelou,2026-07-16 15:27:48
+Nibia de lá Vega,48998604468,2721,Helenice,cancelou,1,cancelou,2026-07-16 15:27:54
+Vânia,4899717672,3057,Helenice,comparecimento,1,compareceu,2026-07-16 16:44:44
+Silmara Terezinha Ceglarek Paulo,48998568108,2860,Helenice,comparecimento,1,compareceu,2026-07-16 19:40:47
+Clélia,48999776535,2933,Agda,remarcou,1,remarcou,2026-07-16 22:10:06

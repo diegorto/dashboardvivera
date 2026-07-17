@@ -429,12 +429,11 @@ const ExecutiveDashboard: React.FC = () => {
               (() => {
                 // Mapear e filtrar estágios
                 const stageMap: { [key: string]: string } = {
-                  'Entrada': 'Entrada',
-                  'Contato': 'Leads',
+                  'Entrada': 'Leads',
                   'Qualificado': 'Qualificados',
-                  'Agendamento': 'Agendaram',
-                  'Compareci': 'Compareceram',
-                  'Won': 'Fecharam'
+                  'Agendamento Realizado': 'Agendaram',
+                  'Comparecimento': 'Compareceram',
+                  'Ganho': 'Fecharam'
                 };
 
                 const colors = ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#10b981'];
@@ -454,7 +453,7 @@ const ExecutiveDashboard: React.FC = () => {
                     <div className="flex justify-between items-start text-[11px] mb-1">
                       <div>
                         <span className="text-[#475569] font-medium">{stage.displayName}</span>
-                        {stage.originalStage === 'Won' && stage.value > 0 && (
+                        {stage.originalStage === 'Ganho' && stage.value > 0 && (
                           <div className="text-[10px] text-[#10b981] font-semibold mt-0.5">
                             Faturado: R$ {(stage.value / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                           </div>

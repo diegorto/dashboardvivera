@@ -20,6 +20,13 @@ interface FilterDef {
 }
 
 const filterDefs: FilterDef[] = [
+  { key: 'procedure', label: 'Procedimento', filterKey: 'procedure' },
+  { key: 'professional', label: 'Profissional', filterKey: 'professional' },
+  { key: 'sdr', label: 'SDR', filterKey: 'sdr' },
+  { key: 'campaign', label: 'Campanha', filterKey: 'campaign' },
+  { key: 'adSet', label: 'Ad Set', filterKey: 'creative' },
+  { key: 'pipeline', label: 'Pipeline', filterKey: 'pipeline' },
+  { key: 'status', label: 'Status', filterKey: 'status' },
 ];
 
 const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customBreadcrumb, right }) => {

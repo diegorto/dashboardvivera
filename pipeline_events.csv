@@ -1,0 +1,293 @@
+deal_id,person_name,phone,owner_name,stage_id,event_key,entered_at,old_stage
+598,Roseli  ✨✨,54899013590,Helenice,5,comparecimento,2026-03-25 23:06:20,17
+623,Luciane,54884336342,Agda,5,comparecimento,2026-04-23 12:16:49,4
+641,Susana,54888472641,Helenice,5,comparecimento,2026-05-15 14:42:48,4
+664,Ana Lopes,54899041338,Agda,5,comparecimento,2026-04-29 21:25:48,4
+669,Camila Luisa,54797279394,Helenice,13,nao_compareceu,2026-05-04 19:12:31,4
+682,Nando,54899702856,Agda,5,comparecimento,2026-03-31 13:21:07,13
+682,Nando,54899702856,Agda,13,nao_compareceu,2026-03-31 13:20:58,4
+722,Josi,54888306828,Helenice,5,comparecimento,2026-05-19 12:58:23,4
+722,Josi,54888306828,Helenice,13,nao_compareceu,2026-05-08 14:48:38,4
+740,Marly,54884116521,Agda,13,nao_compareceu,2026-06-17 13:19:44,4
+785,Maria Velza,54899599091,Helenice,13,nao_compareceu,2026-04-14 17:13:17,4
+799,Marlene,54899019095,Helenice,13,nao_compareceu,2026-03-27 18:31:03,4
+814,Luiz Marcelo,54891919978,Agda,13,nao_compareceu,2026-05-08 12:59:15,4
+819,Rute Firminio,54885065617,Helenice,13,nao_compareceu,2026-05-07 13:53:00,4
+830,Ilene,54899085254,Agda,5,comparecimento,2026-03-27 14:01:42,17
+866,Mari,21997524148,Agda,13,nao_compareceu,2026-05-13 09:30:58,4
+868,Zoe Henschel,48998179151,Agda,5,comparecimento,2026-03-31 18:36:23,4
+870,Alice,48999554191,Helenice,13,nao_compareceu,2026-05-07 13:20:20,4
+870,Alice,48999554191,Helenice,13,nao_compareceu,2026-05-06 12:01:07,4
+870,Alice,48999554191,Helenice,13,nao_compareceu,2026-03-27 18:27:39,4
+884,Janira,48991547783,Agda,5,comparecimento,2026-04-10 20:42:33,4
+885,jc construções,48998443505,Agda,13,nao_compareceu,2026-03-30 19:25:34,5
+885,jc construções,48998443505,Agda,5,comparecimento,2026-03-30 19:25:22,13
+885,jc construções,48998443505,Agda,13,nao_compareceu,2026-03-26 13:36:47,4
+886,jardel,48999363590,Helenice,13,nao_compareceu,2026-03-31 13:34:49,4
+886,jardel,48999363590,Helenice,13,nao_compareceu,2026-03-30 17:27:23,4
+896,Goreti,48988590577,Agda,13,nao_compareceu,2026-05-08 12:54:26,4
+915,MAGNA,48984818586,Agda,5,comparecimento,2026-03-26 14:08:49,4
+924,flavio,48999914548,Agda,13,nao_compareceu,2026-05-06 13:04:50,4
+928,maria do carmo,48988604646,Helenice,13,nao_compareceu,2026-04-02 19:55:10,4
+933,viviane leite,48999806833,Helenice,13,nao_compareceu,2026-03-31 20:03:28,4
+941,marli farias,48991419672,Helenice,5,comparecimento,2026-06-05 14:21:31,4
+941,marli farias,48991419672,Helenice,13,nao_compareceu,2026-04-14 12:19:56,4
+957,Giselle,6596689488,Agda,13,nao_compareceu,2026-04-08 13:34:15,4
+969,Maria Cecilia Rodrigues,48988584523,Agda,5,comparecimento,2026-03-31 19:09:05,4
+971,mariza carvalho,48999273346,Agda,5,comparecimento,2026-04-08 19:25:36,4
+973,marlene,48991945566,Agda,5,comparecimento,2026-06-05 20:44:01,4
+977,Graciela,48991895262,Agda,5,comparecimento,2026-04-09 21:01:24,4
+979,Tainara,48996897711,Agda,13,nao_compareceu,2026-05-20 19:46:28,4
+980,marcelo,48984046580,Helenice,13,nao_compareceu,2026-06-08 23:11:48,21
+988,Thiago Lemos,48984477744,Helenice,13,nao_compareceu,2026-04-27 20:10:22,5
+988,Thiago Lemos,48984477744,Helenice,5,comparecimento,2026-04-27 20:05:03,13
+988,Thiago Lemos,48984477744,Helenice,13,nao_compareceu,2026-04-08 13:34:14,4
+988,Thiago Lemos,48984477744,Helenice,13,nao_compareceu,2026-03-31 20:46:05,4
+993,fernando martins,41998809168,Agda,13,nao_compareceu,2026-04-17 13:21:33,3
+1003,Débora Zamban,48991130616,Agda,5,comparecimento,2026-04-13 17:20:48,13
+1003,Débora Zamban,48991130616,Agda,13,nao_compareceu,2026-04-13 17:20:45,4
+1034,Nilsa,4899544991,Agda,5,comparecimento,2026-07-08 16:02:52,4
+1042,Leticia Decio,5199703421,Agda,5,comparecimento,2026-04-08 13:35:25,4
+1057,Gabriela Kowalsky,4796048918,Agda,13,nao_compareceu,2026-04-15 12:36:50,4
+1066,Hilda,4899101234,Agda,13,nao_compareceu,2026-06-08 19:57:12,4
+1068,Cecilia,48999715448,Agda,13,nao_compareceu,2026-06-16 11:49:05,4
+1073,Fábio,48984337119,Agda,5,comparecimento,2026-04-08 19:25:40,4
+1078,Rosa Alves,48998405520,Agda,13,nao_compareceu,2026-06-23 16:45:28,4
+1079,Cleci Fedatto,48988441125,Agda,13,nao_compareceu,2026-06-12 11:29:37,4
+1085,..,43984983766,Agda,13,nao_compareceu,2026-05-04 18:30:33,4
+1100,Rosangela,48996605305,Agda,5,comparecimento,2026-05-11 20:54:29,4
+1100,Rosangela,48996605305,Agda,13,nao_compareceu,2026-04-10 21:00:20,4
+1107,Cristiano Delatore,4899887775,Agda,13,nao_compareceu,2026-05-08 12:50:34,4
+1109,..,48984056469,Agda,13,nao_compareceu,2026-05-26 20:19:44,4
+1116,..,48984509193,Agda,13,nao_compareceu,2026-04-14 13:08:16,5
+1116,..,48984509193,Agda,5,comparecimento,2026-04-14 13:07:29,6
+1116,..,48984509193,Agda,5,comparecimento,2026-04-14 13:07:21,4
+1117,CÉLIA  REGINA,48999639052,Agda,13,nao_compareceu,2026-04-27 21:54:50,4
+1122,..,48984165006,Agda,5,comparecimento,2026-04-16 22:58:23,6
+1122,..,48984165006,Agda,5,comparecimento,2026-04-13 21:25:11,4
+1125,Bete,48996065371,Agda,5,comparecimento,2026-04-14 19:14:23,4
+1129,..,49998066217,Agda,5,comparecimento,2026-04-17 12:19:31,4
+1134,Cristiane Mendes ferreira,48991107424,Agda,13,nao_compareceu,2026-04-16 17:48:22,3
+1154,José Androaldo Lemes,48999387178,Agda,5,comparecimento,2026-04-14 17:46:03,4
+1156,**,17742741749,Agda,5,comparecimento,2026-05-04 18:28:27,4
+1157,Rose,48988757756,Agda,13,nao_compareceu,2026-05-08 12:48:16,4
+1158,Estela Maris Alves,5196351827,Agda,13,nao_compareceu,2026-04-20 20:48:17,4
+1170,katia pamplona,48988111324,Agda,5,comparecimento,2026-04-24 20:55:52,4
+1173,Juliano Nickel,48984730365,Agda,13,nao_compareceu,2026-04-27 17:22:27,4
+1174,Frederico de Nadai,11993153663,Agda,5,comparecimento,2026-04-24 21:00:42,4
+1204,Marega,48988775226,Helenice,13,nao_compareceu,2026-04-28 17:29:58,4
+1210,Maria Joana,48999621597,Agda,13,nao_compareceu,2026-05-21 18:03:53,20
+1216,**,61981237895,Agda,5,comparecimento,2026-04-24 20:59:18,4
+1221,Elia Kim Diniz,91982510553,Agda,5,comparecimento,2026-04-22 20:08:54,4
+1231,Janete  Barcaro,48991581206,Agda,13,nao_compareceu,2026-07-03 13:33:17,6
+1231,Janete  Barcaro,48991581206,Agda,5,comparecimento,2026-04-27 21:55:17,4
+1233,Anynha,48991458094,Agda,13,nao_compareceu,2026-04-30 20:42:20,4
+1240,Eloisa,48991929123,Agda,13,nao_compareceu,2026-05-04 23:10:59,5
+1240,Eloisa,48991929123,Agda,5,comparecimento,2026-05-04 18:27:56,13
+1240,Eloisa,48991929123,Agda,13,nao_compareceu,2026-05-04 18:27:52,4
+1255,Maria Cecilia Rodrigues,48988584523,Agda,5,comparecimento,2026-04-23 00:19:37,6
+1269,Jonas Ramos,4896248864,Agda,5,comparecimento,2026-04-27 17:19:44,2
+1278,Larissa machado,4896448170,Agda,13,nao_compareceu,2026-04-28 17:32:36,4
+1291,Cristina,48988272724,Agda,5,comparecimento,2026-05-04 18:27:40,4
+1296,Matheus Bala,48998476739,Agda,5,comparecimento,2026-05-18 16:54:13,4
+1302,Lisiane Braga,48998094970,Agda,5,comparecimento,2026-05-06 19:23:37,4
+1309,**,48999400669,Agda,13,nao_compareceu,2026-05-06 13:04:13,4
+1312,**,48991324019,Agda,5,comparecimento,2026-04-30 14:20:43,4
+1320,Lauro,48984743553,Agda,5,comparecimento,2026-05-07 22:22:53,4
+1323,Letícia Antônia Soares,48984654926,Agda,5,comparecimento,2026-04-30 14:20:53,4
+1338,Caroline Villela,47992092332,Agda,13,nao_compareceu,2026-05-08 12:52:35,4
+1356,Gabriela Conde,48991520835,Agda,13,nao_compareceu,2026-05-06 13:04:00,4
+1369,Caian Magnani,35383211,Helenice,13,nao_compareceu,2026-05-04 17:40:02,4
+1388,Paulo Eduardo Barretos,48999359286,Agda,13,nao_compareceu,2026-05-01 12:13:09,4
+1389,Djalma Moraes Garcia,48999359286,Agda,5,comparecimento,2026-04-30 21:29:55,4
+1391,Cássia Viviane Boscollo Santos,53832079185,Helenice,13,nao_compareceu,2026-05-04 19:03:41,4
+1392,Maria José,47996529761,Agda,5,comparecimento,2026-05-05 16:44:32,4
+1398,Natalicia Cristina Soares Roz,48996495679,Agda,5,comparecimento,2026-05-04 17:59:12,4
+1411,Lucia Lobato,48988432062,Helenice,5,comparecimento,2026-06-26 15:48:42,4
+1411,Lucia Lobato,48988432062,Helenice,13,nao_compareceu,2026-06-12 22:35:55,4
+1432,Douglas Ventura!,48996885960,Agda,5,comparecimento,2026-05-07 18:28:13,13
+1432,Douglas Ventura!,48996885960,Agda,13,nao_compareceu,2026-05-06 21:01:21,4
+1432,Douglas Ventura!,48996885960,Agda,13,nao_compareceu,2026-05-04 22:12:47,4
+1445,Clara Bezerra da Silva,,Helenice,13,nao_compareceu,2026-05-08 14:47:58,4
+1461,Doralice,48991692107,Agda,13,nao_compareceu,2026-07-15 12:57:58,4
+1464,Eliane,48996808914,Agda,13,nao_compareceu,2026-06-17 11:58:11,4
+1474,Diovanne Ferreira,48984276531,Helenice,5,comparecimento,2026-05-06 19:30:46,4
+1476,Julio Cézar,59981659887,Agda,5,comparecimento,2026-05-15 19:22:17,4
+1495,**,48992105689,Agda,13,nao_compareceu,2026-05-15 12:02:18,4
+1502,Rose,4898301795,Agda,5,comparecimento,2026-05-22 13:52:25,4
+1515,Ademir Muller,48992049802,Agda,13,nao_compareceu,2026-05-13 09:29:30,4
+1535,**,89935050296,Agda,13,nao_compareceu,2026-05-08 16:41:50,4
+1551,Pati,89882546666,Agda,13,nao_compareceu,2026-06-10 18:35:27,4
+1551,Pati,89882546666,Agda,13,nao_compareceu,2026-05-18 14:53:08,4
+1581,Cleo Lemos♥️,54891571262,Agda,5,comparecimento,2026-05-13 09:29:08,4
+1584,Orvalina Alves Da Cruz,48988449396,Agda,5,comparecimento,2026-05-22 13:52:05,4
+1603,Ângela  Aparecida  Pinto,49988974989,Agda,5,comparecimento,2026-05-22 13:51:58,4
+1606,Roselma Sagás,54891351996,Agda,5,comparecimento,2026-06-05 20:43:52,4
+1609,Rodrigo,54899362123,Helenice,13,nao_compareceu,2026-05-26 17:08:23,4
+1612,Neli Ribeiro,54896004749,Agda,5,comparecimento,2026-05-19 18:32:00,4
+1623,Renata Swoboda,54884637087,Helenice,13,nao_compareceu,2026-05-13 13:37:04,4
+1628,Jane Fagundes,56182687279,Helenice,5,comparecimento,2026-05-13 20:12:23,4
+1629,clecisalete303@gmail.Com,54888230698,Agda,13,nao_compareceu,2026-05-18 14:46:17,4
+1630,Timóteo Aquino,4888472641,Helenice,5,comparecimento,2026-05-15 14:42:54,4
+1631,João Gabriel Aquino,48988472641,Helenice,5,comparecimento,2026-05-15 14:42:40,4
+1655,João Vitor,52189451004,Agda,5,comparecimento,2026-05-15 12:17:53,4
+1656,Sirlei,48999858256,Agda,5,comparecimento,2026-06-18 17:46:13,4
+1663,Elizandra Hoffmann,54884314067,Helenice,13,nao_compareceu,2026-06-12 22:35:36,20
+1669,Nicole da Silva Sell,15981659887,Agda,5,comparecimento,2026-05-15 19:21:27,4
+1676,Emerson Martins,54896174980,Agda,5,comparecimento,2026-05-25 19:22:07,4
+1679,Marlene da Silva,48984195052,Helenice,5,comparecimento,2026-07-06 18:09:49,4
+1684,Rosangeles Aparecida Gomes,54884218189,Helenice,5,comparecimento,2026-05-22 18:52:36,4
+1687,Solange Zonatto Rodrigue,54899485744,Helenice,5,comparecimento,2026-05-20 21:56:09,4
+1692,Cintia😇🧜‍♀️,54896163372,Helenice,13,nao_compareceu,2026-05-19 19:14:21,4
+1698,Daiana Ilha,54896070096,Helenice,5,comparecimento,2026-05-25 19:05:04,4
+1705,MC Ferraz,54898097190,Agda,13,nao_compareceu,2026-07-06 17:27:10,4
+1721,Morgana,48999099430,Agda,5,comparecimento,2026-05-21 18:07:08,4
+1724,Jade,48984667692,Agda,5,comparecimento,2026-05-20 17:49:29,4
+1732,Luciane,4891637545,Helenice,13,nao_compareceu,2026-05-26 09:20:50,4
+1739,Eose,54898142926,Agda,13,nao_compareceu,2026-05-20 13:22:53,4
+1747,Michele Marchi,48991298966,Agda,5,comparecimento,2026-06-09 18:43:02,4
+1769,Nilésia,54896981630,Helenice,13,nao_compareceu,2026-05-21 15:08:27,4
+1771,Lourdes Maria Gless,54899009700,Helenice,5,comparecimento,2026-06-05 14:16:07,6
+1771,Lourdes Maria Gless,54899009700,Helenice,13,nao_compareceu,2026-06-05 14:13:58,4
+1771,Lourdes Maria Gless,54899009700,Helenice,13,nao_compareceu,2026-05-22 19:07:50,4
+1776,Marilane,54899271267,Agda,13,nao_compareceu,2026-06-23 19:14:25,4
+1794,Eduardo shimidt,51985286064,Agda,5,comparecimento,2026-05-22 17:40:10,4
+1824,Marlene Borges,54891508876,Agda,13,nao_compareceu,2026-07-03 13:30:07,6
+1824,Marlene Borges,54891508876,Agda,5,comparecimento,2026-05-26 20:20:35,4
+1830,Elaine Vieira Saar,52492694778,Helenice,5,comparecimento,2026-06-01 20:26:32,4
+1841,Rosercy Lescano Ferreira Polisel,56599616355,Helenice,5,comparecimento,2026-06-08 22:09:32,4
+1843,Claudemar da Silva Paz,54888412819,Helenice,13,nao_compareceu,2026-06-01 13:08:01,4
+1850,Edson,54884228450,Agda,5,comparecimento,2026-05-28 12:28:23,4
+1879,Nara TeresaSilva daCruz,54888184216,Agda,13,nao_compareceu,2026-05-28 14:16:55,4
+1885,Michele,48999488650,Helenice,13,nao_compareceu,2026-05-26 17:08:32,4
+1900,Regina,54898642122,Agda,5,comparecimento,2026-06-29 18:22:47,4
+1903,Anelise Búrigo,54896848388,Helenice,13,nao_compareceu,2026-07-14 20:08:27,4
+1909,Jean Jeferson Reis da Silva,54896225191,Helenice,13,nao_compareceu,2026-05-31 19:10:59,4
+1911,Tamiris Ferreira Polisel,6599616355,Helenice,5,comparecimento,2026-06-08 22:09:30,4
+1915,Rosimeri Halfen Fleck,55182565447,Agda,13,nao_compareceu,2026-06-22 19:46:57,4
+1918,Bruna Medeiros Domingos,54898180241,Helenice,13,nao_compareceu,2026-05-29 13:22:13,4
+1922,Ana Lúcia Pauletti Baldisserotto,54899415048,Helenice,13,nao_compareceu,2026-05-26 14:31:27,4
+1929,Luiz Rosa Junior,54899712913,Helenice,13,nao_compareceu,2026-05-28 13:41:17,4
+1933,Andreia Krajeski,55183481926,Helenice,13,nao_compareceu,2026-06-25 19:34:01,3
+1956,Paulo Castro,54888396069,Agda,5,comparecimento,2026-06-05 13:15:29,4
+1965,Roberta Lilian Orru Viegas,52187240403,Helenice,5,comparecimento,2026-07-03 14:40:49,4
+1969,Leandro João de Carvalho,54796726521,Helenice,13,nao_compareceu,2026-06-10 14:32:23,4
+1979,Luciana,54891242226,Helenice,13,nao_compareceu,2026-05-27 18:16:24,4
+1981,Silmara,54891596631,Helenice,13,nao_compareceu,2026-06-08 22:17:09,4
+1983,Magda Pacheco Rocha,54884598885,Helenice,13,nao_compareceu,2026-06-08 22:18:15,4
+1998,Rosan.,54898135984,Helenice,13,nao_compareceu,2026-06-04 19:22:30,4
+2031,Fernanda Selistre,48999122981,Agda,5,comparecimento,2026-06-03 18:03:22,4
+2040,Renata L Joaquim,49991520023,Agda,13,nao_compareceu,2026-05-28 18:16:01,2
+2042,Adriana Alves Madalena Candido,54884152017,Helenice,13,nao_compareceu,2026-06-08 22:17:08,4
+2051,Luciane Dos Santos,54896846796,Agda,13,nao_compareceu,2026-06-02 11:14:40,4
+2068,Doraci Moreira Costa Demétrio,54891204384,Helenice,5,comparecimento,2026-06-11 15:03:07,4
+2086,Alex,54891410976,Agda,13,nao_compareceu,2026-06-10 18:36:47,4
+2106,Josilene Protazio Silva,4896093315,Helenice,13,nao_compareceu,2026-06-05 18:41:09,4
+2118,Sueli,11955851801,Helenice,13,nao_compareceu,2026-06-07 11:33:10,4
+2121,Gilberto Valvito Nascimento,54896362909,Helenice,13,nao_compareceu,2026-06-08 22:17:05,4
+2145,Claudia Guth,54898091121,Helenice,13,nao_compareceu,2026-06-30 14:58:33,4
+2149,kauã alemão,56892300912,Helenice,13,nao_compareceu,2026-06-08 17:04:27,4
+2150,Fabíola Franzoni Wagner,54884167091,Agda,5,comparecimento,2026-06-22 23:47:00,4
+2158,Alice,54884949892,Agda,13,nao_compareceu,2026-06-10 12:41:51,4
+2211,Angela Maria Meschke,4899621714,Agda,13,nao_compareceu,2026-06-11 12:58:38,4
+2215,Gabriel,48988774174,Agda,5,comparecimento,2026-06-17 13:15:14,4
+2218,Rosy América Alves,48991382704,Helenice,5,comparecimento,2026-07-07 19:05:32,4
+2224,Márcio Portela,47988977261,Helenice,5,comparecimento,2026-06-10 21:54:02,4
+2229,Luciane Dos Santos,48996846796,Agda,13,nao_compareceu,2026-06-10 18:09:46,25
+2232,Aida Teresinha Godoi de Ataíde Silva,4896289019,Helenice,5,comparecimento,2026-06-11 16:25:36,4
+2232,Aida Teresinha Godoi de Ataíde Silva,4896289019,Helenice,13,nao_compareceu,2026-06-11 12:48:58,4
+2262,Drica de Mello,48988337670,Helenice,13,nao_compareceu,2026-07-09 09:53:02,4
+2267,Daniel Ribeiro,,Helenice,5,comparecimento,2026-06-26 15:48:39,4
+2267,Daniel Ribeiro,,Helenice,13,nao_compareceu,2026-06-12 20:52:07,4
+2271,68805443207343@lid,48984863346,Agda,13,nao_compareceu,2026-07-08 11:18:32,4
+2286,Joyce Nunis,48996356875,Agda,13,nao_compareceu,2026-06-23 21:39:05,4
+2302,Wilton Batalha,4899890882,Helenice,13,nao_compareceu,2026-06-16 11:59:35,4
+2303,Renato Mendes Viegas,21987240403,Helenice,5,comparecimento,2026-07-03 14:40:46,4
+2305,Roseli Santos Luiz,48984473741,Helenice,5,comparecimento,2026-06-18 14:02:45,4
+2321,Denise Patrícia Alves,48999034006,Helenice,13,nao_compareceu,2026-06-23 11:31:13,4
+2323,Vanuza Padilha,4899034006,Helenice,13,nao_compareceu,2026-06-23 11:31:51,4
+2324,Rosangela Olivia🇧🇷,48984511010,Agda,13,nao_compareceu,2026-06-17 21:26:22,4
+2325,Kaue Lopes Amaral,51996333740,Agda,5,comparecimento,2026-06-17 13:14:57,4
+2330,Amauri Dornelles,48999804428,Helenice,5,comparecimento,2026-06-18 17:31:25,4
+2331,Patrícia,48984680367,Agda,13,nao_compareceu,2026-06-24 16:24:51,4
+2334,Marcilane Maria Veras,48999471082,Helenice,13,nao_compareceu,2026-07-09 17:23:43,4
+2335,Ivone Dilma Guesser Rosa,48988724352,Agda,13,nao_compareceu,2026-06-22 16:56:08,4
+2338,Eduardo Brito Filho,49998340404,Helenice,13,nao_compareceu,2026-07-08 15:59:09,4
+2358,Yuri,48996737301,Helenice,13,nao_compareceu,2026-07-07 13:39:35,4
+2381,Edmilson Laurindo,,Helenice,5,comparecimento,2026-06-18 17:31:23,4
+2399,Luis Alencar,48984738456,Agda,13,nao_compareceu,2026-06-22 19:45:19,4
+2403,Branca,11970979083,Agda,13,nao_compareceu,2026-06-22 13:36:20,4
+2406,Ida Mendes Melo,48996028090,Helenice,64,cancelou,2026-07-16 15:27:35,13
+2406,Ida Mendes Melo,48996028090,Helenice,13,nao_compareceu,2026-07-15 18:39:52,4
+2421,Kelly Silveira Lopes,48984701772,Agda,13,nao_compareceu,2026-06-30 17:45:57,4
+2421,Kelly Silveira Lopes,48984701772,Agda,13,nao_compareceu,2026-06-29 18:21:56,5
+2421,Kelly Silveira Lopes,48984701772,Agda,5,comparecimento,2026-06-29 18:00:43,4
+2423,Bemia Vasconcelos,48991211596,Agda,13,nao_compareceu,2026-06-29 17:53:57,4
+2436,Dr Diego Aguiar,48998364811,Agda,13,nao_compareceu,2026-07-15 14:43:00,4
+2436,Dr Diego Aguiar,48998364811,Agda,5,comparecimento,2026-07-15 14:35:29,4
+2436,Dr Diego Aguiar,48998364811,Agda,13,nao_compareceu,2026-07-15 14:12:45,4
+2436,Dr Diego Aguiar,48998364811,Agda,13,nao_compareceu,2026-07-15 14:11:05,4
+2437,Joseane,48988679745,Helenice,13,nao_compareceu,2026-07-13 17:10:23,4
+2451,Katia Gonçalves,48996510887,Helenice,13,nao_compareceu,2026-06-29 12:29:25,4
+2463,Maria Aparecida de Siqueira de Souza,48991202913,Helenice,13,nao_compareceu,2026-07-10 18:17:13,24
+2463,Maria Aparecida de Siqueira de Souza,48991202913,Helenice,13,nao_compareceu,2026-06-29 21:51:17,4
+2469,Bruna Gonçalves,4896510887,Helenice,13,nao_compareceu,2026-06-29 12:29:23,4
+2472,Wendell,48991541483,Agda,5,comparecimento,2026-06-26 18:10:36,4
+2475,Patrícia Íris de Andrade,48984112399,Helenice,13,nao_compareceu,2026-06-24 19:30:39,4
+2513,🤍,48998481156,Agda,5,comparecimento,2026-06-27 00:25:54,4
+2516,Michele,48996219674,Helenice,13,nao_compareceu,2026-06-23 21:13:40,4
+2517,Izamara,48984090037,Agda,13,nao_compareceu,2026-07-15 17:04:01,4
+2517,Izamara,48984090037,Agda,13,nao_compareceu,2026-07-09 14:08:36,4
+2518,ADRIANA PIRES,,Helenice,13,nao_compareceu,2026-06-23 21:27:30,4
+2521,Valter,48988521099,Agda,5,comparecimento,2026-06-25 16:54:31,4
+2532,Marcos Andre Menegassi Rossi,48999774463,Helenice,5,comparecimento,2026-06-30 18:29:04,4
+2537,Natália Zinola,4899618259,Helenice,5,comparecimento,2026-07-02 19:07:34,4
+2537,Natália Zinola,4899618259,Helenice,13,nao_compareceu,2026-06-30 15:01:55,4
+2555,Patrícia Correa Soares,48991477983,Agda,5,comparecimento,2026-07-07 21:13:52,4
+2566,Clarice B. Nieland,67991146440,Helenice,5,comparecimento,2026-06-27 20:48:47,3
+2566,Clarice B. Nieland,67991146440,Helenice,5,comparecimento,2026-06-25 15:15:32,4
+2577,Marinelci Alves Fagundes,51996227163,Helenice,13,nao_compareceu,2026-06-29 23:03:45,4
+2587,Leraci,48984203073,Agda,5,comparecimento,2026-07-15 12:56:48,4
+2591,Danilo,48991366682,Agda,5,comparecimento,2026-07-01 21:14:38,4
+2602,Jaqueline Ficher Lopes,48991104533,Helenice,5,comparecimento,2026-07-10 17:01:37,4
+2609,Paloma,48998663269,Agda,13,nao_compareceu,2026-07-03 18:18:00,4
+2624,Fabiana Fleck,48996310240,Agda,5,comparecimento,2026-06-26 23:45:50,1
+2669,Alfreda Adriana da Conceição,48998282986,Helenice,13,nao_compareceu,2026-07-03 17:45:59,4
+2673,Mônica Oliveira Ferreira,48991131621,Helenice,5,comparecimento,2026-07-06 19:53:15,4
+2687,Patrícia Pacheco Cordeiro,48998048690,Helenice,13,nao_compareceu,2026-07-06 20:58:13,5
+2687,Patrícia Pacheco Cordeiro,48998048690,Helenice,5,comparecimento,2026-07-03 16:04:45,4
+2690,Karinne,48996762480,Agda,13,nao_compareceu,2026-07-15 12:56:09,4
+2703,Sandra Maria Mafra,,Helenice,5,comparecimento,2026-07-06 17:04:31,4
+2715,Ana Karla de Jesus,48991458094,Helenice,64,cancelou,2026-07-16 15:27:32,13
+2715,Ana Karla de Jesus,48991458094,Helenice,13,nao_compareceu,2026-07-16 11:07:47,4
+2715,Ana Karla de Jesus,48991458094,Helenice,5,comparecimento,2026-07-13 17:08:28,4
+2721,Nibia de lá Vega,48998604468,Helenice,64,cancelou,2026-07-16 15:27:54,13
+2721,Nibia de lá Vega,48998604468,Helenice,13,nao_compareceu,2026-07-15 18:40:40,4
+2735,Solange,48985045617,Helenice,13,nao_compareceu,2026-07-02 12:43:29,4
+2736,Ana Paula,48991639263,Agda,13,nao_compareceu,2026-07-13 18:21:46,4
+2778,Carla,4884962639,Helenice,5,comparecimento,2026-07-13 17:09:45,4
+2781,Leunete de Jesus Oliveira,9881825125,Helenice,13,nao_compareceu,2026-07-15 11:09:52,4
+2799,Valdinete Maria Bernades  Nascimento,4884226163,Helenice,64,cancelou,2026-07-16 15:27:45,13
+2799,Valdinete Maria Bernades  Nascimento,4884226163,Helenice,13,nao_compareceu,2026-07-14 12:51:20,4
+2814,Marcia Maria Pereira,48984645130,Agda,13,nao_compareceu,2026-07-08 11:11:20,4
+2845,Maria Madalena,48984548254,Agda,13,nao_compareceu,2026-07-15 19:07:10,4
+2859,Isabel,48988233331,Agda,13,nao_compareceu,2026-07-14 13:35:48,4
+2860,Silmara Terezinha Ceglarek Paulo,48998568108,Helenice,5,comparecimento,2026-07-16 19:40:47,4
+2865,Samuka 🤪,48984658253,Agda,13,nao_compareceu,2026-07-09 21:31:44,4
+2866,Eliane Luiz,48988556858,Helenice,5,comparecimento,2026-07-09 20:51:20,6
+2866,Eliane Luiz,48988556858,Helenice,5,comparecimento,2026-07-08 17:00:53,4
+2868,Daiana oliveira brito Martins,48984678038,Agda,13,nao_compareceu,2026-07-09 21:31:58,4
+2879,Cleusane Lourdes Cumerlatto,48996006110,Helenice,64,cancelou,2026-07-16 15:27:48,13
+2879,Cleusane Lourdes Cumerlatto,48996006110,Helenice,13,nao_compareceu,2026-07-09 14:12:12,4
+2880,Vivi,48991130951,Agda,13,nao_compareceu,2026-07-13 18:17:23,4
+2902,bernadetefagundes1965,48999704034,Agda,13,nao_compareceu,2026-07-09 20:53:42,4
+2933,Clélia,48999776535,Agda,63,remarcou,2026-07-16 22:10:06,4
+2942,Maria Salete de Souza,48991877220,Helenice,13,nao_compareceu,2026-07-15 11:27:29,4
+2996,Cristiane,48984481473,Helenice,13,nao_compareceu,2026-07-16 14:09:57,4
+3003,emiliasantiago816,48988798861,Agda,13,nao_compareceu,2026-07-15 12:58:59,4
+3034,Raquel Barreto,48991086444,Helenice,13,nao_compareceu,2026-07-16 13:44:23,4
+3040,Izadora Narci Stempniak Gnecco,4884043311,Helenice,5,comparecimento,2026-07-15 12:09:15,4
+3057,Vânia,4899717672,Helenice,5,comparecimento,2026-07-16 16:44:44,4
+3071,Sandra,4891136226,Helenice,5,comparecimento,2026-07-16 14:17:49,4
+3084,Edilaine Terezinha Zomkowsky,41996114125,Helenice,13,nao_compareceu,2026-07-15 11:10:08,4
+3110,Rutinha Tim,47999411862,Helenice,13,nao_compareceu,2026-07-16 09:42:43,4

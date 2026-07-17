@@ -1,0 +1,4 @@
+total_deals=2438
+processed=2438
+found=119
+DONE=1

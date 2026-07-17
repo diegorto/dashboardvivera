@@ -2,12 +2,77 @@ require('dotenv').config();
 
 const express = require('express');
 const axios = require('axios');
+
+const fsCache = require('fs');
+const PIPEDRIVE_CACHE_FILE = __dirname + '/data/pipedrive_cache.json';
+let pipedriveCache = {};
+try {
+  if (fsCache.existsSync(PIPEDRIVE_CACHE_FILE)) {
+    pipedriveCache = JSON.parse(fsCache.readFileSync(PIPEDRIVE_CACHE_FILE, 'utf-8'));
+    console.log(`[pipedrive-cache] Cache carregado com ${Object.keys(pipedriveCache).length} entradas`);
+  }
+} catch (e) {
+  console.log('[pipedrive-cache] Falha ao carregar cache existente:', e.message);
+}
+
+let pipedriveCacheDirty = false;
+function savePipedriveCacheDebounced() {
+  if (pipedriveCacheDirty) return;
+  pipedriveCacheDirty = true;
+  setTimeout(() => {
+    try {
+      fsCache.writeFileSync(PIPEDRIVE_CACHE_FILE, JSON.stringify(pipedriveCache));
+    } catch (e) {
+      console.log('[pipedrive-cache] Falha ao salvar cache:', e.message);
+    }
+    pipedriveCacheDirty = false;
+  }, 2000);
+}
+
+axios.interceptors.response.use(
+  (response) => {
+    const url = response.config && response.config.url;
+    if (url && url.includes('pipedrive.com')) {
+      pipedriveCache[url] = { data: response.data, cachedAt: Date.now() };
+      savePipedriveCacheDebounced();
+    }
+    return response;
+  },
+  (error) => {
+    const cfg = error.config;
+    const url = cfg && cfg.url;
+    const status = error.response && error.response.status;
+    if (url && url.includes('pipedrive.com') && status === 429 && pipedriveCache[url]) {
+      const cached = pipedriveCache[url];
+      const ageMin = Math.round((Date.now() - cached.cachedAt) / 60000);
+      console.log(`[pipedrive-cache] 429 recebido, servindo cache de ${ageMin}min atras para ${url.split('?')[0]}`);
+      return Promise.resolve({ data: cached.data, status: 200, fromCache: true, cachedAt: cached.cachedAt });
+    }
+    return Promise.reject(error);
+  }
+);
+
+const pipedriveLocalDB = require('./pipedriveLocalDB');
+pipedriveLocalDB.startScheduledSync(30);
+
 const cors = require('cors');
 const path = require('path');
 const pipeboardGoogleAds = require('./pipeboardGoogleAdsService');
 const pipeboardMetaAds = require('./pipeboardMetaAdsService');
 
 const app = express();
+
+// ===== Banco de dados local do Pipedrive (reduz consumo da API) =====
+app.get('/api/admin/pipedrive-db/status', (req, res) => {
+  const meta = pipedriveLocalDB.getMeta();
+  res.json({ success: true, meta });
+});
+
+app.post('/api/admin/pipedrive-db/sync', async (req, res) => {
+  const result = await pipedriveLocalDB.syncNow();
+  res.json(result);
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
@@ -160,6 +225,205 @@ function invalidateCache() {
   _cache.clear();
 }
 
+// ============================================
+// Rastreamento de eventos de etapa do pipeline (Comparecimento, Nao Compareceu,
+// Remarcou, Cancelou) - historico persistente em disco (data/pipeline_events.json),
+// pois o Pipedrive nao oferece um jeito barato de perguntar "quem passou pela
+// etapa X" em lote. Atualiza sozinho (ver setInterval no fim do arquivo).
+// ============================================
+const STAGE_EVENT_TYPES = {
+  5:  { key: 'comparecimento', verb: 'compareceu', label: 'Comparecimento' },
+  13: { key: 'nao_compareceu', verb: 'faltou', label: 'Não Compareceu' },
+  63: { key: 'remarcou', verb: 'remarcou', label: 'Remarcou' },
+  64: { key: 'cancelou', verb: 'cancelou', label: 'Cancelou/Desmarcou' }
+};
+
+const PIPELINE_EVENTS_FILE = path.join(__dirname, 'data', 'pipeline_events.json');
+const PIPELINE_SYNC_STATE_FILE = path.join(__dirname, 'data', 'pipeline_sync_state.json');
+let _pipelineEvents = [];
+const _pipelineEventKeys = new Set();
+
+function loadPipelineEvents() {
+  try {
+    if (fs.existsSync(PIPELINE_EVENTS_FILE)) {
+      _pipelineEvents = JSON.parse(fs.readFileSync(PIPELINE_EVENTS_FILE, 'utf8'));
+      _pipelineEvents.forEach(e => _pipelineEventKeys.add(`${e.dealId}|${e.enteredAt}|${e.stageId}`));
+      console.log(`[pipeline-events] ${_pipelineEvents.length} eventos carregados do disco`);
+    }
+  } catch (e) {
+    console.error('[pipeline-events] Erro ao carregar do disco:', e.message);
+  }
+}
+
+let _pipelineSaveTimer = null;
+function savePipelineEventsToDisk() {
+  if (_pipelineSaveTimer) return;
+  _pipelineSaveTimer = setTimeout(() => {
+    _pipelineSaveTimer = null;
+    try {
+      fs.mkdirSync(path.dirname(PIPELINE_EVENTS_FILE), { recursive: true });
+      fs.writeFileSync(PIPELINE_EVENTS_FILE, JSON.stringify(_pipelineEvents), 'utf8');
+    } catch (e) {
+      console.error('[pipeline-events] Erro ao salvar no disco:', e.message);
+    }
+  }, 2000);
+}
+
+function loadPipelineSyncState() {
+  try {
+    if (fs.existsSync(PIPELINE_SYNC_STATE_FILE)) {
+      return JSON.parse(fs.readFileSync(PIPELINE_SYNC_STATE_FILE, 'utf8'));
+    }
+  } catch (e) { /* ignore */ }
+  return {};
+}
+function savePipelineSyncState(state) {
+  try {
+    fs.mkdirSync(path.dirname(PIPELINE_SYNC_STATE_FILE), { recursive: true });
+    fs.writeFileSync(PIPELINE_SYNC_STATE_FILE, JSON.stringify(state), 'utf8');
+  } catch (e) {
+    console.error('[pipeline-events] Erro ao salvar estado do sync:', e.message);
+  }
+}
+
+function normalizePipedrivePhone(person) {
+  if (!person || typeof person !== 'object') return '';
+  const phones = Array.isArray(person.phone) ? person.phone : [];
+  if (!phones.length) return '';
+  const primary = phones.find(p => p.primary) || phones[0];
+  const raw = (primary && primary.value) || '';
+  let digits = String(raw).replace(/\D/g, '');
+  if (digits.length >= 10) digits = digits.slice(-11);
+  return digits;
+}
+
+let _pipelineSyncRunning = false;
+
+// Varre negocios do Pipedrive (todos ou so os atualizados recentemente) e busca
+// o historico de mudanca de etapa (/deals/{id}/flow) de cada um, registrando
+// toda vez que um negocio entrou em uma das 4 etapas rastreadas.
+async function syncPipelineEvents({ full = false } = {}) {
+  if (_pipelineSyncRunning) {
+    console.log('[pipeline-events] Sync ja em andamento, ignorando chamada duplicada.');
+    return;
+  }
+  _pipelineSyncRunning = true;
+  const startedAt = Date.now();
+  try {
+    let deals = [];
+    let start = 0;
+    let hasMore = true;
+    const state = loadPipelineSyncState();
+    const sinceStr = (!full && state.lastRun)
+      ? new Date(new Date(state.lastRun).getTime() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' ')
+      : null;
+
+    while (hasMore) {
+      const response = await axios.get('https://api.pipedrive.com/v1/deals', {
+        params: { api_token: PIPEDRIVE_TOKEN, status: 'all_not_deleted', limit: 500, start, sort: 'update_time DESC' }
+      });
+      if (!response.data.success || !response.data.data) break;
+      let stop = false;
+      for (const deal of response.data.data) {
+        if (INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) continue;
+        if (sinceStr && deal.update_time && deal.update_time < sinceStr) { stop = true; break; }
+        deals.push(deal);
+      }
+      if (stop) break;
+      hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
+      start = response.data.additional_data?.pagination?.next_start || 0;
+      await new Promise(r => setTimeout(r, 80));
+    }
+
+    console.log(`[pipeline-events] Sync ${full ? 'completo' : 'incremental'}: ${deals.length} negocios a varrer`);
+    let found = 0;
+    for (let i = 0; i < deals.length; i++) {
+      const deal = deals[i];
+      try {
+        const flowResp = await axios.get(`https://api.pipedrive.com/v1/deals/${deal.id}/flow`, {
+          params: { api_token: PIPEDRIVE_TOKEN }
+        });
+        const flowData = flowResp.data && flowResp.data.data;
+        if (!Array.isArray(flowData)) continue;
+        const person = (deal.person_id && typeof deal.person_id === 'object') ? deal.person_id : {};
+        const personName = person.name || deal.title || '';
+        const phone = normalizePipedrivePhone(person);
+        const ownerName = (deal.user_id && typeof deal.user_id === 'object') ? deal.user_id.name : '';
+
+        for (const item of flowData) {
+          if (item.object !== 'dealChange') continue;
+          const c = item.data || {};
+          if (c.field_key !== 'stage_id') continue;
+          const stageId = parseInt(c.new_value, 10);
+          if (!STAGE_EVENT_TYPES[stageId]) continue;
+          const enteredAt = c.log_time;
+          const key = `${deal.id}|${enteredAt}|${stageId}`;
+          if (_pipelineEventKeys.has(key)) continue;
+          _pipelineEventKeys.add(key);
+          _pipelineEvents.push({
+            dealId: deal.id, personName, phone, ownerName, stageId,
+            eventKey: STAGE_EVENT_TYPES[stageId].key, enteredAt, oldStage: c.old_value
+          });
+          found++;
+        }
+      } catch (e) {
+        console.error(`[pipeline-events] Erro no /flow do deal ${deal.id}:`, e.message);
+      }
+      await new Promise(r => setTimeout(r, 60));
+    }
+
+    if (found > 0) savePipelineEventsToDisk();
+    savePipelineSyncState({ lastRun: new Date().toISOString() });
+    const secs = ((Date.now() - startedAt) / 1000).toFixed(0);
+    console.log(`[pipeline-events] Sync concluido em ${secs}s: ${found} eventos novos (total: ${_pipelineEvents.length})`);
+  } catch (e) {
+    console.error('[pipeline-events] Erro no sync:', e.message);
+  } finally {
+    _pipelineSyncRunning = false;
+  }
+}
+
+// Agrupa por pessoa (telefone quando disponivel, senao nome) e numera as
+// ocorrencias de cada tipo de evento em ordem cronologica: 1a vez = so o verbo
+// ("compareceu"), 2a em diante = "compareceu 2a vez", etc.
+function buildPipelineEventsLabeled() {
+  const byPerson = new Map();
+  for (const e of _pipelineEvents) {
+    const ident = e.phone || `nome:${(e.personName || '').trim().toLowerCase()}`;
+    if (!byPerson.has(ident)) byPerson.set(ident, []);
+    byPerson.get(ident).push(e);
+  }
+  const labeled = [];
+  for (const events of byPerson.values()) {
+    const byType = new Map();
+    for (const e of events) {
+      if (!byType.has(e.eventKey)) byType.set(e.eventKey, []);
+      byType.get(e.eventKey).push(e);
+    }
+    for (const [eventKey, list] of byType.entries()) {
+      list.sort((a, b) => (a.enteredAt || '').localeCompare(b.enteredAt || ''));
+      const verb = Object.values(STAGE_EVENT_TYPES).find(v => v.key === eventKey).verb;
+      list.forEach((e, idx) => {
+        const occurrence = idx + 1;
+        labeled.push({ ...e, occurrence, label: occurrence === 1 ? verb : `${verb} ${occurrence}a vez` });
+      });
+    }
+  }
+  labeled.sort((a, b) => (a.enteredAt || '').localeCompare(b.enteredAt || ''));
+  return labeled;
+}
+
+function buildPipelineEventsSummary() {
+  const labeled = buildPipelineEventsLabeled();
+  const summary = {};
+  Object.values(STAGE_EVENT_TYPES).forEach(t => { summary[t.key] = {}; });
+  for (const e of labeled) {
+    const bucket = e.occurrence >= 4 ? '4+' : String(e.occurrence);
+    summary[e.eventKey][bucket] = (summary[e.eventKey][bucket] || 0) + 1;
+  }
+  return summary;
+}
+
 
 // Wrappers com cache (60s) sobre as chamadas externas
 function getMetaAds(since, until) {
@@ -218,8 +482,22 @@ async function fetchMetaAdsUncached(since, until) {
 
           let leads = 0;
           if (insight.actions) {
-            const leadAction = insight.actions.find(a => a.action_type === 'lead');
-            leads = leadAction ? parseInt(leadAction.value) : 0;
+            // Ordem de prioridade: formulario de lead classico, depois
+            // conversas do WhatsApp/Messenger iniciadas (resultado real das
+            // campanhas atuais, que tem objetivo Mensagens, nao Cadastro).
+            const LEAD_ACTION_TYPES = [
+              'lead',
+              'onsite_conversion.lead_grouped',
+              'onsite_conversion.messaging_conversation_started_7d',
+              'onsite_conversion.total_messaging_connection'
+            ];
+            for (const actionType of LEAD_ACTION_TYPES) {
+              const found = insight.actions.find(a => a.action_type === actionType);
+              if (found) {
+                leads = parseInt(found.value) || 0;
+                break;
+              }
+            }
           }
 
           ads.push({
@@ -1028,7 +1306,7 @@ app.get('/api/dashboard/executive', async (req, res) => {
       });
       if (stagesResp.data.success && stagesResp.data.data) {
         stagesResp.data.data.forEach(s => {
-          stageIdToName[s.id] = s.name;
+          stageIdToName[s.id] = (s.name || '').trim();
         });
       }
     } catch (error) {
@@ -1393,34 +1671,21 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
     };
 
     // Buscar stages de todos os pipelines e mapear stage_id -> name
-    const stageMap = {};
-    try {
-      const stagesResponse = await axios.get('https://api.pipedrive.com/v1/stages', {
-        params: { api_token: PIPEDRIVE_TOKEN, limit: 500 }
-      });
-      if (stagesResponse.data.success && stagesResponse.data.data) {
-        stagesResponse.data.data.forEach(stage => {
-          stageMap[stage.id] = stage.name;
+      const stageMap = {};
+      try {
+        const localStages = pipedriveLocalDB.getStages();
+        localStages.forEach(stage => {
+          stageMap[stage.id] = (stage.name || '').trim();
         });
+      } catch (error) {
+        console.error('Erro ao montar stageMap (banco local):', error.message);
       }
-    } catch (error) {
-      console.error('Erro ao buscar stages:', error.message);
-    }
 
-    // Buscar deals de TODOS os pipelines, não só Inbound
-    const allDeals = [];
-    let start = 0;
-    let hasMore = true;
-
-    try {
-      while (hasMore) {
-        const url = 'https://api.pipedrive.com/v1/deals';
-        const response = await axios.get(url, {
-          params: { api_token: PIPEDRIVE_TOKEN, limit: 500, start }
-        });
-
-        if (response.data.success && response.data.data) {
-          response.data.data.forEach(deal => {
+      // Buscar deals de TODOS os pipelines, nao so Inbound (banco local)
+      const allDeals = [];
+      try {
+        const localDeals = pipedriveLocalDB.getDeals();
+        localDeals.forEach(deal => {
             const addDate = (deal.add_time || '').slice(0, 10);
             if (addDate >= range.since && addDate <= range.until) {
               allDeals.push({
@@ -1438,21 +1703,14 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
               });
             }
           });
-
-          hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
-          start = response.data.additional_data?.pagination?.next_start || 0;
-        } else {
-          hasMore = false;
-        }
+      } catch (error) {
+        console.error('Erro ao montar allDeals (banco local):', error.message);
       }
-    } catch (error) {
-      console.error('Erro ao buscar deals para funnel:', error.message);
-    }
 
-    const dealsInRange = allDeals;
+      const dealsInRange = allDeals;
 
     // Mapa de pipeline_id => pipeline_name
-    const pipelineMap = { '1': 'Inbound', '2': 'Outbound', '3': 'Referência' };
+    const pipelineMap = { '1': 'Inbound', '2': 'Recepção', '3': 'Base de Leads', '4': 'Ortodontia', '5': 'Indicação', '6': 'MKT de permissão para Resgate Futuro', '7': 'RMKT' };
 
     // Agrupa deals por estágio (stageName)
     const dealsByStage = {};
@@ -1503,6 +1761,25 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
         campaign: d[FIELD_CAMPANHA] || '-'
       });
     });
+
+
+      // Bucket sintetico "Ganho" (status won) - Pipedrive nao usa 'won' como stage, entao construimos aqui
+      const ganhoStageName = 'Ganho';
+      if (wonDeals.length > 0) {
+        funnel.push({
+          stage: ganhoStageName,
+          value: wonDeals.length,
+          deals: wonDeals.map(d => ({
+            id: d.id,
+            title: d.title,
+            value: d.rawValue || 0,
+            status: d.status,
+            pipeline: pipelineMap[String(d.pipeline_id)] || 'Outro',
+            campaign: d[FIELD_CAMPANHA] || '-',
+            personName: d.person_name || (d.person_id && d.person_id.name)
+          }))
+        });
+      }
 
     res.json({
       success: true,
@@ -1830,7 +2107,7 @@ app.get('/api/dashboard/funnel', async (req, res) => {
       });
       if (stagesResponse.data.success && stagesResponse.data.data) {
         stagesResponse.data.data.forEach(stage => {
-          stageIdToName[stage.id] = stage.name;
+          stageIdToName[stage.id] = (stage.name || '').trim();
         });
       }
     } catch (error) {
@@ -3402,10 +3679,14 @@ app.get('/api/filters/options', async (req, res) => {
         .filter(d => d.pipeline_id)
         .map(d => {
           const pipelineMap = {
-            '1': 'Inbound',
-            '2': 'Outbound',
-            '3': 'Referência',
-          };
+          '1': 'Inbound',
+          '2': 'Recepção',
+          '3': 'Base de Leads',
+          '4': 'Ortodontia',
+          '5': 'Indicação',
+          '6': 'MKT de permissão para Resgate Futuro',
+          '7': 'RMKT',
+        };
           return pipelineMap[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
         })
     );
@@ -3442,7 +3723,7 @@ app.get('/api/filters/options', async (req, res) => {
       sdrs: ['Agda', 'Helenice'],
       campaigns: [],
       adSets: [],
-      pipelines: ['Inbound', 'Outbound', 'Referência'],
+      pipelines: ['Inbound', 'Recepção', 'Base de Leads', 'Ortodontia', 'Indicação', 'MKT de permissão para Resgate Futuro', 'RMKT'],
       statuses: ['Aberto', 'Ganho', 'Perdido'],
     });
   }
@@ -4059,8 +4340,62 @@ app.get('/api/meta-ads/conversions', async (req, res) => {
   }
 });
 
+
+// GET /api/dashboard/pipeline-events/summary - contagem de comparecimentos,
+// faltas, remarcacoes e cancelamentos, por numero da ocorrencia (1a, 2a, 3a, 4+)
+app.get('/api/dashboard/pipeline-events/summary', (req, res) => {
+  try {
+    res.json({
+      success: true,
+      stageTypes: Object.fromEntries(Object.values(STAGE_EVENT_TYPES).map(t => [t.key, t.label])),
+      totalEvents: _pipelineEvents.length,
+      summary: buildPipelineEventsSummary()
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/pipeline-events/detail?eventType=comparecimento&occurrence=2
+// "Explode" com os nomes de quem compoe aquele numero
+app.get('/api/dashboard/pipeline-events/detail', (req, res) => {
+  try {
+    const eventType = String(req.query.eventType || '');
+    const occurrenceParam = String(req.query.occurrence || '');
+    const labeled = buildPipelineEventsLabeled();
+    const rows = labeled.filter(e => {
+      if (e.eventKey !== eventType) return false;
+      if (occurrenceParam === '4+') return e.occurrence >= 4;
+      return String(e.occurrence) === occurrenceParam;
+    }).sort((a, b) => (b.enteredAt || '').localeCompare(a.enteredAt || ''));
+    res.json({
+      success: true,
+      eventType,
+      occurrence: occurrenceParam,
+      count: rows.length,
+      rows: rows.map(r => ({
+        personName: r.personName, phone: r.phone, dealId: r.dealId,
+        ownerName: r.ownerName, label: r.label, enteredAt: r.enteredAt
+      }))
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/dashboard/pipeline-events/sync - forca uma atualizacao manual agora
+app.post('/api/dashboard/pipeline-events/sync', (req, res) => {
+  if (_pipelineSyncRunning) {
+    return res.json({ success: true, message: 'Sync ja em andamento' });
+  }
+  syncPipelineEvents({ full: String(req.query.full) === 'true' });
+  res.json({ success: true, message: 'Sync iniciado em background' });
+});
 loadCacheFromDisk();
 setInterval(warmCache, 5 * 60 * 1000);   // a cada 5 minutos
+loadPipelineEvents();
+setInterval(() => syncPipelineEvents({ full: false }), 4 * 60 * 60 * 1000); // pipeline-events: a cada 4h
+setTimeout(() => syncPipelineEvents({ full: _pipelineEvents.length === 0 }), 15000); // pipeline-events: primeira carga
 setTimeout(warmCache, 3000);              // primeira carga logo apos subir
 
 const PORT = process.env.PORT || 8000;
