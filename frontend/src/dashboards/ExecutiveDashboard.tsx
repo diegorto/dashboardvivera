@@ -427,7 +427,7 @@ export default function ExecutiveDashboard() {
                 <tbody>
                   {faltasPorSDR.map((p: any) => (
                     <tr key={p.nome} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
-                      <td className="py-2 pr-2 text-[#334155] font-medium">{p.nome.split(' ').slice(0, 2).join(' ')}</td>
+                      <td className="py-2 pr-2 text-[#334155] font-medium">{(p.nome || '').split(' ').slice(0, 2).join(' ')}</td>
                       <td className="py-2 pr-2 font-bold text-[#ef4444] tabular-nums">{p.faltas}</td>
                       <td className="py-2 pr-2">
                         <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${p.taxa > 12 ? 'bg-[#fee2e2] text-[#dc2626]' : p.taxa > 7 ? 'bg-[#fef3c7] text-[#d97706]' : 'bg-[#dcfce7] text-[#16a34a]'}`}>{p.taxa}%</span>
@@ -588,7 +588,7 @@ export default function ExecutiveDashboard() {
               const cor = sdr.tempo < 5 ? '#10b981' : sdr.tempo < 8 ? '#f59e0b' : '#ef4444'
               return (
                 <div key={sdr.nome} className="bg-[#f8fafc] rounded-xl p-3">
-                  <div className="text-[11px] font-semibold text-[#334155] mb-2 leading-tight">{sdr.nome.split(' ')[0]} {sdr.nome.split(' ')[1]}</div>
+                  <div className="text-[11px] font-semibold text-[#334155] mb-2 leading-tight">{(sdr.nome || '').split(' ')[0]} {(sdr.nome || '').split(' ')[1] || ''}</div>
                   <div className="text-[18px] font-bold tabular-nums" style={{ color: cor }}>{sdr.tempo} min</div>
                   <div className="mt-2 space-y-1">
                     <div className="flex justify-between text-[10px]"><span className="text-[#94a3b8]">Qualif.</span><span className="font-semibold text-[#334155]">{sdr.pctQualif}%</span></div>
