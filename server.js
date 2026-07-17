@@ -3428,14 +3428,8 @@ app.get('/api/filters/options', async (req, res) => {
         .filter(Boolean)
     );
 
-    // Usa nomes reais dos pipelines do Pipedrive (já carregados antes do try)
-    const pipelines = new Set(
-      allDeals
-        .filter(d => d.pipeline_id)
-        .map(d => {
-          return pipelineMapData[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
-        })
-    );
+    // Usa TODOS os pipelines do Pipedrive (não apenas os que têm deals)
+    const pipelines = new Set(Object.values(pipelineMapData).filter(Boolean));
 
     const statusMap = {
       'open': 'Aberto',
