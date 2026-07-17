@@ -678,7 +678,7 @@ export default function ExecutiveDashboard() {
                       <td className="py-2 pr-2 font-bold text-[#dc2626] tabular-nums">{c.perdidos}</td>
                       <td className="py-2 pr-2 text-[#64748b]">{c.pct}%</td>
                       <td className="py-2 pr-2 text-[#475569]">{c.topMotivo}</td>
-                      <td className="py-2"><div className="flex gap-1">{c.tags.slice(0, 2).map((t: any) => (<span key={t} className="text-[8px] font-semibold px-1 py-0.5 bg-[#f1f5f9] text-[#475569] rounded">{t}</span>))}</div></td>
+                      <td className="py-2"><div className="flex gap-1">{(c.tags || []).slice(0, 2).map((t: any) => (<span key={t} className="text-[8px] font-semibold px-1 py-0.5 bg-[#f1f5f9] text-[#475569] rounded">{t}</span>))}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -744,7 +744,7 @@ export default function ExecutiveDashboard() {
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="text-[#475569] font-medium">{stage.stage}</span>
                   <div className="flex items-center gap-3">
-                    <span className="font-bold text-[#0f172a] tabular-nums">{stage.value.toLocaleString('pt-BR')}</span>
+                    <span className="font-bold text-[#0f172a] tabular-nums">{(stage.value || 0).toLocaleString('pt-BR')}</span>
                     <span className="text-[10px] text-[#94a3b8] w-10 text-right">{stage.pct}%</span>
                   </div>
                 </div>
