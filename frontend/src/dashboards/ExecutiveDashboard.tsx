@@ -38,6 +38,8 @@ import {
   useLostLeadsCard,
   useAlertsCard,
 } from '../services/executiveDashboardCardsService';
+import { useDrillDown } from '../hooks/useDrillDown';
+import ExecutiveDrillDownDrawer from '../components/ExecutiveDrillDownDrawer';
 
 // Valores monetários em milhares: 17500 -> "R$ 17.5k", 500000 -> "R$ 500k"
 const fmtK = (v: number): string => {
@@ -51,6 +53,7 @@ const fmtK = (v: number): string => {
 const ExecutiveDashboard: React.FC = () => {
   const { filters } = useFilters();
   const { addNotification } = useAppStore();
+  const { drillDown, openDrillDown, closeDrillDown } = useDrillDown();
 
   // State
   const [loading, setLoading] = useState(true);
@@ -491,6 +494,9 @@ const ExecutiveDashboard: React.FC = () => {
           />
         );
       })()}
+
+      {/* Drill-down para cards - novo sistema */}
+      <ExecutiveDrillDownDrawer drillDown={drillDown} onClose={closeDrillDown} />
     </Layout>
   );
 };
