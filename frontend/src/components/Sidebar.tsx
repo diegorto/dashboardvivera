@@ -12,17 +12,13 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'executive', label: 'Executive', icon: '◆', group: 'Intelligence', path: '/' },
-  { id: 'marketing', label: 'Marketing Intelligence', icon: '◈', group: 'Intelligence', path: '/marketing' },
-  { id: 'commercial', label: 'Commercial Intelligence', icon: '◉', group: 'Intelligence', path: '/comercial' },
+  { id: 'executive', label: 'Executive Dashboard', icon: '◆', group: 'Intelligence', path: '/' },
   { id: 'crm', label: 'CRM Intelligence', icon: '⬡', group: 'Intelligence', path: '/crm' },
-  { id: 'financial', label: 'Finance', icon: '◑', group: 'Intelligence', path: '/financeiro' },
   { id: 'google-ads', label: 'Google Ads', icon: '🔍', group: 'Media', path: '/google-ads' },
   { id: 'meta-ads', label: 'Meta Ads', icon: '📱', group: 'Media', path: '/meta-ads' },
   { id: 'campaigns', label: 'Campaigns', icon: '▣', group: 'Media', path: '/campanhas' },
   { id: 'creatives', label: 'Creatives', icon: '▤', group: 'Media', path: '/criativos' },
   { id: 'agenda', label: 'Agenda', icon: '▦', group: 'Operations', path: '/agenda' },
-  { id: 'patients', label: 'Patients', icon: '▧', group: 'Operations', path: '/pacientes' },
   { id: 'professionals', label: 'Professionals', icon: '▨', group: 'Operations', path: '/profissionais' },
   { id: 'sdrs', label: 'SDRs', icon: '▩', group: 'Operations', path: '/sdrs' },
   { id: 'whatsapp', label: 'WhatsApp Analytics', icon: '◫', group: 'Operations', path: '/whatsapp' },
