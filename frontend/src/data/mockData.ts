@@ -4,19 +4,19 @@ export const mockKPIsData = {
   executive: [
     { id: 'revenue-day', title: 'Receita Hoje', value: 45000, comparison: 12.5 },
     { id: 'revenue-week', title: 'Receita Semana', value: 280000, comparison: 8.3 },
-    { id: 'revenue-month', title: 'Receita Mês', value: 1200000, comparison: 15.2 },
-    { id: 'meta', title: 'Meta Mês', value: 1000000, comparison: 0 },
-    { id: 'meta-percentage', title: '% da Meta', value: 120, comparison: 15.2 },
-    { id: 'forecast', title: 'Previsão IA', value: 1350000, comparison: 12.5 },
+    { id: 'revenue-month', title: 'Receita Mês', value: 2847300, comparison: 15.2 },
+    { id: 'meta', title: 'Meta Mês', value: 3000000, comparison: 0 },
+    { id: 'meta-percentage', title: '% da Meta', value: 94.9, comparison: 15.2 },
+    { id: 'forecast', title: 'Previsão IA', value: 3200000, comparison: 12.5 },
     { id: 'profit', title: 'Lucro', value: 600000, comparison: 18.7 },
     { id: 'roas', title: 'ROAS', value: 4.25, comparison: 5.3 },
     { id: 'cac', title: 'CAC', value: 450, comparison: -8.2 },
-    { id: 'ticket', title: 'Ticket Médio', value: 2100, comparison: 6.4 },
-    { id: 'leads', title: 'Leads', value: 1250, comparison: 10.2 },
-    { id: 'qualified', title: 'Qualificados', value: 875, comparison: 8.5 },
-    { id: 'scheduled', title: 'Agendados', value: 620, comparison: 12.1 },
-    { id: 'attended', title: 'Compareceram', value: 558, comparison: 9.3 },
-    { id: 'purchased', title: 'Compraram', value: 430, comparison: 15.8 },
+    { id: 'ticket', title: 'Ticket Médio', value: 15050, comparison: 6.4 },
+    { id: 'leads', title: 'Leads', value: 734, comparison: 10.2 },
+    { id: 'qualified', title: 'Qualificados', value: 412, comparison: 8.5 },
+    { id: 'scheduled', title: 'Agendados', value: 287, comparison: 12.1 },
+    { id: 'attended', title: 'Compareceram', value: 256, comparison: 9.3 },
+    { id: 'purchased', title: 'Compraram', value: 189, comparison: 15.8 },
   ],
 };
 
@@ -288,6 +288,348 @@ export const mockPatients = [
     revenue: 3500,
   },
 ];
+
+// ============= EXECUTIVE DASHBOARD - 7 CARD COMPONENTS =============
+
+// LeadsCard Mock Data
+export const mockLeadsCardData = {
+  title: 'Leads Totais',
+  period: 'Junho 2025',
+  totalLeads: 734,
+  qualifiedLeads: 412,
+  qualificationRate: 56.1,
+  changeVsPreviousMonth: 12.5,
+  leadsPerDay: 24.5,
+  dailyEvolutionData: [
+    { date: '01', total: 25, qualified: 14 },
+    { date: '02', total: 28, qualified: 16 },
+    { date: '03', total: 22, qualified: 12 },
+    { date: '04', total: 32, qualified: 18 },
+    { date: '05', total: 26, qualified: 15 },
+    { date: '06', total: 29, qualified: 17 },
+    { date: '07', total: 35, qualified: 20 },
+    { date: '08', total: 30, qualified: 17 },
+    { date: '09', total: 34, qualified: 19 },
+    { date: '10', total: 38, qualified: 22 },
+    { date: '11', total: 25, qualified: 14 },
+    { date: '12', total: 28, qualified: 16 },
+    { date: '13', total: 31, qualified: 18 },
+    { date: '14', total: 27, qualified: 15 },
+    { date: '15', total: 33, qualified: 19 },
+    { date: '16', total: 29, qualified: 16 },
+    { date: '17', total: 36, qualified: 21 },
+    { date: '18', total: 32, qualified: 18 },
+    { date: '19', total: 28, qualified: 16 },
+    { date: '20', total: 34, qualified: 19 },
+    { date: '21', total: 30, qualified: 17 },
+    { date: '22', total: 26, qualified: 15 },
+    { date: '23', total: 29, qualified: 16 },
+    { date: '24', total: 31, qualified: 18 },
+    { date: '25', total: 27, qualified: 15 },
+    { date: '26', total: 33, qualified: 19 },
+    { date: '27', total: 28, qualified: 16 },
+    { date: '28', total: 35, qualified: 20 },
+    { date: '29', total: 32, qualified: 18 },
+    { date: '30', total: 29, qualified: 16 },
+  ],
+  leadsBySource: [
+    { source: 'Meta Ads', leads: 285, percentage: 38.8, qualified: 165, qualificationRate: 57.9, color: '#6366f1' },
+    { source: 'Google Ads', leads: 198, percentage: 27.0, qualified: 108, qualificationRate: 54.5, color: '#0ea5e9' },
+    { source: 'Indicação', leads: 147, percentage: 20.0, qualified: 92, qualificationRate: 62.6, color: '#10b981' },
+    { source: 'Orgânico', leads: 74, percentage: 10.1, qualified: 35, qualificationRate: 47.3, color: '#f59e0b' },
+    { source: 'WhatsApp Inbound', leads: 30, percentage: 4.1, qualified: 12, qualificationRate: 40.0, color: '#8b5cf6' },
+  ],
+};
+
+// SalesByFunnelCard Mock Data
+export const mockSalesByFunnelCardData = {
+  title: 'Vendas por Funil',
+  period: 'Junho 2025',
+  totalRevenue: 2847300,
+  totalSales: 189,
+  avgTicket: 15050,
+  funnels: [
+    {
+      name: 'Meta Ads',
+      color: '#6366f1',
+      revenue: 1105000,
+      revenuePercentage: 38.8,
+      sales: 75,
+      avgTicket: 14733,
+      change: 12.5,
+      leads: 285,
+      qualified: 165,
+      conversionRate: 26.3,
+    },
+    {
+      name: 'Google Ads',
+      color: '#0ea5e9',
+      revenue: 768500,
+      revenuePercentage: 27.0,
+      sales: 52,
+      avgTicket: 14779,
+      change: 8.3,
+      leads: 198,
+      qualified: 108,
+      conversionRate: 26.3,
+    },
+    {
+      name: 'Indicação',
+      color: '#10b981',
+      revenue: 594000,
+      revenuePercentage: 20.8,
+      sales: 41,
+      avgTicket: 14488,
+      change: 15.2,
+      leads: 147,
+      qualified: 92,
+      conversionRate: 27.9,
+    },
+    {
+      name: 'Orgânico',
+      color: '#f59e0b',
+      revenue: 296700,
+      revenuePercentage: 10.4,
+      sales: 18,
+      avgTicket: 16483,
+      change: 5.1,
+      leads: 74,
+      qualified: 35,
+      conversionRate: 24.3,
+    },
+    {
+      name: 'WhatsApp',
+      color: '#8b5cf6',
+      revenue: 83100,
+      revenuePercentage: 2.9,
+      sales: 3,
+      avgTicket: 27700,
+      change: -2.1,
+      leads: 30,
+      qualified: 12,
+      conversionRate: 10.0,
+    },
+  ],
+};
+
+// ConversionTimeCard Mock Data
+export const mockConversionTimeCardData = {
+  title: 'Tempos no Funil',
+  subtitle: 'Tempo médio de conversão por etapa',
+  totalTime: 12.5,
+  bestChannel: 'Meta Ads',
+  improvement: 8.3,
+  channels: [
+    { name: 'Meta Ads', time: 11.2, color: '#6366f1' },
+    { name: 'Google Ads', time: 13.8, color: '#0ea5e9' },
+    { name: 'Indicação', time: 10.5, color: '#10b981' },
+    { name: 'Orgânico', time: 14.2, color: '#f59e0b' },
+  ],
+  monthlyEvolution: [
+    { month: 'Jan', time: 15.2 },
+    { month: 'Fev', time: 14.8 },
+    { month: 'Mar', time: 14.1 },
+    { month: 'Abr', time: 13.5 },
+    { month: 'Mai', time: 13.0 },
+    { month: 'Jun', time: 12.5 },
+  ],
+  additionalMetrics: [
+    { label: 'Conversão mais rápida (dias)', value: 8.2 },
+    { label: 'Conversão mais lenta (dias)', value: 21.5 },
+    { label: 'Tempo até qualificação (dias)', value: 5.3 },
+    { label: 'Tempo até agendamento (dias)', value: 7.8 },
+  ],
+  aiInsight: 'Meta Ads está 21% mais rápido que a média. Recomenda-se aumentar investimento neste canal.',
+};
+
+// NoShowCancellationCard Mock Data
+export const mockNoShowCancellationCardData = {
+  title: 'Faltas e Cancelamentos',
+  subtitle: 'Análise de no-shows e cancelamentos',
+  totalCount: 47,
+  percentage: 15.6,
+  revenue: 706250,
+  change: 8.3,
+  metrics: [
+    { name: 'Dr. João Souza', value: 13, percentage: 18.2, revenue: 195000 },
+    { name: 'Dra. Paula Silva', value: 9, percentage: 14.3, revenue: 157500 },
+    { name: 'Dr. Carlos Santos', value: 9, percentage: 12.8, revenue: 144000 },
+    { name: 'Dra. Ana Costa', value: 6, percentage: 10.2, revenue: 114400 },
+    { name: 'Dr. Roberto Lima', value: 5, percentage: 8.5, revenue: 95350 },
+  ],
+  dayData: [
+    { day: 'Seg', count: 13 },
+    { day: 'Ter', count: 13 },
+    { day: 'Qua', count: 13 },
+    { day: 'Qui', count: 9 },
+    { day: 'Sex', count: 7 },
+  ],
+  motives: [
+    { label: 'Problema pessoal', count: 18, percentage: 38.3 },
+    { label: 'Falta de confirmação', count: 12, percentage: 25.5 },
+    { label: 'Mudança de horário', count: 10, percentage: 21.3 },
+    { label: 'Indecisão', count: 7, percentage: 14.9 },
+  ],
+  recentItems: [
+    { name: 'João Silva', date: 'Hoje', time: '14:30', reason: 'no-show', revenue: 5000, status: 'Perdido' as const },
+    { name: 'Maria Santos', date: 'Ontem', time: '10:00', reason: 'cancelation', revenue: 4500, status: 'Reagendado' as const },
+    { name: 'Pedro Oliveira', date: '2 dias atrás', time: '15:15', reason: 'no-show', revenue: 3500, status: 'Perdido' as const },
+    { name: 'Ana Costa', date: '3 dias atrás', time: '11:00', reason: 'cancelation', revenue: 2800, status: 'Reagendado' as const },
+    { name: 'Carlos Mendes', date: '4 dias atrás', time: '16:45', reason: 'no-show', revenue: 3200, status: 'Perdido' as const },
+  ],
+};
+
+// ResponseSpeedCard Mock Data
+export const mockResponseSpeedCardData = {
+  title: 'Velocidade de Resposta',
+  subtitle: 'Análise de tempo de resposta a leads',
+  avgResponseTime: 6.2,
+  fastResponsePercentage: 68.5,
+  extraRevenue: 425000,
+  timeRangeData: [
+    { range: '0-5 min', leads: 502, qualified: 310, scheduled: 226, attended: 203, qualificationRate: 61.8, schedulingRate: 45.0, attendanceRate: 89.9 },
+    { range: '5-15 min', leads: 162, qualified: 91, scheduled: 57, attended: 51, qualificationRate: 56.2, schedulingRate: 35.2, attendanceRate: 89.5 },
+    { range: '15-30 min', leads: 45, qualified: 11, scheduled: 4, attended: 2, qualificationRate: 24.4, schedulingRate: 8.9, attendanceRate: 50.0 },
+    { range: '>30 min', leads: 25, qualified: 0, scheduled: 0, attended: 0, qualificationRate: 0.0, schedulingRate: 0.0, attendanceRate: 0.0 },
+  ],
+  sdrData: [
+    { name: 'Paula Mendes', avgResponseTime: 2.8, qualificationRate: 68, schedulingRate: 52, attendanceRate: 91 },
+    { name: 'Carlos Ribeiro', avgResponseTime: 4.5, qualificationRate: 62, schedulingRate: 45, attendanceRate: 88 },
+    { name: 'Ana Silva', avgResponseTime: 5.1, qualificationRate: 58, schedulingRate: 40, attendanceRate: 87 },
+    { name: 'João Pereira', avgResponseTime: 7.2, qualificationRate: 52, schedulingRate: 32, attendanceRate: 85 },
+    { name: 'Mariana Costa', avgResponseTime: 8.5, qualificationRate: 48, schedulingRate: 28, attendanceRate: 82 },
+  ],
+  speedGoal: 'Responder 70% dos leads em menos de 5 minutos',
+  speedGoalPercentage: 68.5,
+  impactInsight: 'Leads respondidos em menos de 5 min têm 62% mais chances de conversão',
+  aiInsight: 'Paula Mendes é a mais rápida (2.8 min). Considere usar como benchmark de treinamento.',
+};
+
+// LostLeadsCard Mock Data
+export const mockLostLeadsCardData = {
+  title: 'Leads Perdidos',
+  subtitle: 'Análise de leads que não converteram',
+  totalLost: 322,
+  lostPercentage: 43.9,
+  lostRevenue: 4850000,
+  topObjections: [
+    { tag: 'Preço', count: 95, percentage: 29.5 },
+    { tag: 'Indecisão', count: 72, percentage: 22.4 },
+    { tag: 'Concorrência', count: 58, percentage: 18.0 },
+    { tag: 'Timing', count: 47, percentage: 14.6 },
+    { tag: 'Outros', count: 50, percentage: 15.5 },
+  ],
+  channels: [
+    {
+      channel: 'Meta Ads',
+      color: '#6366f1',
+      lostLeads: 120,
+      percentage: 37.3,
+      topMotives: [
+        { motive: 'Preço', count: 42, percentage: 35.0 },
+        { motive: 'Indecisão', count: 28, percentage: 23.3 },
+      ],
+      tags: [
+        { tag: 'Preço', count: 42, percentage: 35.0 },
+        { tag: 'Indecisão', count: 28, percentage: 23.3 },
+      ],
+    },
+    {
+      channel: 'Google Ads',
+      color: '#0ea5e9',
+      lostLeads: 90,
+      percentage: 27.9,
+      topMotives: [
+        { motive: 'Indecisão', count: 35, percentage: 38.9 },
+        { motive: 'Preço', count: 26, percentage: 28.9 },
+      ],
+      tags: [
+        { tag: 'Indecisão', count: 35, percentage: 38.9 },
+        { tag: 'Preço', count: 26, percentage: 28.9 },
+      ],
+    },
+    {
+      channel: 'Indicação',
+      color: '#10b981',
+      lostLeads: 55,
+      percentage: 17.1,
+      topMotives: [
+        { motive: 'Concorrência', count: 22, percentage: 40.0 },
+        { motive: 'Timing', count: 18, percentage: 32.7 },
+      ],
+      tags: [
+        { tag: 'Concorrência', count: 22, percentage: 40.0 },
+        { tag: 'Timing', count: 18, percentage: 32.7 },
+      ],
+    },
+    {
+      channel: 'Orgânico',
+      color: '#f59e0b',
+      lostLeads: 39,
+      percentage: 12.1,
+      topMotives: [
+        { motive: 'Preço', count: 15, percentage: 38.5 },
+        { motive: 'Indecisão', count: 12, percentage: 30.8 },
+      ],
+      tags: [
+        { tag: 'Preço', count: 15, percentage: 38.5 },
+        { tag: 'Indecisão', count: 12, percentage: 30.8 },
+      ],
+    },
+    {
+      channel: 'WhatsApp',
+      color: '#8b5cf6',
+      lostLeads: 18,
+      percentage: 5.6,
+      topMotives: [
+        { motive: 'Outros', count: 11, percentage: 61.1 },
+        { motive: 'Timing', count: 7, percentage: 38.9 },
+      ],
+      tags: [
+        { tag: 'Outros', count: 11, percentage: 61.1 },
+        { tag: 'Timing', count: 7, percentage: 38.9 },
+      ],
+    },
+  ],
+  aiInsight: 'Preço é a objeção mais recorrente. Considere revisar estratégia de pricing ou criar campanhas de valor agregado.',
+};
+
+// ExecutiveAlertsCard Mock Data
+export const mockExecutiveAlertsCardData = {
+  title: 'Alertas Executivos',
+  alerts: [
+    {
+      id: '1',
+      severity: 'critical' as const,
+      title: 'Meta de faturamento em risco',
+      timeAgo: '2 horas atrás',
+    },
+    {
+      id: '2',
+      severity: 'warning' as const,
+      title: 'Taxa de no-show acima de 15%',
+      timeAgo: '4 horas atrás',
+    },
+    {
+      id: '3',
+      severity: 'warning' as const,
+      title: 'CAC crescendo - revisar investimento em marketing',
+      timeAgo: '1 dia atrás',
+    },
+    {
+      id: '4',
+      severity: 'info' as const,
+      title: 'Novo criativo Meta Ads teve performance de +18.5%',
+      timeAgo: '2 dias atrás',
+    },
+    {
+      id: '5',
+      severity: 'success' as const,
+      title: 'Google Ads alcançou ROAS de 8.3x',
+      timeAgo: '3 dias atrás',
+    },
+  ],
+};
 
 export const mockProfessionals = [
   {

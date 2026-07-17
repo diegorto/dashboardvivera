@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { KPICard, TopBar, Layout, DrillDownDrawer } from '../components';
 import OriginBreakdownCard from '../components/OriginBreakdownCard';
 import RevenueByFunnelCard from '../components/RevenueByFunnelCard';
+import LeadsCard from '../components/LeadsCard';
+import SalesByFunnelCard from '../components/SalesByFunnelCard';
+import ConversionTimeCard from '../components/ConversionTimeCard';
+import NoShowCancellationCard from '../components/NoShowCancellationCard';
+import ResponseSpeedCard from '../components/ResponseSpeedCard';
+import LostLeadsCard from '../components/LostLeadsCard';
+import ExecutiveAlertsCard from '../components/ExecutiveAlertsCard';
 import dashboardService, {
   ExecutiveKPIs,
   ChartDataPoint,
@@ -13,6 +20,15 @@ import { useAppStore } from '../stores/appStore';
 import { api } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDateRange, ExportButton } from '../utils/dashboardHelpers';
+import {
+  mockLeadsCardData,
+  mockSalesByFunnelCardData,
+  mockConversionTimeCardData,
+  mockNoShowCancellationCardData,
+  mockResponseSpeedCardData,
+  mockLostLeadsCardData,
+  mockExecutiveAlertsCardData,
+} from '../data/mockData';
 
 // Valores monetários em milhares: 17500 -> "R$ 17.5k", 500000 -> "R$ 500k"
 const fmtK = (v: number): string => {
@@ -210,30 +226,17 @@ const ExecutiveDashboard: React.FC = () => {
   ] : [];
 
   return (
-    <Layout title="Executive Dashboard" breadcrumb={['Dashboard', 'Executive']} right={<ExportButton filename="executive-dashboard" rows={exportData} />}>
-      {/* Alertas */}
-      {alerts.length > 0 && (
-        <div className="mb-6 space-y-3">
-          {alerts.map((alert, idx) => (
-            <div
-              key={idx}
-              className={`p-4 rounded-lg border ${
-                alert.severity === 'critical'
-                  ? 'bg-red-50 border-red-200'
-                  : alert.severity === 'high'
-                  ? 'bg-orange-50 border-orange-200'
-                  : 'bg-yellow-50 border-yellow-200'
-              }`}
-            >
-              <div className="font-semibold text-sm">{alert.title}</div>
-              <div className="text-sm text-gray-700 mt-1">{alert.message}</div>
-            </div>
-          ))}
-        </div>
-      )}
+    <Layout title="Executive Dashboard" breadcrumb={['Dashboard', 'Executive Dashboard']} right={<ExportButton filename="executive-dashboard" rows={exportData} />}>
+      {/* Alertas Executivos */}
+      <div className="mb-8">
+        <ExecutiveAlertsCard
+          title={mockExecutiveAlertsCardData.title}
+          alerts={mockExecutiveAlertsCardData.alerts}
+        />
+      </div>
 
       {/* KPI Row 1 (4 cards wide on desktop) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <KPICard
           label="Receita"
           onClick={() => setDrillMetric('revenue')}
@@ -267,7 +270,7 @@ const ExecutiveDashboard: React.FC = () => {
       </div>
 
       {/* KPI Row 2 (7 cards - similar layout to screenshot) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mb-8">
         <KPICard
           label="Ticket Médio"
           onClick={() => setDrillMetric('avgTicket')}
@@ -319,171 +322,93 @@ const ExecutiveDashboard: React.FC = () => {
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Chart - 2/3 width */}
-        <div className="lg:col-span-2 bg-white border border-[#e2e8f0] rounded-xl p-5">
-          <div className="mb-4">
-            <h3 className="text-[13px] font-semibold text-[#0f172a]">
-              Receita vs. Meta vs. Forecast
-            </h3>
-            <p className="text-[11px] text-[#94a3b8] mt-1">
-              {filters.period === 'today' ? 'Hoje' :
-               filters.period === 'week' ? 'Última semana' :
-               filters.period === 'year' ? 'Último ano' :
-               'Últimos 30 dias'}
-            </p>
-          </div>
-
-          {revenueChart.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={revenueChart}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => fmtK(v)}
-                  width={56}
-                />
-                <Tooltip
-                  formatter={(v: any) => fmtK(v)}
-                  contentStyle={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#6366f1"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: '#6366f1' }}
-                  name="Receita"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="goal"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={{ r: 3, fill: '#10b981' }}
-                  name="Meta"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="forecast"
-                  stroke="#94a3b8"
-                  strokeWidth={2}
-                  strokeDasharray="5 3"
-                  dot={false}
-                  name="Forecast"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-60 flex items-center justify-center text-gray-500">
-              Sem dados disponíveis
-            </div>
-          )}
-        </div>
-
-        {/* Funnel - 1/3 width */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
-          <h3 className="text-[13px] font-semibold text-[#0f172a]">Funil Executivo</h3>
-          <p className="text-[11px] text-[#94a3b8] mt-1">Período atual</p>
-
-          <div className="mt-4 space-y-3">
-            {funnel.length > 0 ? (
-              (() => {
-                // Mapear e filtrar estágios
-                const stageMap: { [key: string]: string } = {
-                  'Entrada': 'Entrada',
-                  'Contato': 'Leads',
-                  'Qualificado': 'Qualificados',
-                  'Agendamento': 'Agendaram',
-                  'Compareci': 'Compareceram',
-                  'Won': 'Fecharam'
-                };
-
-                const colors = ['#6366f1', '#8b5cf6', '#0ea5e9', '#10b981', '#f59e0b', '#10b981'];
-
-                const filteredFunnel = funnel
-                  .filter(s => stageMap[s.stage])
-                  .map((s, idx) => ({
-                    ...s,
-                    displayName: stageMap[s.stage],
-                    originalStage: s.stage,
-                    index: idx,
-                    count: s.count || s.value
-                  }));
-
-                return filteredFunnel.map((stage) => (
-                  <div key={stage.originalStage}>
-                    <div className="flex justify-between items-start text-[11px] mb-1">
-                      <div>
-                        <span className="text-[#475569] font-medium">{stage.displayName}</span>
-                        {stage.originalStage === 'Won' && stage.value > 0 && (
-                          <div className="text-[10px] text-[#10b981] font-semibold mt-0.5">
-                            Faturado: R$ {(stage.value / 100).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
-                          </div>
-                        )}
-                      </div>
-                      <span className="text-[#0f172a] font-semibold font-mono">
-                        {(stage.count || 0).toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                    <div className="h-5 bg-[#f1f5f9] rounded-md overflow-hidden">
-                      <div
-                        className="h-full rounded-md transition-all"
-                        style={{
-                          width: `${stage.pct}%`,
-                          backgroundColor: colors[stage.index] || '#6366f1',
-                          opacity: 0.85
-                        }}
-                      />
-                    </div>
-                    <div className="text-[10px] text-[#94a3b8] mt-0.5">{stage.pct}%</div>
-                  </div>
-                ));
-              })()
-            ) : (
-              <div className="text-gray-500 text-center py-8">Sem dados</div>
-            )}
-          </div>
-        </div>
+      {/* 1. LeadsCard - Leads Totais */}
+      <div className="mb-8">
+        <LeadsCard
+          title={mockLeadsCardData.title}
+          period={mockLeadsCardData.period}
+          totalLeads={mockLeadsCardData.totalLeads}
+          qualifiedLeads={mockLeadsCardData.qualifiedLeads}
+          qualificationRate={mockLeadsCardData.qualificationRate}
+          changeVsPreviousMonth={mockLeadsCardData.changeVsPreviousMonth}
+          leadsPerDay={mockLeadsCardData.leadsPerDay}
+          dailyEvolutionData={mockLeadsCardData.dailyEvolutionData}
+          leadsBySource={mockLeadsCardData.leadsBySource}
+        />
       </div>
 
-      {/* BREAKDOWN POR ORIGEM */}
-      <div className="mb-6">
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-6">
-          <h3 className="text-[13px] font-semibold text-[#0f172a]">Leads por Origem</h3>
-          <p className="text-[11px] text-[#94a3b8] mt-1">Google, Instagram, Meta, Indicação</p>
-          <div className="mt-4">
-            <OriginBreakdownCard data={origins} loading={loadingOrigins} />
-          </div>
-        </div>
+      {/* 2. SalesByFunnelCard - Vendas por Funil */}
+      <div className="mb-8">
+        <SalesByFunnelCard
+          title={mockSalesByFunnelCardData.title}
+          period={mockSalesByFunnelCardData.period}
+          totalRevenue={mockSalesByFunnelCardData.totalRevenue}
+          totalSales={mockSalesByFunnelCardData.totalSales}
+          avgTicket={mockSalesByFunnelCardData.avgTicket}
+          funnels={mockSalesByFunnelCardData.funnels}
+        />
       </div>
 
-      {/* RECEITA POR FUNIL */}
-      <div className="mb-6">
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-6">
-          <h3 className="text-[13px] font-semibold text-[#0f172a]">Receita por Funil</h3>
-          {revenueByFunnel.length > 0 && (
-            <p className="text-[11px] text-[#94a3b8] mt-1">
-              {revenueByFunnel.map(f => f.funnel).join(', ')}
-            </p>
-          )}
-          <div className="mt-4">
-            <RevenueByFunnelCard
-              data={revenueByFunnel}
-              loading={loadingRevenueByFunnel}
-              total={totalRevenueByFunnel}
-            />
-          </div>
-        </div>
+      {/* 3. ConversionTimeCard - Tempos no Funil */}
+      <div className="mb-8">
+        <ConversionTimeCard
+          title={mockConversionTimeCardData.title}
+          subtitle={mockConversionTimeCardData.subtitle}
+          totalTime={mockConversionTimeCardData.totalTime}
+          bestChannel={mockConversionTimeCardData.bestChannel}
+          improvement={mockConversionTimeCardData.improvement}
+          channels={mockConversionTimeCardData.channels}
+          monthlyEvolution={mockConversionTimeCardData.monthlyEvolution}
+          additionalMetrics={mockConversionTimeCardData.additionalMetrics}
+          aiInsight={mockConversionTimeCardData.aiInsight}
+        />
+      </div>
+
+      {/* 4. NoShowCancellationCard - Faltas e Cancelamentos */}
+      <div className="mb-8">
+        <NoShowCancellationCard
+          title={mockNoShowCancellationCardData.title}
+          subtitle={mockNoShowCancellationCardData.subtitle}
+          totalCount={mockNoShowCancellationCardData.totalCount}
+          percentage={mockNoShowCancellationCardData.percentage}
+          revenue={mockNoShowCancellationCardData.revenue}
+          change={mockNoShowCancellationCardData.change}
+          metrics={mockNoShowCancellationCardData.metrics}
+          dayData={mockNoShowCancellationCardData.dayData}
+          motives={mockNoShowCancellationCardData.motives}
+          recentItems={mockNoShowCancellationCardData.recentItems}
+        />
+      </div>
+
+      {/* 5. ResponseSpeedCard - Velocidade de Resposta */}
+      <div className="mb-8">
+        <ResponseSpeedCard
+          title={mockResponseSpeedCardData.title}
+          subtitle={mockResponseSpeedCardData.subtitle}
+          avgResponseTime={mockResponseSpeedCardData.avgResponseTime}
+          fastResponsePercentage={mockResponseSpeedCardData.fastResponsePercentage}
+          extraRevenue={mockResponseSpeedCardData.extraRevenue}
+          timeRangeData={mockResponseSpeedCardData.timeRangeData}
+          sdrData={mockResponseSpeedCardData.sdrData}
+          speedGoal={mockResponseSpeedCardData.speedGoal}
+          speedGoalPercentage={mockResponseSpeedCardData.speedGoalPercentage}
+          impactInsight={mockResponseSpeedCardData.impactInsight}
+          aiInsight={mockResponseSpeedCardData.aiInsight}
+        />
+      </div>
+
+      {/* 6. LostLeadsCard - Leads Perdidos */}
+      <div className="mb-8">
+        <LostLeadsCard
+          title={mockLostLeadsCardData.title}
+          subtitle={mockLostLeadsCardData.subtitle}
+          totalLost={mockLostLeadsCardData.totalLost}
+          lostPercentage={mockLostLeadsCardData.lostPercentage}
+          lostRevenue={mockLostLeadsCardData.lostRevenue}
+          topObjections={mockLostLeadsCardData.topObjections}
+          channels={mockLostLeadsCardData.channels}
+          aiInsight={mockLostLeadsCardData.aiInsight}
+        />
       </div>
 
       {/* Drill-down: explode a lista que popula o KPI clicado */}
