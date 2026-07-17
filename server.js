@@ -4,8 +4,8 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const path = require('path');
-const googleAdsMcp = require('./googleAdsMcpService');
-const metaAdsMcp = require('./metaAdsMcpService');
+const pipeboardGoogleAds = require('./pipeboardGoogleAdsService');
+const pipeboardMetaAds = require('./pipeboardMetaAdsService');
 
 const app = express();
 app.use(cors());
@@ -3775,41 +3775,33 @@ async function warmCache() {
 
 // GET /api/google-ads/test - Testa conexão com Pipeboard Google Ads MCP
 // ==================== GOOGLE ADS ENDPOINTS ====================
-// Nota: Google Ads usa Pipeboard MCP via googleAdsMcpService.js
+// Nota: Google Ads usa Pipeboard REST API diretamente
 // Requer PIPEBOARD_API_KEY e GOOGLE_ADS_CUSTOMER_ID configurados
 
-// GET /api/google-ads/campaigns - Lista campanhas do Google Ads via Pipeboard MCP
+// GET /api/google-ads/campaigns - Lista campanhas do Google Ads via Pipeboard REST API
 app.get('/api/google-ads/campaigns', async (req, res) => {
   try {
-    if (!PIPEBOARD_API_KEY) {
-      return res.json({
-        success: false,
-        error: 'Google Ads: Configure PIPEBOARD_API_KEY no .env para usar Pipeboard MCP',
-        data: []
-      });
-    }
-
-    console.log('Buscando campanhas do Google Ads via Pipeboard...');
     let customerId = GOOGLE_ADS_CUSTOMER_ID;
 
     if (!customerId) {
-      console.log('Auto-detectando Customer ID...');
-      const customers = await googleAdsMcp.listCustomers();
+      console.log('Auto-detectando Customer ID via Pipeboard...');
+      const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
-        console.log(`✅ Auto-detectado: ${customerId}`);
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
 
     if (!customerId) {
       return res.json({
         success: false,
-        error: 'Google Ads: Nenhum cliente detectado. Configure GOOGLE_ADS_CUSTOMER_ID ou PIPEBOARD_API_KEY',
+        error: 'Google Ads: Nenhum cliente detectado. Configure PIPEBOARD_API_KEY e/ou GOOGLE_ADS_CUSTOMER_ID',
         data: []
       });
     }
 
-    const campaigns = await googleAdsMcp.getCampaigns(customerId);
+    console.log(`Buscando campanhas do Google Ads (customer: ${customerId})...`);
+    const campaigns = await pipeboardGoogleAds.getCampaigns(customerId);
 
     res.json({
       success: true,
@@ -3821,45 +3813,37 @@ app.get('/api/google-ads/campaigns', async (req, res) => {
     console.error('Erro Google Ads campaigns:', error.message);
     res.json({
       success: false,
-      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e GOOGLE_ADS_CUSTOMER_ID.`,
+      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e PIPEBOARD_BASE_URL.`,
       data: []
     });
   }
 });
 
-// GET /api/google-ads/metrics - Métricas de performance do Google Ads
+// GET /api/google-ads/metrics - Métricas de performance do Google Ads via Pipeboard REST API
 app.get('/api/google-ads/metrics', async (req, res) => {
   try {
-    if (!PIPEBOARD_API_KEY) {
-      return res.json({
-        success: false,
-        error: 'Google Ads: Configure PIPEBOARD_API_KEY no .env para usar Pipeboard MCP',
-        data: []
-      });
-    }
-
-    console.log('Buscando métricas do Google Ads via Pipeboard...');
     let customerId = GOOGLE_ADS_CUSTOMER_ID;
 
     if (!customerId) {
-      console.log('Auto-detectando Customer ID...');
-      const customers = await googleAdsMcp.listCustomers();
+      console.log('Auto-detectando Customer ID via Pipeboard...');
+      const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
-        console.log(`✅ Auto-detectado: ${customerId}`);
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
 
     if (!customerId) {
       return res.json({
         success: false,
-        error: 'Google Ads: Nenhum cliente detectado. Configure GOOGLE_ADS_CUSTOMER_ID ou PIPEBOARD_API_KEY',
+        error: 'Google Ads: Nenhum cliente detectado. Configure PIPEBOARD_API_KEY e/ou GOOGLE_ADS_CUSTOMER_ID',
         data: []
       });
     }
 
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
-    const metrics = await googleAdsMcp.getMetrics(customerId, dateRange);
+    console.log(`Buscando métricas do Google Ads (customer: ${customerId}, período: ${dateRange})...`);
+    const metrics = await pipeboardGoogleAds.getMetrics(customerId, dateRange);
 
     res.json({
       success: true,
@@ -3872,45 +3856,37 @@ app.get('/api/google-ads/metrics', async (req, res) => {
     console.error('Erro Google Ads metrics:', error.message);
     res.json({
       success: false,
-      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e GOOGLE_ADS_CUSTOMER_ID.`,
+      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e PIPEBOARD_BASE_URL.`,
       data: []
     });
   }
 });
 
-// GET /api/google-ads/conversions - Conversões/Leads do Google Ads
+// GET /api/google-ads/conversions - Conversões/Leads do Google Ads via Pipeboard REST API
 app.get('/api/google-ads/conversions', async (req, res) => {
   try {
-    if (!PIPEBOARD_API_KEY) {
-      return res.json({
-        success: false,
-        error: 'Google Ads: Configure PIPEBOARD_API_KEY no .env para usar Pipeboard MCP',
-        data: []
-      });
-    }
-
-    console.log('Buscando conversões do Google Ads via Pipeboard...');
     let customerId = GOOGLE_ADS_CUSTOMER_ID;
 
     if (!customerId) {
-      console.log('Auto-detectando Customer ID...');
-      const customers = await googleAdsMcp.listCustomers();
+      console.log('Auto-detectando Customer ID via Pipeboard...');
+      const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
-        console.log(`✅ Auto-detectado: ${customerId}`);
+        console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
 
     if (!customerId) {
       return res.json({
         success: false,
-        error: 'Google Ads: Nenhum cliente detectado. Configure GOOGLE_ADS_CUSTOMER_ID ou PIPEBOARD_API_KEY',
+        error: 'Google Ads: Nenhum cliente detectado. Configure PIPEBOARD_API_KEY e/ou GOOGLE_ADS_CUSTOMER_ID',
         data: []
       });
     }
 
     const dateRange = req.query.date_range || 'LAST_30_DAYS';
-    const conversions = await googleAdsMcp.getConversions(customerId, dateRange);
+    console.log(`Buscando conversões do Google Ads (customer: ${customerId}, período: ${dateRange})...`);
+    const conversions = await pipeboardGoogleAds.getConversions(customerId, dateRange);
 
     res.json({
       success: true,
@@ -3923,7 +3899,7 @@ app.get('/api/google-ads/conversions', async (req, res) => {
     console.error('Erro Google Ads conversions:', error.message);
     res.json({
       success: false,
-      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e GOOGLE_ADS_CUSTOMER_ID.`,
+      error: `Google Ads: ${error.message}. Verifique PIPEBOARD_API_KEY e PIPEBOARD_BASE_URL.`,
       data: []
     });
   }
