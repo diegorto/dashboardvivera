@@ -13,12 +13,14 @@ import {
 
 const COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6']
 
-const fmt = (n: number) =>
-  'R$ ' + (n >= 1000000
-    ? (n / 1000000).toFixed(1) + 'M'
-    : n >= 1000
-    ? (n / 1000).toFixed(0) + 'K'
-    : n.toString())
+const fmt = (n: number | undefined | null) => {
+  const v = typeof n === 'number' && !isNaN(n) ? n : 0
+  return 'R$ ' + (v >= 1000000
+    ? (v / 1000000).toFixed(1) + 'M'
+    : v >= 1000
+    ? (v / 1000).toFixed(0) + 'K'
+    : v.toString())
+}
 
 export default function ExecutiveDashboard() {
   return (
