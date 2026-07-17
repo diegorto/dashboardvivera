@@ -2,6 +2,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts'
+import { Layout } from '../components'
 import {
   leadsDaily, leadsBySource,
   leadsMetaDaily, leadsGoogleDaily, leadsMetaStats, leadsGoogleStats,
@@ -24,7 +25,8 @@ const fmt = (n: number | undefined | null) => {
 
 export default function ExecutiveDashboard() {
   return (
-    <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-6 space-y-6">
+    <Layout title="Executivo" breadcrumb={['Dashboards', 'Executivo']}>
+    <div className="space-y-6">
 
       {/* KPI Row 1 */}
       <div className="grid grid-cols-4 gap-4">
@@ -845,5 +847,6 @@ export default function ExecutiveDashboard() {
       </div>
 
     </div>
+    </Layout>
   )
 }
