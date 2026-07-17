@@ -29,6 +29,15 @@ import {
   mockLostLeadsCardData,
   mockExecutiveAlertsCardData,
 } from '../data/mockData';
+import {
+  useLeadsCard,
+  useSalesByFunnelCard,
+  useConversionTimeCard,
+  useNoShowCancellationCard,
+  useResponseSpeedCard,
+  useLostLeadsCard,
+  useAlertsCard,
+} from '../services/executiveDashboardCardsService';
 
 // Valores monetários em milhares: 17500 -> "R$ 17.5k", 500000 -> "R$ 500k"
 const fmtK = (v: number): string => {
@@ -57,6 +66,16 @@ const ExecutiveDashboard: React.FC = () => {
   const [totalRevenueByFunnel, setTotalRevenueByFunnel] = useState(0);
   // Drill-down: qual KPI está "explodido" no drawer lateral
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
+
+  // Carregar dados dos cards via API
+  const dateRange = getDateRange(filters.period, filters.dateRange);
+  const leadsCardData = useLeadsCard(dateRange.since, dateRange.until);
+  const salesByFunnelData = useSalesByFunnelCard(dateRange.since, dateRange.until);
+  const conversionTimeData = useConversionTimeCard(dateRange.since, dateRange.until);
+  const noShowCancellationData = useNoShowCancellationCard(dateRange.since, dateRange.until);
+  const responseSpeedData = useResponseSpeedCard(dateRange.since, dateRange.until);
+  const lostLeadsData = useLostLeadsCard(dateRange.since, dateRange.until);
+  const alertsData = useAlertsCard();
 
   // Carregar dados quando filtros mudam + atualizacao automatica a cada 5 minutos
   useEffect(() => {
@@ -229,10 +248,17 @@ const ExecutiveDashboard: React.FC = () => {
     <Layout title="Executive Dashboard" breadcrumb={['Dashboard', 'Executive Dashboard']} right={<ExportButton filename="executive-dashboard" rows={exportData} />}>
       {/* Alertas Executivos */}
       <div className="mb-8">
-        <ExecutiveAlertsCard
-          title={mockExecutiveAlertsCardData.title}
-          alerts={mockExecutiveAlertsCardData.alerts}
-        />
+        {alertsData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Alertas...</p>
+          </div>
+        ) : (
+          <ExecutiveAlertsCard
+            title={(alertsData.data || mockExecutiveAlertsCardData).title}
+            alerts={(alertsData.data || mockExecutiveAlertsCardData).alerts}
+          />
+        )}
       </div>
 
       {/* KPI Row 1 (4 cards wide on desktop) */}
@@ -324,91 +350,133 @@ const ExecutiveDashboard: React.FC = () => {
 
       {/* 1. LeadsCard - Leads Totais */}
       <div className="mb-8">
-        <LeadsCard
-          title={mockLeadsCardData.title}
-          period={mockLeadsCardData.period}
-          totalLeads={mockLeadsCardData.totalLeads}
-          qualifiedLeads={mockLeadsCardData.qualifiedLeads}
-          qualificationRate={mockLeadsCardData.qualificationRate}
-          changeVsPreviousMonth={mockLeadsCardData.changeVsPreviousMonth}
-          leadsPerDay={mockLeadsCardData.leadsPerDay}
-          dailyEvolutionData={mockLeadsCardData.dailyEvolutionData}
-          leadsBySource={mockLeadsCardData.leadsBySource}
-        />
+        {leadsCardData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Leads...</p>
+          </div>
+        ) : (
+          <LeadsCard
+            title={(leadsCardData.data || mockLeadsCardData).title}
+            period={(leadsCardData.data || mockLeadsCardData).period}
+            totalLeads={(leadsCardData.data || mockLeadsCardData).totalLeads}
+            qualifiedLeads={(leadsCardData.data || mockLeadsCardData).qualifiedLeads}
+            qualificationRate={(leadsCardData.data || mockLeadsCardData).qualificationRate}
+            changeVsPreviousMonth={(leadsCardData.data || mockLeadsCardData).changeVsPreviousMonth}
+            leadsPerDay={(leadsCardData.data || mockLeadsCardData).leadsPerDay}
+            dailyEvolutionData={(leadsCardData.data || mockLeadsCardData).dailyEvolutionData}
+            leadsBySource={(leadsCardData.data || mockLeadsCardData).leadsBySource}
+          />
+        )}
       </div>
 
       {/* 2. SalesByFunnelCard - Vendas por Funil */}
       <div className="mb-8">
-        <SalesByFunnelCard
-          title={mockSalesByFunnelCardData.title}
-          period={mockSalesByFunnelCardData.period}
-          totalRevenue={mockSalesByFunnelCardData.totalRevenue}
-          totalSales={mockSalesByFunnelCardData.totalSales}
-          avgTicket={mockSalesByFunnelCardData.avgTicket}
-          funnels={mockSalesByFunnelCardData.funnels}
-        />
+        {salesByFunnelData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Vendas por Funil...</p>
+          </div>
+        ) : (
+          <SalesByFunnelCard
+            title={(salesByFunnelData.data || mockSalesByFunnelCardData).title}
+            period={(salesByFunnelData.data || mockSalesByFunnelCardData).period}
+            totalRevenue={(salesByFunnelData.data || mockSalesByFunnelCardData).totalRevenue}
+            totalSales={(salesByFunnelData.data || mockSalesByFunnelCardData).totalSales}
+            avgTicket={(salesByFunnelData.data || mockSalesByFunnelCardData).avgTicket}
+            funnels={(salesByFunnelData.data || mockSalesByFunnelCardData).funnels}
+          />
+        )}
       </div>
 
       {/* 3. ConversionTimeCard - Tempos no Funil */}
       <div className="mb-8">
-        <ConversionTimeCard
-          title={mockConversionTimeCardData.title}
-          subtitle={mockConversionTimeCardData.subtitle}
-          totalTime={mockConversionTimeCardData.totalTime}
-          bestChannel={mockConversionTimeCardData.bestChannel}
-          improvement={mockConversionTimeCardData.improvement}
-          channels={mockConversionTimeCardData.channels}
-          monthlyEvolution={mockConversionTimeCardData.monthlyEvolution}
-          additionalMetrics={mockConversionTimeCardData.additionalMetrics}
-          aiInsight={mockConversionTimeCardData.aiInsight}
-        />
+        {conversionTimeData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Tempos no Funil...</p>
+          </div>
+        ) : (
+          <ConversionTimeCard
+            title={(conversionTimeData.data || mockConversionTimeCardData).title}
+            subtitle={(conversionTimeData.data || mockConversionTimeCardData).subtitle}
+            totalTime={(conversionTimeData.data || mockConversionTimeCardData).totalTime}
+            bestChannel={(conversionTimeData.data || mockConversionTimeCardData).bestChannel}
+            improvement={(conversionTimeData.data || mockConversionTimeCardData).improvement}
+            channels={(conversionTimeData.data || mockConversionTimeCardData).channels}
+            monthlyEvolution={(conversionTimeData.data || mockConversionTimeCardData).monthlyEvolution}
+            additionalMetrics={(conversionTimeData.data || mockConversionTimeCardData).additionalMetrics}
+            aiInsight={(conversionTimeData.data || mockConversionTimeCardData).aiInsight}
+          />
+        )}
       </div>
 
       {/* 4. NoShowCancellationCard - Faltas e Cancelamentos */}
       <div className="mb-8">
-        <NoShowCancellationCard
-          title={mockNoShowCancellationCardData.title}
-          subtitle={mockNoShowCancellationCardData.subtitle}
-          totalCount={mockNoShowCancellationCardData.totalCount}
-          percentage={mockNoShowCancellationCardData.percentage}
-          revenue={mockNoShowCancellationCardData.revenue}
-          change={mockNoShowCancellationCardData.change}
-          metrics={mockNoShowCancellationCardData.metrics}
-          dayData={mockNoShowCancellationCardData.dayData}
-          motives={mockNoShowCancellationCardData.motives}
-          recentItems={mockNoShowCancellationCardData.recentItems}
-        />
+        {noShowCancellationData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Faltas e Cancelamentos...</p>
+          </div>
+        ) : (
+          <NoShowCancellationCard
+            title={(noShowCancellationData.data || mockNoShowCancellationCardData).title}
+            subtitle={(noShowCancellationData.data || mockNoShowCancellationCardData).subtitle}
+            totalCount={(noShowCancellationData.data || mockNoShowCancellationCardData).totalCount}
+            percentage={(noShowCancellationData.data || mockNoShowCancellationCardData).percentage}
+            revenue={(noShowCancellationData.data || mockNoShowCancellationCardData).revenue}
+            change={(noShowCancellationData.data || mockNoShowCancellationCardData).change}
+            metrics={(noShowCancellationData.data || mockNoShowCancellationCardData).metrics}
+            dayData={(noShowCancellationData.data || mockNoShowCancellationCardData).dayData}
+            motives={(noShowCancellationData.data || mockNoShowCancellationCardData).motives}
+            recentItems={(noShowCancellationData.data || mockNoShowCancellationCardData).recentItems}
+          />
+        )}
       </div>
 
       {/* 5. ResponseSpeedCard - Velocidade de Resposta */}
       <div className="mb-8">
-        <ResponseSpeedCard
-          title={mockResponseSpeedCardData.title}
-          subtitle={mockResponseSpeedCardData.subtitle}
-          avgResponseTime={mockResponseSpeedCardData.avgResponseTime}
-          fastResponsePercentage={mockResponseSpeedCardData.fastResponsePercentage}
-          extraRevenue={mockResponseSpeedCardData.extraRevenue}
-          timeRangeData={mockResponseSpeedCardData.timeRangeData}
-          sdrData={mockResponseSpeedCardData.sdrData}
-          speedGoal={mockResponseSpeedCardData.speedGoal}
-          speedGoalPercentage={mockResponseSpeedCardData.speedGoalPercentage}
-          impactInsight={mockResponseSpeedCardData.impactInsight}
-          aiInsight={mockResponseSpeedCardData.aiInsight}
-        />
+        {responseSpeedData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Velocidade de Resposta...</p>
+          </div>
+        ) : (
+          <ResponseSpeedCard
+            title={(responseSpeedData.data || mockResponseSpeedCardData).title}
+            subtitle={(responseSpeedData.data || mockResponseSpeedCardData).subtitle}
+            avgResponseTime={(responseSpeedData.data || mockResponseSpeedCardData).avgResponseTime}
+            fastResponsePercentage={(responseSpeedData.data || mockResponseSpeedCardData).fastResponsePercentage}
+            extraRevenue={(responseSpeedData.data || mockResponseSpeedCardData).extraRevenue}
+            timeRangeData={(responseSpeedData.data || mockResponseSpeedCardData).timeRangeData}
+            sdrData={(responseSpeedData.data || mockResponseSpeedCardData).sdrData}
+            speedGoal={(responseSpeedData.data || mockResponseSpeedCardData).speedGoal}
+            speedGoalPercentage={(responseSpeedData.data || mockResponseSpeedCardData).speedGoalPercentage}
+            impactInsight={(responseSpeedData.data || mockResponseSpeedCardData).impactInsight}
+            aiInsight={(responseSpeedData.data || mockResponseSpeedCardData).aiInsight}
+          />
+        )}
       </div>
 
       {/* 6. LostLeadsCard - Leads Perdidos */}
       <div className="mb-8">
-        <LostLeadsCard
-          title={mockLostLeadsCardData.title}
-          subtitle={mockLostLeadsCardData.subtitle}
-          totalLost={mockLostLeadsCardData.totalLost}
-          lostPercentage={mockLostLeadsCardData.lostPercentage}
-          lostRevenue={mockLostLeadsCardData.lostRevenue}
-          topObjections={mockLostLeadsCardData.topObjections}
-          channels={mockLostLeadsCardData.channels}
-          aiInsight={mockLostLeadsCardData.aiInsight}
-        />
+        {lostLeadsData.loading ? (
+          <div className="bg-white border border-[#e2e8f0] rounded-lg p-6 text-center">
+            <div className="w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-500">Carregando Leads Perdidos...</p>
+          </div>
+        ) : (
+          <LostLeadsCard
+            title={(lostLeadsData.data || mockLostLeadsCardData).title}
+            subtitle={(lostLeadsData.data || mockLostLeadsCardData).subtitle}
+            totalLost={(lostLeadsData.data || mockLostLeadsCardData).totalLost}
+            lostPercentage={(lostLeadsData.data || mockLostLeadsCardData).lostPercentage}
+            lostRevenue={(lostLeadsData.data || mockLostLeadsCardData).lostRevenue}
+            topObjections={(lostLeadsData.data || mockLostLeadsCardData).topObjections}
+            channels={(lostLeadsData.data || mockLostLeadsCardData).channels}
+            aiInsight={(lostLeadsData.data || mockLostLeadsCardData).aiInsight}
+          />
+        )}
       </div>
 
       {/* Drill-down: explode a lista que popula o KPI clicado */}
