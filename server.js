@@ -109,6 +109,11 @@ let FB_AD_ACCOUNT_IDS = (process.env.FB_AD_ACCOUNT_IDS || '')
   .filter(Boolean);
 let TINTIM_ACCOUNT_CODE = process.env.TINTIM_ACCOUNT_CODE;
 let TINTIM_ACCOUNT_TOKEN = process.env.TINTIM_ACCOUNT_TOKEN;
+// Alias: api.tintim.io usa API Key + Workspace ID. TINTIM_API_KEY/WORKSPACE_ID nunca eram
+// declaradas antes, causando ReferenceError em /api/settings/test, /api/settings/test/tintim
+// e /api/tintim/audit -- derrubando junto as checagens de Google Ads/OpenAI no mesmo handler.
+let TINTIM_API_KEY = process.env.TINTIM_API_KEY || TINTIM_ACCOUNT_TOKEN;
+let TINTIM_WORKSPACE_ID = process.env.TINTIM_WORKSPACE_ID || TINTIM_ACCOUNT_CODE;
 let GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID;
 let GOOGLE_ADS_DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
 
@@ -124,8 +129,8 @@ function applySettings(s) {
   if (s.fbAdAccountIds) {
     FB_AD_ACCOUNT_IDS = String(s.fbAdAccountIds).split(',').map(id => id.trim()).filter(Boolean);
   }
-  if (s.tintimAccountCode) TINTIM_ACCOUNT_CODE = s.tintimAccountCode;
-  if (s.tintimAccountToken) TINTIM_ACCOUNT_TOKEN = s.tintimAccountToken;
+  if (s.tintimAccountCode) { TINTIM_ACCOUNT_CODE = s.tintimAccountCode; TINTIM_WORKSPACE_ID = s.tintimAccountCode; }
+  if (s.tintimAccountToken) { TINTIM_ACCOUNT_TOKEN = s.tintimAccountToken; TINTIM_API_KEY = s.tintimAccountToken; }
   if (s.googleAdsCustomerId) GOOGLE_ADS_CUSTOMER_ID = s.googleAdsCustomerId;
   if (s.googleAdsDeveloperToken) GOOGLE_ADS_DEVELOPER_TOKEN = s.googleAdsDeveloperToken;
   if (s.openaiApiKey) process.env.OPENAI_API_KEY = s.openaiApiKey;
@@ -232,6 +237,7 @@ function invalidateCache() {
 // etapa X" em lote. Atualiza sozinho (ver setInterval no fim do arquivo).
 // ============================================
 const STAGE_EVENT_TYPES = {
+  3:  { key: 'qualificado', verb: 'qualificou', label: 'Qualificado' },
   5:  { key: 'comparecimento', verb: 'compareceu', label: 'Comparecimento' },
   13: { key: 'nao_compareceu', verb: 'faltou', label: 'Não Compareceu' },
   63: { key: 'remarcou', verb: 'remarcou', label: 'Remarcou' },
@@ -1331,21 +1337,6 @@ app.get('/api/dashboard/executive', async (req, res) => {
       };
     };
 
-    // Fetch stages to map stageId -> stageName for qualified count
-    const stageIdToName = {};
-    try {
-      const stagesResp = await axios.get('https://api.pipedrive.com/v1/stages', {
-        params: { api_token: PIPEDRIVE_TOKEN, limit: 500 }
-      });
-      if (stagesResp.data.success && stagesResp.data.data) {
-        stagesResp.data.data.forEach(s => {
-          stageIdToName[s.id] = (s.name || '').trim();
-        });
-      }
-    } catch (error) {
-      console.error('Erro ao buscar stages para count qualified:', error.message);
-    }
-
     const cur = aggregate(range, adsData);
     const prev = prevRange ? aggregate(prevRange, prevAdsData) : null;
 
@@ -1419,12 +1410,18 @@ app.get('/api/dashboard/executive', async (req, res) => {
         change: pct(cur.leads, prev && prev.leads)
       },
       qualified: {
-        // Contar deals reais no estágio "Qualificado" dentro do período
-        value: dealsData.filter(d => {
-          const addDate = (d.addDate || '').slice(0, 10);
-          const stageName = stageIdToName[d.stageId] || '';
-          return addDate >= range.since && addDate <= range.until && stageName.includes('Qualificado');
-        }).length,
+        // Lead qualificado = deal que JA PASSOU pelo estagio "Qualificado" (id 3) em algum
+        // momento dentro do periodo -- nao apenas quem esta parado la agora. Usa o historico
+        // de transicoes de estagio (_pipelineEvents), o mesmo mecanismo do card de Comparecimento.
+        value: new Set(
+          _pipelineEvents
+            .filter(e => e.eventKey === 'qualificado')
+            .filter(e => {
+              const d = (e.enteredAt || '').slice(0, 10);
+              return d >= range.since && d <= range.until;
+            })
+            .map(e => e.dealId)
+        ).size,
         change: pct(cur.dealsWon, prev && prev.dealsWon)
       },
       sales: {
@@ -3881,17 +3878,18 @@ app.post('/api/settings/test', async (req, res) => {
     results.tintim.message = 'API Key ou Workspace ID não configurados';
   }
 
-  if (GOOGLE_ADS_CUSTOMER_ID && GOOGLE_ADS_DEVELOPER_TOKEN) {
+  if (process.env.PIPEBOARD_API_KEY) {
     try {
-      // Valida apenas se as credenciais estão preenchidas
-      // A validação completa requer mais passos (refresh token, etc)
-      results.googleAds.ok = true;
-      results.googleAds.message = `Credenciais configuradas para ${GOOGLE_ADS_CUSTOMER_ID}`;
+      const gadsOk = await pipeboardGoogleAds.testConnection();
+      results.googleAds.ok = gadsOk;
+      results.googleAds.message = gadsOk
+        ? `Conectado via Pipeboard${GOOGLE_ADS_CUSTOMER_ID ? ' (customer ' + GOOGLE_ADS_CUSTOMER_ID + ')' : ' (auto-detectando customer)'}`
+        : 'PIPEBOARD_API_KEY configurada, mas a chamada de teste ao MCP do Google Ads falhou';
     } catch (e) {
-      results.googleAds.message = 'Erro ao validar credenciais Google Ads';
+      results.googleAds.message = e.message || 'Erro ao validar conexão com Pipeboard/Google Ads';
     }
   } else {
-    results.googleAds.message = 'Customer ID ou Developer Token não configurados';
+    results.googleAds.message = 'PIPEBOARD_API_KEY não configurada (é isso que o Google Ads usa, não o Developer Token)';
   }
 
   if (process.env.OPENAI_API_KEY) {
@@ -4104,6 +4102,7 @@ app.get('/api/google-ads/campaigns', async (req, res) => {
       const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
+        GOOGLE_ADS_CUSTOMER_ID = customerId; // cache: evita redetectar via Pipeboard em toda requisicao
         console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
@@ -4145,6 +4144,7 @@ app.get('/api/google-ads/metrics', async (req, res) => {
       const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
+        GOOGLE_ADS_CUSTOMER_ID = customerId; // cache: evita redetectar via Pipeboard em toda requisicao
         console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
@@ -4188,6 +4188,7 @@ app.get('/api/google-ads/conversions', async (req, res) => {
       const customers = await pipeboardGoogleAds.listCustomers();
       if (customers && customers.length > 0) {
         customerId = customers[0].id || customers[0].customer_id;
+        GOOGLE_ADS_CUSTOMER_ID = customerId; // cache: evita redetectar via Pipeboard em toda requisicao
         console.log(`✅ Auto-detectado Customer ID: ${customerId}`);
       }
     }
