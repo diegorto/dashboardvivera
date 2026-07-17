@@ -310,6 +310,13 @@ async function fetchPipedriveDealsUncached(since, until) {
             email = primaryEmail ? primaryEmail.value : '';
           }
 
+          // Extrair phone do paciente
+          let phone = '';
+          if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.phone)) {
+            const primaryPhone = deal.person_id.phone.find(p => p.primary) || deal.person_id.phone[0];
+            phone = primaryPhone ? primaryPhone.value : '';
+          }
+
           deals.push({
             id: deal.id,
             title: deal.title,
@@ -321,9 +328,10 @@ async function fetchPipedriveDealsUncached(since, until) {
             stageChangeTime: deal.stage_change_time || deal.add_time || '',
             userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
             userName: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.name : '',
-            lostReason: deal.lost_reason || '',
+            lostReason: deal.lost_reason || '', // Campo detalhado de motivo da perda
             wonTime: deal.won_time || '',
             lostTime: deal.lost_time || '',
+            expectedCloseDate: deal.expected_close_date || '', // 🆕 Data prevista de fechamento
             updateTime: deal.update_time || '',
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
@@ -331,7 +339,8 @@ async function fetchPipedriveDealsUncached(since, until) {
             plataforma: deal[FIELD_PLATAFORMA] || '',
             origem: deal[FIELD_ORIGEM] || '',
             personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
-            email
+            email,
+            phone // 🆕 Telefone do paciente
           });
         });
 
@@ -389,6 +398,7 @@ async function fetchPipedriveActivitiesUncached(since, until) {
             duration: act.duration || '',
             done: !!act.done,
             markedAsDoneTime: act.marked_as_done_time || '',
+            note: act.note || '', // 🆕 Notas/observações da atividade
             userId: act.user_id,
             userName: act.owner_name || '',
             personName: act.person_name || '',
@@ -3231,6 +3241,7 @@ app.get('/api/dashboard/patients', async (req, res) => {
       id: d.id,
       name: d.personName || d.title,
       email: d.email,
+      phone: d.phone, // 🆕 Telefone do paciente
       status: d.status,
       value: d.rawValue,
       stageId: d.stageId,
@@ -3240,6 +3251,7 @@ app.get('/api/dashboard/patients', async (req, res) => {
       criativo: d.palavraChave,
       owner: d.userName,
       addDate: d.addDate,
+      expectedCloseDate: d.expectedCloseDate, // 🆕 Data prevista de fechamento
       lostReason: d.lostReason
     }));
 
@@ -3393,9 +3405,10 @@ app.get('/api/filters/options', async (req, res) => {
     );
 
     // Profissionais: obtém do field owner (person linked ao deal) ou user_id
+    // 🆕 Filtra apenas pessoas ativas
     const professionals = new Set(
       allPeople
-        .filter(p => p.name && typeof p.name === 'string')
+        .filter(p => p.name && typeof p.name === 'string' && p.active_flag !== false)
         .map(p => p.name)
     );
 
