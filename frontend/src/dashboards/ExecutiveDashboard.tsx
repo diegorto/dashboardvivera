@@ -232,8 +232,8 @@ const ExecutiveDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* KPI Row 1 (7 cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 mb-6">
+      {/* KPI Row 1 (4 cards wide on desktop) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
           label="Receita"
           onClick={() => setDrillMetric('revenue')}
@@ -243,34 +243,12 @@ const ExecutiveDashboard: React.FC = () => {
           accent="#6366f1"
         />
         <KPICard
-          label="Meta"
+          label="Meta de Faturamento Mensal"
           onClick={() => setDrillMetric('goal')}
           value={fmtK(kpis.goal.value as number)}
-          sub="Meta"
+          progress={Math.min((kpis.revenue.value as number) / (kpis.goal.value as number) * 100, 100)}
+          progressLabel="Alcançado"
           accent="#6366f1"
-        />
-        <KPICard
-          label="% Meta"
-          onClick={() => setDrillMetric('goalPct')}
-          value={`${kpis.goalPct.value}%`}
-          change={kpis.goalPct.change}
-          sub="progresso"
-          accent="#6366f1"
-        />
-        <KPICard
-          label="Forecast"
-          onClick={() => setDrillMetric('forecast')}
-          value={fmtK(kpis.forecast.value as number)}
-          change={kpis.forecast.change}
-          sub="projetado"
-          accent="#6366f1"
-        />
-        <KPICard
-          label="ROI"
-          onClick={() => setDrillMetric('roi')}
-          value={`${kpis.roi.value}%`}
-          change={kpis.roi.change}
-          accent="#8b5cf6"
         />
         <KPICard
           label="ROAS"
@@ -288,8 +266,8 @@ const ExecutiveDashboard: React.FC = () => {
         />
       </div>
 
-      {/* KPI Row 2 (8 cards) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-3 mb-6">
+      {/* KPI Row 2 (7 cards - similar layout to screenshot) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4 mb-6">
         <KPICard
           label="Ticket Médio"
           onClick={() => setDrillMetric('avgTicket')}
@@ -298,30 +276,23 @@ const ExecutiveDashboard: React.FC = () => {
           accent="#6366f1"
         />
         <KPICard
-          label="Agendamentos Hoje"
+          label="Consultas Agendadas no Período"
           onClick={() => setDrillMetric('appointmentsToday')}
           value={kpis.appointmentsToday.value}
           sub={kpis.appointmentsToday.sub}
           accent="#6366f1"
         />
         <KPICard
-          label="Agenda Amanhã"
-          onClick={() => setDrillMetric('appointmentsTomorrow')}
-          value={kpis.appointmentsTomorrow.value}
-          sub={kpis.appointmentsTomorrow.sub}
-          accent="#6366f1"
-        />
-        <KPICard
-          label="Comparecimento"
+          label="Consultas Comparecidas no Período"
           onClick={() => setDrillMetric('attendance')}
-          value={`${kpis.attendance.value}%`}
+          value={kpis.attendance.value}
           change={kpis.attendance.change}
           accent="#10b981"
         />
         <KPICard
-          label="No-show"
+          label="Faltaram no Período"
           onClick={() => setDrillMetric('noShow')}
-          value={kpis.noShow.value}
+          value={`${kpis.noShow.value}%`}
           change={kpis.noShow.change}
           accent="#ef4444"
         />
