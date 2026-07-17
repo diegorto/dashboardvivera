@@ -326,10 +326,6 @@ app.get('/api/pipedrive/:resource', async (req, res) => {
 });
 
 // Servir o dashboard HTML
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dashboard-api.html'));
-});
-
 // Painel Vivera Orofacial - Corrida das SDRs
 app.get('/sdr', (req, res) => {
   const sdrPath = path.join(__dirname, 'dashboard-sdr.html');
