@@ -438,6 +438,9 @@ function getPipedriveStages() {
 function getPipedriveActivities(since, until) {
   return cached(`activities:${since}:${until}`, () => fetchPipedriveActivitiesUncached(since, until));
 }
+function getPipelineMap() {
+  return cached('pipelines:map', () => fetchPipelineMapUncached());
+}
 
 function defaultDateRange() {
   const until = new Date();
@@ -585,6 +588,13 @@ async function fetchPipedriveDealsUncached(since, until) {
             email = primaryEmail ? primaryEmail.value : '';
           }
 
+          // Extrair phone do paciente
+          let phone = '';
+          if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.phone)) {
+            const primaryPhone = deal.person_id.phone.find(p => p.primary) || deal.person_id.phone[0];
+            phone = primaryPhone ? primaryPhone.value : '';
+          }
+
           deals.push({
             id: deal.id,
             title: deal.title,
@@ -596,9 +606,10 @@ async function fetchPipedriveDealsUncached(since, until) {
             stageChangeTime: deal.stage_change_time || deal.add_time || '',
             userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
             userName: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.name : '',
-            lostReason: deal.lost_reason || '',
+            lostReason: deal.lost_reason || '', // Campo detalhado de motivo da perda
             wonTime: deal.won_time || '',
             lostTime: deal.lost_time || '',
+            expectedCloseDate: deal.expected_close_date || '', // 🆕 Data prevista de fechamento
             updateTime: deal.update_time || '',
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
@@ -606,7 +617,8 @@ async function fetchPipedriveDealsUncached(since, until) {
             plataforma: deal[FIELD_PLATAFORMA] || '',
             origem: deal[FIELD_ORIGEM] || '',
             personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
-            email
+            email,
+            phone // 🆕 Telefone do paciente
           });
         });
 
@@ -664,6 +676,7 @@ async function fetchPipedriveActivitiesUncached(since, until) {
             duration: act.duration || '',
             done: !!act.done,
             markedAsDoneTime: act.marked_as_done_time || '',
+            note: act.note || '', // 🆕 Notas/observações da atividade
             userId: act.user_id,
             userName: act.owner_name || '',
             personName: act.person_name || '',
@@ -704,6 +717,26 @@ async function fetchPipedriveStagesUncached() {
   } catch (error) {
     console.error('Erro ao buscar stages Pipedrive:', error.response?.data?.error || error.message);
     return [];
+  }
+}
+
+// Busca todos os pipelines do Pipedrive e retorna mapa de id -> name
+async function fetchPipelineMapUncached() {
+  try {
+    const response = await axios.get('https://api.pipedrive.com/v1/pipelines', {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+    if (response.data.success && response.data.data) {
+      const map = {};
+      response.data.data.forEach(p => {
+        map[String(p.id)] = p.name;
+      });
+      return map;
+    }
+    return {};
+  } catch (error) {
+    console.error('Erro ao buscar pipelines Pipedrive:', error.response?.data?.error || error.message);
+    return {};
   }
 }
 
@@ -1709,8 +1742,8 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
 
       const dealsInRange = allDeals;
 
-    // Mapa de pipeline_id => pipeline_name
-    const pipelineMap = { '1': 'Inbound', '2': 'Recepção', '3': 'Base de Leads', '4': 'Ortodontia', '5': 'Indicação', '6': 'MKT de permissão para Resgate Futuro', '7': 'RMKT' };
+    // Busca nomes reais dos pipelines do Pipedrive
+    const pipelineMap = await getPipelineMap();
 
     // Agrupa deals por estágio (stageName)
     const dealsByStage = {};
@@ -3485,6 +3518,7 @@ app.get('/api/dashboard/patients', async (req, res) => {
       id: d.id,
       name: d.personName || d.title,
       email: d.email,
+      phone: d.phone, // 🆕 Telefone do paciente
       status: d.status,
       value: d.rawValue,
       stageId: d.stageId,
@@ -3494,6 +3528,7 @@ app.get('/api/dashboard/patients', async (req, res) => {
       criativo: d.palavraChave,
       owner: d.userName,
       addDate: d.addDate,
+      expectedCloseDate: d.expectedCloseDate, // 🆕 Data prevista de fechamento
       lostReason: d.lostReason
     }));
 
@@ -3597,6 +3632,14 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
 // ============================================
 
 app.get('/api/filters/options', async (req, res) => {
+  // Busca nomes reais dos pipelines (usado em sucesso e erro)
+  let pipelineMapData = {};
+  try {
+    pipelineMapData = await getPipelineMap();
+  } catch (e) {
+    console.error('Erro ao buscar pipeline map:', e.message);
+  }
+
   try {
     const allDeals = await cached('deals', async () => {
       const deals = await Promise.all(
@@ -3639,9 +3682,10 @@ app.get('/api/filters/options', async (req, res) => {
     );
 
     // Profissionais: obtém do field owner (person linked ao deal) ou user_id
+    // 🆕 Filtra apenas pessoas ativas
     const professionals = new Set(
       allPeople
-        .filter(p => p.name && typeof p.name === 'string')
+        .filter(p => p.name && typeof p.name === 'string' && p.active_flag !== false)
         .map(p => p.name)
     );
 
@@ -3674,22 +3718,8 @@ app.get('/api/filters/options', async (req, res) => {
         .filter(Boolean)
     );
 
-    const pipelines = new Set(
-      allDeals
-        .filter(d => d.pipeline_id)
-        .map(d => {
-          const pipelineMap = {
-          '1': 'Inbound',
-          '2': 'Recepção',
-          '3': 'Base de Leads',
-          '4': 'Ortodontia',
-          '5': 'Indicação',
-          '6': 'MKT de permissão para Resgate Futuro',
-          '7': 'RMKT',
-        };
-          return pipelineMap[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
-        })
-    );
+    // Usa TODOS os pipelines do Pipedrive (não apenas os que têm deals)
+    const pipelines = new Set(Object.values(pipelineMapData).filter(Boolean));
 
     const statusMap = {
       'open': 'Aberto',
@@ -3716,6 +3746,11 @@ app.get('/api/filters/options', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao carregar opções de filtro:', error.message);
+    // Usa nomes reais dos pipelines mesmo em caso de erro
+    const pipelineNames = Object.values(pipelineMapData).length > 0
+      ? Object.values(pipelineMapData)
+      : ['Inbound', 'Outbound', 'Referência']; // fallback
+
     res.json({
       success: false,
       procedures: [],
@@ -3723,7 +3758,7 @@ app.get('/api/filters/options', async (req, res) => {
       sdrs: ['Agda', 'Helenice'],
       campaigns: [],
       adSets: [],
-      pipelines: ['Inbound', 'Recepção', 'Base de Leads', 'Ortodontia', 'Indicação', 'MKT de permissão para Resgate Futuro', 'RMKT'],
+      pipelines: pipelineNames,
       statuses: ['Aberto', 'Ganho', 'Perdido'],
     });
   }
