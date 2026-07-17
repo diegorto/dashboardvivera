@@ -174,6 +174,9 @@ function getPipedriveStages() {
 function getPipedriveActivities(since, until) {
   return cached(`activities:${since}:${until}`, () => fetchPipedriveActivitiesUncached(since, until));
 }
+function getPipelineMap() {
+  return cached('pipelines:map', () => fetchPipelineMapUncached());
+}
 
 function defaultDateRange() {
   const until = new Date();
@@ -426,6 +429,26 @@ async function fetchPipedriveStagesUncached() {
   } catch (error) {
     console.error('Erro ao buscar stages Pipedrive:', error.response?.data?.error || error.message);
     return [];
+  }
+}
+
+// Busca todos os pipelines do Pipedrive e retorna mapa de id -> name
+async function fetchPipelineMapUncached() {
+  try {
+    const response = await axios.get('https://api.pipedrive.com/v1/pipelines', {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+    if (response.data.success && response.data.data) {
+      const map = {};
+      response.data.data.forEach(p => {
+        map[String(p.id)] = p.name;
+      });
+      return map;
+    }
+    return {};
+  } catch (error) {
+    console.error('Erro ao buscar pipelines Pipedrive:', error.response?.data?.error || error.message);
+    return {};
   }
 }
 
@@ -1451,8 +1474,8 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
 
     const dealsInRange = allDeals;
 
-    // Mapa de pipeline_id => pipeline_name
-    const pipelineMap = { '1': 'Inbound', '2': 'Outbound', '3': 'Referência' };
+    // Busca nomes reais dos pipelines do Pipedrive
+    const pipelineMap = await getPipelineMap();
 
     // Agrupa deals por estágio (stageName)
     const dealsByStage = {};
@@ -3320,6 +3343,14 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
 // ============================================
 
 app.get('/api/filters/options', async (req, res) => {
+  // Busca nomes reais dos pipelines (usado em sucesso e erro)
+  let pipelineMapData = {};
+  try {
+    pipelineMapData = await getPipelineMap();
+  } catch (e) {
+    console.error('Erro ao buscar pipeline map:', e.message);
+  }
+
   try {
     const allDeals = await cached('deals', async () => {
       const deals = await Promise.all(
@@ -3397,16 +3428,12 @@ app.get('/api/filters/options', async (req, res) => {
         .filter(Boolean)
     );
 
+    // Usa nomes reais dos pipelines do Pipedrive (já carregados antes do try)
     const pipelines = new Set(
       allDeals
         .filter(d => d.pipeline_id)
         .map(d => {
-          const pipelineMap = {
-            '1': 'Inbound',
-            '2': 'Outbound',
-            '3': 'Referência',
-          };
-          return pipelineMap[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
+          return pipelineMapData[String(d.pipeline_id)] || `Pipeline ${d.pipeline_id}`;
         })
     );
 
@@ -3435,6 +3462,11 @@ app.get('/api/filters/options', async (req, res) => {
     });
   } catch (error) {
     console.error('Erro ao carregar opções de filtro:', error.message);
+    // Usa nomes reais dos pipelines mesmo em caso de erro
+    const pipelineNames = Object.values(pipelineMapData).length > 0
+      ? Object.values(pipelineMapData)
+      : ['Inbound', 'Outbound', 'Referência']; // fallback
+
     res.json({
       success: false,
       procedures: [],
@@ -3442,7 +3474,7 @@ app.get('/api/filters/options', async (req, res) => {
       sdrs: ['Agda', 'Helenice'],
       campaigns: [],
       adSets: [],
-      pipelines: ['Inbound', 'Outbound', 'Referência'],
+      pipelines: pipelineNames,
       statuses: ['Aberto', 'Ganho', 'Perdido'],
     });
   }
