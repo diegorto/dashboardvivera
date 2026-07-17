@@ -1,36 +1,37 @@
 const axios = require('axios');
 
-// Configuração direta da API REST Pipeboard para Google Ads
-const PIPEBOARD_API_KEY = process.env.PIPEBOARD_API_KEY || '';
-const PIPEBOARD_BASE_URL = process.env.PIPEBOARD_BASE_URL || 'https://api.pipeboard.co';
+// Configuração da integração Pipeboard Google Ads
+const PIPEBOARD_GOOGLE_ADS_TOKEN = process.env.PIPEBOARD_GOOGLE_ADS_TOKEN || '';
+const PIPEBOARD_GOOGLE_ADS_BASE_URL = 'https://google-ads.mcp.pipeboard.co';
 const GOOGLE_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID || '';
 
-// Cliente Axios para chamar Pipeboard REST API
-const pipeboardClient = axios.create({
-  baseURL: PIPEBOARD_BASE_URL,
+// Cliente Axios para chamar Pipeboard Google Ads API
+const pipeboardGoogleAdsClient = axios.create({
+  baseURL: PIPEBOARD_GOOGLE_ADS_BASE_URL,
   timeout: 30000,
   headers: {
-    'Authorization': `Bearer ${PIPEBOARD_API_KEY}`,
     'Content-Type': 'application/json'
   }
 });
 
 /**
- * Testa conexão com Pipeboard Google Ads API
+ * Testa conexão com Pipeboard Google Ads
  */
 async function testConnection() {
   try {
-    if (!PIPEBOARD_API_KEY) {
+    if (!PIPEBOARD_GOOGLE_ADS_TOKEN) {
       return {
         success: false,
-        message: 'Pipeboard API Key não configurada'
+        message: 'Pipeboard Google Ads Token não configurado'
       };
     }
 
     console.log('Testando conexão com Pipeboard Google Ads...');
 
     // Tenta buscar clientes disponíveis
-    const response = await pipeboardClient.get('/google-ads/customers');
+    const response = await pipeboardGoogleAdsClient.get('/', {
+      params: { token: PIPEBOARD_GOOGLE_ADS_TOKEN }
+    });
 
     console.log('✅ Conexão com Pipeboard Google Ads bem-sucedida');
     return {
@@ -52,9 +53,18 @@ async function testConnection() {
  */
 async function listCustomers() {
   try {
-    console.log('Listando clientes Google Ads disponíveis...');
+    if (!PIPEBOARD_GOOGLE_ADS_TOKEN) {
+      throw new Error('PIPEBOARD_GOOGLE_ADS_TOKEN não configurado');
+    }
 
-    const response = await pipeboardClient.get('/google-ads/customers');
+    console.log('Listando clientes Google Ads disponíveis via Pipeboard...');
+
+    const response = await pipeboardGoogleAdsClient.get('/', {
+      params: {
+        token: PIPEBOARD_GOOGLE_ADS_TOKEN,
+        method: 'list_google_ads_customers'
+      }
+    });
 
     const customers = response.data.customers || response.data.data || [];
     console.log(`✅ ${customers.length} clientes encontrados`);
@@ -73,10 +83,19 @@ async function getCampaigns(customerId) {
     if (!customerId) {
       throw new Error('Customer ID é obrigatório');
     }
+    if (!PIPEBOARD_GOOGLE_ADS_TOKEN) {
+      throw new Error('PIPEBOARD_GOOGLE_ADS_TOKEN não configurado');
+    }
 
     console.log(`Buscando campanhas para customer: ${customerId}`);
 
-    const response = await pipeboardClient.get(`/google-ads/customers/${customerId}/campaigns`);
+    const response = await pipeboardGoogleAdsClient.get('/', {
+      params: {
+        token: PIPEBOARD_GOOGLE_ADS_TOKEN,
+        method: 'get_google_ads_campaigns',
+        customer_id: customerId.toString()
+      }
+    });
 
     const campaigns = response.data.campaigns || response.data.data || [];
     console.log(`✅ ${campaigns.length} campanhas encontradas`);
@@ -95,18 +114,23 @@ async function getMetrics(customerId, dateRange = 'LAST_30_DAYS') {
     if (!customerId) {
       throw new Error('Customer ID é obrigatório');
     }
+    if (!PIPEBOARD_GOOGLE_ADS_TOKEN) {
+      throw new Error('PIPEBOARD_GOOGLE_ADS_TOKEN não configurado');
+    }
 
     console.log(`Buscando métricas para customer: ${customerId}, período: ${dateRange}`);
 
-    const response = await pipeboardClient.get(`/google-ads/customers/${customerId}/metrics`, {
+    const response = await pipeboardGoogleAdsClient.get('/', {
       params: {
+        token: PIPEBOARD_GOOGLE_ADS_TOKEN,
+        method: 'get_google_ads_campaign_metrics',
+        customer_id: customerId.toString(),
         date_range: dateRange,
-        time_breakdown: 'day',
-        status_filter: 'ENABLED'
+        time_breakdown: 'day'
       }
     });
 
-    const metrics = response.data.metrics || response.data.data || [];
+    const metrics = response.data.metrics || response.data.campaigns || [];
     console.log(`✅ Métricas carregadas para ${metrics.length} campanhas`);
     return metrics;
   } catch (error) {
@@ -123,11 +147,17 @@ async function getConversions(customerId, dateRange = 'LAST_30_DAYS') {
     if (!customerId) {
       throw new Error('Customer ID é obrigatório');
     }
+    if (!PIPEBOARD_GOOGLE_ADS_TOKEN) {
+      throw new Error('PIPEBOARD_GOOGLE_ADS_TOKEN não configurado');
+    }
 
     console.log(`Buscando conversões para customer: ${customerId}, período: ${dateRange}`);
 
-    const response = await pipeboardClient.get(`/google-ads/customers/${customerId}/conversions`, {
+    const response = await pipeboardGoogleAdsClient.get('/', {
       params: {
+        token: PIPEBOARD_GOOGLE_ADS_TOKEN,
+        method: 'get_google_ads_conversions',
+        customer_id: customerId.toString(),
         date_range: dateRange
       }
     });
