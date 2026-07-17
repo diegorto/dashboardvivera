@@ -2,77 +2,29 @@ name: Deploy to Production
 
 on:
   push:
-    branches: [main]
+    branches: [backup-wip-vps-20260717-1606]
   workflow_dispatch:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Deploy
+        run: |
+          set -e
+          cd /root/dashboardvivera-prod
+          git fetch origin
+          git checkout ${{ github.ref_name }}
+          git reset --hard origin/${{ github.ref_name }}
+          docker-compose build --no-cache
+          docker-compose up -d
+          docker-compose exec -T backend npm run migrate --if-present || true
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_PRIVATE_KEY }}
-          port: 22
-          script: |
-            cd /home/app/dashboardvivera
-            git pull origin main
-            docker-compose build --no-cache
-            docker-compose up -d
-            docker-compose exec -T backend npm run migrate --if-present
-            
-            # Health checks
-            sleep 5
-            if ! curl -f http://localhost:3001/api/governance/health; then
-              echo "Backend health check failed"
-              docker-compose logs backend
-              exit 1
-            fi
-            
-            echo "✅ Deployment successful"
-
-      - name: Notify Slack
-        if: success()
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "✅ Deployment to production successful",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Vivera Dashboard - Production Deployment*\n✅ Status: Success\n🔗 URL: https://your-domain.com"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-
-      - name: Notify Slack on Failure
-        if: failure()
-        uses: slackapi/slack-github-action@v1
-        with:
-          payload: |
-            {
-              "text": "❌ Deployment to production failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Vivera Dashboard - Production Deployment*\n❌ Status: Failed\n📋 Check: https://github.com/diegorto/dashboardvivera/actions"
-                  }
-                }
-              ]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          sleep 5
+          if ! curl -sf http://localhost:8001/api/health; then
+            echo "Backend health check failed"
+            docker-compose logs backend --tail 50
+            exit 1
+          fi
+          echo "Deployment successful"
