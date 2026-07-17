@@ -66,7 +66,7 @@ export default function ExecutiveDashboard() {
           { label: 'Leads', value: '734', change: '+18.3%', ok: true },
           { label: 'Qualificados', value: '412', change: '+14.7%', ok: true },
           { label: 'Vendas', value: '189', change: '+22.1%', ok: true },
-        ].map((k) => (
+        ].map((k: any) => (
           <div key={k.label} className="bg-white border border-[#e2e8f0] rounded-xl p-4">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2 leading-tight">{k.label}</div>
             <div className="text-[22px] font-bold text-[#0f172a] tabular-nums leading-none mb-1.5">{k.value}</div>
@@ -135,13 +135,13 @@ export default function ExecutiveDashboard() {
             <table className="w-full text-[12px]">
               <thead>
                 <tr className="border-b border-[#f1f5f9]">
-                  {['Fonte', 'Leads', '%', 'Qualif.', 'Conv.'].map((h) => (
+                  {['Fonte', 'Leads', '%', 'Qualif.', 'Conv.'].map((h: any) => (
                     <th key={h} className="text-left pb-2 text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] pr-3">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {leadsBySource.map((s) => (
+                {leadsBySource.map((s: any) => (
                   <tr key={s.source} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2">
@@ -200,7 +200,7 @@ export default function ExecutiveDashboard() {
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 15.064</div><div className="text-[10px] text-[#94a3b8]">ticket medio geral</div></div></div>
         </div>
         <div className="grid grid-cols-5 divide-x divide-[#f1f5f9]">
-          {vendasPorFunil.map((canal) => (
+          {vendasPorFunil.map((canal: any) => (
             <div key={canal.canal} className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -348,7 +348,7 @@ export default function ExecutiveDashboard() {
               <div className="text-right"><div className="text-[13px] font-semibold text-[#10b981]">Melhor canal</div><div className="text-[11px] text-[#64748b]">vs 2,8d total</div><div className="text-[11px] font-bold text-[#10b981]">-50% mais rapido</div></div>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {[{ label: 'Mediana', value: `${tempoFunilData.indicacaoToAgendamento.mediana}d` }, { label: 'P90', value: `${tempoFunilData.indicacaoToAgendamento.p90}d` }, { label: 'Conv.', value: `${tempoFunilData.indicacaoToAgendamento.pctConv}%` }].map((s) => (
+              {[{ label: 'Mediana', value: `${tempoFunilData.indicacaoToAgendamento.mediana}d` }, { label: 'P90', value: `${tempoFunilData.indicacaoToAgendamento.p90}d` }, { label: 'Conv.', value: `${tempoFunilData.indicacaoToAgendamento.pctConv}%` }].map((s: any) => (
                 <div key={s.label} className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg px-3 py-2.5 text-center"><div className="text-[13px] font-bold text-[#0f172a] tabular-nums">{s.value}</div><div className="text-[9px] text-[#94a3b8] mt-0.5">{s.label}</div></div>
               ))}
             </div>
@@ -417,13 +417,13 @@ export default function ExecutiveDashboard() {
               <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-[#f1f5f9]">
-                    {['SDR', 'Faltas', 'Taxa', 'Receita em risco'].map((h) => (
+                    {['SDR', 'Faltas', 'Taxa', 'Receita em risco'].map((h: any) => (
                       <th key={h} className="text-left pb-1.5 text-[9px] font-semibold uppercase tracking-wider text-[#94a3b8] pr-2">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {faltasPorSDR.map((p) => (
+                  {faltasPorSDR.map((p: any) => (
                     <tr key={p.nome} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
                       <td className="py-2 pr-2 text-[#334155] font-medium">{p.nome.split(' ').slice(0, 2).join(' ')}</td>
                       <td className="py-2 pr-2 font-bold text-[#ef4444] tabular-nums">{p.faltas}</td>
@@ -439,7 +439,7 @@ export default function ExecutiveDashboard() {
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Faltas por dia da semana</div>
               <div className="flex gap-1 mb-4">
-                {faltasData.porDia.map((d) => (
+                {faltasData.porDia.map((d: any) => (
                   <div key={d.dia} className="flex-1 text-center">
                     <div className="mx-auto rounded-md mb-1" style={{ height: `${(d.faltas / 8) * 48}px`, minHeight: 6, backgroundColor: '#ef4444', opacity: 0.6 + (d.faltas / 8) * 0.4, width: '100%' }} />
                     <div className="text-[9px] text-[#94a3b8]">{d.dia}</div>
@@ -449,7 +449,7 @@ export default function ExecutiveDashboard() {
               </div>
               <div className="text-[11px] font-semibold text-[#334155] mb-2">Ultimas faltas</div>
               <div className="space-y-1.5">
-                {faltasData.ultimasFaltas.slice(0, 4).map((f, i) => (
+                {faltasData.ultimasFaltas.slice(0, 4).map((f: any, i: number) => (
                   <div key={i} className="flex items-center justify-between text-[10px] py-1 border-b border-[#f8fafc]">
                     <div><span className="font-semibold text-[#334155]">{f.paciente}</span><span className="text-[#94a3b8] ml-1.5">{f.data} {f.horario}</span></div>
                     <div className="text-right"><span className="text-[#0f172a] font-semibold">{f.valor}</span><span className="text-[#94a3b8] ml-1.5">{f.procedimento}</span></div>
@@ -483,7 +483,7 @@ export default function ExecutiveDashboard() {
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Motivos de cancelamento</div>
               <div className="space-y-2 mb-4">
-                {cancelamentosData.porMotivo.map((m) => (
+                {cancelamentosData.porMotivo.map((m: any) => (
                   <div key={m.motivo}>
                     <div className="flex justify-between text-[10px] mb-1"><span className="text-[#475569]">{m.motivo}</span><span className="font-bold text-[#0f172a]">{m.count} <span className="text-[#94a3b8] font-normal">({m.pct}%)</span></span></div>
                     <div className="h-1.5 bg-[#f1f5f9] rounded-full"><div className="h-full rounded-full bg-[#f59e0b]" style={{ width: `${m.pct}%` }} /></div>
@@ -510,7 +510,7 @@ export default function ExecutiveDashboard() {
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Ultimos cancelamentos</div>
               <div className="space-y-2">
-                {cancelamentosData.ultimosCancelamentos.map((c, i) => (
+                {cancelamentosData.ultimosCancelamentos.map((c: any, i: number) => (
                   <div key={i} className="p-2.5 rounded-lg border text-[10px]"
                     style={{ borderColor: c.reagendado ? '#bbf7d0' : '#fecaca', backgroundColor: c.reagendado ? '#f0fdf4' : '#fef2f2' }}>
                     <div className="flex items-center justify-between mb-1">
@@ -557,13 +557,13 @@ export default function ExecutiveDashboard() {
           <table className="w-full text-[12px] mb-4">
             <thead>
               <tr className="border-b border-[#f1f5f9] bg-[#f8fafc]">
-                {['Tempo 1a resposta', 'Leads', 'Qualificados', 'Agendados', 'Compareceram', '% Qualif.', '% Agend.', '% Compar.'].map((h) => (
+                {['Tempo 1a resposta', 'Leads', 'Qualificados', 'Agendados', 'Compareceram', '% Qualif.', '% Agend.', '% Compar.'].map((h: any) => (
                   <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8] whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {velocidadeResposta.porFaixa.map((row, i) => (
+              {velocidadeResposta.porFaixa.map((row: any, i: number) => (
                 <tr key={row.faixa} className={`border-b border-[#f8fafc] ${i === 0 ? 'bg-[#f0fdf4]' : 'hover:bg-[#f8fafc]'} transition-colors`}>
                   <td className="px-3 py-2.5 font-semibold text-[#0f172a] whitespace-nowrap">{row.faixa}</td>
                   <td className="px-3 py-2.5 tabular-nums text-[#334155]">{row.leads}</td>
@@ -582,7 +582,7 @@ export default function ExecutiveDashboard() {
           </div>
           <div className="text-[12px] font-semibold text-[#334155] mb-3">Tempo medio de resposta por SDR</div>
           <div className="grid grid-cols-5 gap-3 mb-4">
-            {velocidadeResposta.porSDR.map((sdr) => {
+            {velocidadeResposta.porSDR.map((sdr: any) => {
               const cor = sdr.tempo < 5 ? '#10b981' : sdr.tempo < 8 ? '#f59e0b' : '#ef4444'
               return (
                 <div key={sdr.nome} className="bg-[#f8fafc] rounded-xl p-3">
@@ -636,7 +636,7 @@ export default function ExecutiveDashboard() {
               <div className="text-[12px] font-semibold text-[#334155] mb-2">Top Objecoes Globais</div>
               <div className="text-[10px] text-[#94a3b8] mb-3">Tags mais frequentes em todos os canais</div>
               <div className="flex flex-wrap gap-1.5 mb-5">
-                {leadsPerdidos.topObjecoes.map((obj) => (
+                {leadsPerdidos.topObjecoes.map((obj: any) => (
                   <div key={obj.tag} className="flex items-center gap-1 px-2 py-1 bg-[#f1f5f9] rounded-lg border border-[#e2e8f0]">
                     <span className="text-[11px] font-semibold text-[#475569]">{obj.tag}</span>
                     <span className="text-[10px] font-bold text-[#0f172a]">{obj.count}</span>
@@ -664,7 +664,7 @@ export default function ExecutiveDashboard() {
               <table className="w-full text-[11px]">
                 <thead>
                   <tr className="border-b border-[#f1f5f9]">
-                    {['Canal', 'Perdidos', '%', 'Top motivo', 'Tags'].map((h) => (
+                    {['Canal', 'Perdidos', '%', 'Top motivo', 'Tags'].map((h: any) => (
                       <th key={h} className="text-left pb-2 text-[9px] font-semibold uppercase tracking-wider text-[#94a3b8] pr-2">{h}</th>
                     ))}
                   </tr>
@@ -676,7 +676,7 @@ export default function ExecutiveDashboard() {
                       <td className="py-2 pr-2 font-bold text-[#dc2626] tabular-nums">{c.perdidos}</td>
                       <td className="py-2 pr-2 text-[#64748b]">{c.pct}%</td>
                       <td className="py-2 pr-2 text-[#475569]">{c.topMotivo}</td>
-                      <td className="py-2"><div className="flex gap-1">{c.tags.slice(0, 2).map((t) => (<span key={t} className="text-[8px] font-semibold px-1 py-0.5 bg-[#f1f5f9] text-[#475569] rounded">{t}</span>))}</div></td>
+                      <td className="py-2"><div className="flex gap-1">{c.tags.slice(0, 2).map((t: any) => (<span key={t} className="text-[8px] font-semibold px-1 py-0.5 bg-[#f1f5f9] text-[#475569] rounded">{t}</span>))}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -686,7 +686,7 @@ export default function ExecutiveDashboard() {
               <div className="text-[12px] font-semibold text-[#334155] mb-3">Motivos de Perda Detalhados</div>
               <div className="text-[10px] text-[#94a3b8] mb-3">Breakdown por canal</div>
               <div className="space-y-3">
-                {leadsPerdidos.porCanal.filter((c) => c.detalhes.length > 0).map((canal) => (
+                {leadsPerdidos.porCanal.filter((c) => c.detalhes.length > 0).map((canal: any) => (
                   <div key={canal.canal} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
                     <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: canal.cor + '18' }}>
                       <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: canal.cor }} />
@@ -694,7 +694,7 @@ export default function ExecutiveDashboard() {
                       <span className="text-[10px] text-[#94a3b8] ml-auto">{canal.perdidos} perdidos</span>
                     </div>
                     <div className="p-3 space-y-1.5">
-                      {canal.detalhes.map((d) => (
+                      {canal.detalhes.map((d: any) => (
                         <div key={d.motivo} className="flex items-center justify-between text-[10px]">
                           <span className="text-[#475569]">{d.motivo}</span>
                           <span className="font-semibold text-[#0f172a]">{d.count} <span className="text-[#94a3b8] font-normal">({d.pct}%)</span></span>
@@ -737,7 +737,7 @@ export default function ExecutiveDashboard() {
           <div className="text-[13px] font-semibold text-[#0f172a] mb-1">Funil Executivo</div>
           <div className="text-[11px] text-[#94a3b8] mb-4">Junho 2025</div>
           <div className="space-y-2.5">
-            {executiveFunnel.map((stage, i) => (
+            {executiveFunnel.map((stage: any, i: number) => (
               <div key={stage.stage}>
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="text-[#475569] font-medium">{stage.stage}</span>
@@ -765,7 +765,7 @@ export default function ExecutiveDashboard() {
           <div className="flex justify-center mb-3">
             <PieChart width={140} height={140}>
               <Pie data={revenueBySource} cx={65} cy={65} innerRadius={42} outerRadius={62} dataKey="value" stroke="none">
-                {revenueBySource.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                {revenueBySource.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
             </PieChart>
           </div>
@@ -815,7 +815,7 @@ export default function ExecutiveDashboard() {
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={80} />
               <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8 }} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={22} name="Receita">
-                {revenueByProcedure.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
+                {revenueByProcedure.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -829,8 +829,8 @@ export default function ExecutiveDashboard() {
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#fee2e2] text-[#dc2626]">{alertsData.length} alertas</span>
         </div>
         <div className="divide-y divide-[#f1f5f9]">
-          {alertsData.map((a, i) => {
-            const dot = { critical: '#ef4444', warning: '#f59e0b', success: '#10b981', info: '#6366f1' }[a.type] ?? '#94a3b8'
+          {alertsData.map((a: any, i: number) => {
+            const dot = { critical: '#ef4444', warning: '#f59e0b', success: '#10b981', info: '#6366f1' }[a.type as string] ?? '#94a3b8'
             return (
               <div key={i} className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#f8fafc] transition-colors">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: dot }} />

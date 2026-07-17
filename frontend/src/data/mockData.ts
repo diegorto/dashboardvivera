@@ -760,6 +760,177 @@ export const mockConversionByReception = [
   { reception: 'Recepção 3', scheduled: 98, attended: 85, conversion: 87 },
 ];
 
+// Additional exports for ExecutiveDashboard
+export const leadsDaily = mockLeadsCardData.dailyEvolutionData;
+export const leadsBySource = mockLeadsCardData.leadsBySource.map((s: any) => ({
+  ...s,
+  pct: s.percentage,
+  qualificados: s.qualified,
+  conv: s.qualificationRate,
+  vsAnterior: 8.5,
+  total: s.leads,
+  pctQualificados: s.qualificationRate,
+  pctAgendamento: 65.2,
+  agendados: Math.round(s.qualified * 0.65),
+  pctComparecimento: 87.3,
+  compareceram: Math.round(s.qualified * 0.65 * 0.87),
+  pctCompVsTotal: 32.5,
+  receita: s.leads * 2500,
+  ticketMedio: 2500,
+}));
+export const leadsMetaDaily = [
+  { day: '01', leads: 18 }, { day: '02', leads: 22 }, { day: '03', leads: 20 },
+  { day: '04', leads: 25 }, { day: '05', leads: 23 }, { day: '06', leads: 28 },
+  { day: '07', leads: 32 }, { day: '08', leads: 30 }, { day: '09', leads: 28 }, { day: '10', leads: 35 },
+];
+export const leadsGoogleDaily = [
+  { day: '01', leads: 35 }, { day: '02', leads: 40 }, { day: '03', leads: 38 },
+  { day: '04', leads: 42 }, { day: '05', leads: 39 }, { day: '06', leads: 45 },
+  { day: '07', leads: 48 }, { day: '08', leads: 42 }, { day: '09', leads: 45 }, { day: '10', leads: 50 },
+];
+export const leadsMetaStats = {
+  name: 'Meta',
+  leads: 285,
+  percentage: 38.8,
+  vsAnterior: { total: 12.5 },
+  total: 285,
+  pctQualificados: 57.9,
+  qualificados: 165,
+  pctAgendamento: 51.2,
+  agendados: 145,
+  pctComparecimento: 88.3,
+  compareceram: 128,
+  pctCompVsTotal: 44.9,
+  receita: 687500,
+  ticketMedio: 2413,
+};
+export const leadsGoogleStats = {
+  name: 'Google',
+  leads: 198,
+  percentage: 27.0,
+  vsAnterior: { total: 8.3 },
+  total: 198,
+  pctQualificados: 54.5,
+  qualificados: 108,
+  pctAgendamento: 52.3,
+  agendados: 107,
+  pctComparecimento: 89.7,
+  compareceram: 96,
+  pctCompVsTotal: 33.6,
+  receita: 480000,
+  ticketMedio: 2424,
+};
+export const tempoFunilData = {
+  ...mockConversionTimeCardData,
+  channels: mockConversionTimeCardData.channels,
+  leadToAgendamento: {
+    total: { media: 5.3, mediana: 4.8, p90: 12.8 },
+    meta: { media: 4.9, mediana: 4.2, p90: 11.5 },
+    google: { media: 6.2, mediana: 5.5, p90: 14.2 },
+  },
+  indicacaoToAgendamento: {
+    media: 4.5,
+    mediana: 3.8,
+    p90: 10.2,
+    pctConv: 63,
+    total: { media: 4.5, mediana: 3.8, p90: 10.2 },
+    meta: { media: 4.2, mediana: 3.5, p90: 9.8 },
+    google: { media: 4.8, mediana: 4.2, p90: 11.5 },
+  },
+  leadToVenda: {
+    total: { media: 8.2, mediana: 7.2, p90: 18.5 },
+    meta: { media: 7.8, mediana: 6.8, p90: 17.2 },
+    google: { media: 9.1, mediana: 8.2, p90: 19.8 },
+    indicacao: { media: 6.5, mediana: 5.8, p90: 14.5 },
+  },
+  trend: [
+    { mes: 'Jan', dias: 15.2 },
+    { mes: 'Fev', dias: 14.8 },
+    { mes: 'Mar', dias: 14.1 },
+    { mes: 'Abr', dias: 13.5 },
+    { mes: 'Mai', dias: 13.0 },
+    { mes: 'Jun', dias: 12.5 },
+  ],
+};
+export const faltasData = {
+  ...mockNoShowCancellationCardData,
+  total: 47,
+  taxa: 15.6,
+  receitaPerdida: 706250,
+  vsAnterior: 8.3,
+  porDia: mockNoShowCancellationCardData.dayData.map((d: any) => ({
+    ...d,
+    total: d.count,
+    taxa: (d.count / 47) * 100,
+    receitaPerdida: d.count * 15000,
+    vsAnterior: -5.2,
+  })),
+  ultimasFaltas: mockNoShowCancellationCardData.recentItems,
+};
+export const faltasPorSDR = mockResponseSpeedCardData.sdrData;
+export const cancelamentosData = {
+  total: 42,
+  taxa: 14.2,
+  pctReagendado: 65.7,
+  receitaPerdida: 504000,
+  vsAnterior: 3.2,
+  porMotivo: mockNoShowCancellationCardData.motives,
+  antecedenciaMedia: '2.3 dias',
+  reagendados: 28,
+  receitaRecuperada: 156000,
+  ultimosCancelamentos: mockNoShowCancellationCardData.recentItems,
+  motivos: mockNoShowCancellationCardData.motives.map((m: any) => ({
+    ...m,
+    label: m.label,
+    count: m.count,
+    percentage: m.percentage,
+    total: m.count,
+    taxa: m.percentage,
+    pctReagendado: 65 + Math.random() * 20,
+    receitaPerdida: m.count * 12000,
+    vsAnterior: 3.2,
+  })),
+};
+export const vendasPorFunil = mockSalesByFunnelCardData.funnels;
+export const velocidadeResposta = {
+  tempoMedio: 6.2,
+  pctMenos5min: 68.5,
+  receitaExtra: 425000,
+  porFaixa: mockResponseSpeedCardData.timeRangeData.map((t: any) => ({
+    ...t,
+    tempoMedio: 5.2,
+    pctMenos5min: 68.5,
+  })),
+  porSDR: mockResponseSpeedCardData.sdrData,
+};
+export const leadsPerdidos = {
+  total: 322,
+  pctDoTotal: 43.9,
+  receitaNaoConvertida: 4850000,
+  topObjecoes: mockLostLeadsCardData.topObjections,
+  porCanal: mockLostLeadsCardData.channels.map((ch: any) => ({
+    canal: ch.channel,
+    cor: ch.color,
+    perdidos: ch.lostLeads,
+    pct: ch.percentage,
+    topMotivo: ch.topMotives?.[0]?.motive || 'N/A',
+    tags: ch.tags ? ch.tags.map((t: any) => t.tag || t) : [],
+    detalhes: ch.topMotives || [],
+  })),
+};
+export const revenueVsGoal = mockChartData.revenueDaily;
+export const revenueBySource = mockChartData.originData.map((d: any) => ({
+  ...d,
+  pct: d.value,
+}));
+export const revenueByProcedure = mockChartData.procedureData;
+export const professionalRanking = mockProfessionals.map((p: any) => ({
+  ...p,
+  specialty: p.procedures || 'Geral',
+}));
+export const executiveFunnel = mockFunnelData;
+export const alertsData = mockExecutiveAlertsCardData.alerts;
+
 export default {
   mockKPIsData,
   mockChartData,
@@ -773,4 +944,23 @@ export default {
   mockConversionBySDR,
   mockConversionByProfessional,
   mockConversionByReception,
+  leadsDaily,
+  leadsBySource,
+  leadsMetaDaily,
+  leadsGoogleDaily,
+  leadsMetaStats,
+  leadsGoogleStats,
+  tempoFunilData,
+  faltasData,
+  faltasPorSDR,
+  cancelamentosData,
+  vendasPorFunil,
+  velocidadeResposta,
+  leadsPerdidos,
+  revenueVsGoal,
+  revenueBySource,
+  revenueByProcedure,
+  professionalRanking,
+  executiveFunnel,
+  alertsData,
 };
