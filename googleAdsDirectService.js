@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json');
-const GOOGLE_ADS_API_VERSION = 'v17';
+const GOOGLE_ADS_API_VERSION = 'v23'; // v17 foi desativado pelo Google; v23 e a mais recente estavel em jul/2026
 
 function loadSettings() {
   try {
