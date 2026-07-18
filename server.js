@@ -292,6 +292,59 @@ function savePipelineSyncState(state) {
   }
 }
 
+function toTintimPhone(rawPhone) {
+  let digits = String(rawPhone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('0')) digits = digits.replace(/^0+/, '');
+  if (!digits.startsWith('55')) digits = '55' + digits;
+  return digits;
+}
+
+async function fetchTintimLead(phone) {
+  if (!TINTIM_ACCOUNT_CODE || !TINTIM_ACCOUNT_TOKEN || !phone) return null;
+  try {
+    const r = await axios.get(`https://s.tintim.app/api/v1/${TINTIM_ACCOUNT_CODE}/lead/${phone}`, {
+      params: { token: TINTIM_ACCOUNT_TOKEN }, timeout: 8000
+    });
+    return r.data || null;
+  } catch (e) {
+    if (e.response && e.response.status === 404) return null;
+    console.error(`[tintim] Erro ao buscar lead ${phone}:`, e.response?.data || e.message);
+    return null;
+  }
+}
+
+// Traduz o payload de lead do Tintim (schema real: source/utm_*/ad{...}/visit.params{...})
+// para os campos customizados de trafego pago do Pipedrive.
+function mapTintimLeadToPipedriveFields(lead) {
+  if (!lead) return null;
+  const ad = lead.ad && typeof lead.ad === 'object' ? lead.ad : null;
+  const visitParams = (lead.visit && lead.visit.params) || {};
+  const utmSource = lead.utm_source || visitParams.utm_source || '';
+  const utmCampaign = lead.utm_campaign || visitParams.utm_campaign || (ad && ad.campaign_name) || '';
+  const utmContent = lead.utm_content || visitParams.utm_content || (ad && ad.adset_name) || '';
+  const utmTerm = lead.utm_term || visitParams.utm_term || (ad && ad.ad_name) || '';
+  const hasGclid = !!(visitParams.gclid);
+  const hasFbclid = !!(visitParams.fbclid) || !!lead.ctwa_clid || !!ad;
+
+  let plataforma = '';
+  if (hasFbclid) plataforma = 'Meta';
+  else if (hasGclid || /google/i.test(utmSource)) plataforma = 'Google';
+  else if (/meta|face|instagram|ig/i.test(utmSource)) plataforma = 'Meta';
+
+  const origem = lead.source || plataforma || utmSource || '';
+
+  const fields = {
+    origem,
+    campanha: utmCampaign,
+    conjunto: utmContent,
+    palavraChave: utmTerm,
+    plataforma
+  };
+  const hasAnyData = !!(fields.origem || fields.campanha || fields.conjunto || fields.palavraChave || fields.plataforma);
+  return hasAnyData ? fields : null;
+}
+
 function normalizePipedrivePhone(person) {
   if (!person || typeof person !== 'object') return '';
   const phones = Array.isArray(person.phone) ? person.phone : [];
@@ -3864,18 +3917,18 @@ app.post('/api/settings/test', async (req, res) => {
     results.meta.message = 'Token ou conta de anúncio não configurados';
   }
 
-  if (TINTIM_API_KEY && TINTIM_WORKSPACE_ID) {
+  if (TINTIM_ACCOUNT_CODE && TINTIM_ACCOUNT_TOKEN) {
     try {
-      const r = await axios.get(`https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/health`, {
-        headers: { Authorization: `Bearer ${TINTIM_API_KEY}` }, timeout: 8000
+      const r = await axios.get(`https://s.tintim.app/api/v1/${TINTIM_ACCOUNT_CODE}/leadstatus`, {
+        params: { token: TINTIM_ACCOUNT_TOKEN }, timeout: 8000
       });
-      results.tintim.ok = !!r.data;
-      results.tintim.message = `Conectado ao Workspace ${TINTIM_WORKSPACE_ID}`;
+      results.tintim.ok = Array.isArray(r.data);
+      results.tintim.message = results.tintim.ok ? `Conectado (conta ${TINTIM_ACCOUNT_CODE})` : 'Resposta inesperada do Tintim';
     } catch (e) {
       results.tintim.message = e.response?.data?.message || e.message;
     }
   } else {
-    results.tintim.message = 'API Key ou Workspace ID não configurados';
+    results.tintim.message = 'Account Code ou Account Token não configurados';
   }
 
   if (process.env.PIPEBOARD_API_KEY) {
@@ -3913,19 +3966,18 @@ app.post('/api/settings/test', async (req, res) => {
 app.post('/api/settings/test/tintim', async (req, res) => {
   const result = { ok: false, message: '' };
 
-  if (!TINTIM_API_KEY || !TINTIM_WORKSPACE_ID) {
-    result.message = 'API Key ou Workspace ID do Tintim não configurados';
+  if (!TINTIM_ACCOUNT_CODE || !TINTIM_ACCOUNT_TOKEN) {
+    result.message = 'Account Code ou Account Token do Tintim não configurados';
     return res.json({ success: true, data: result });
   }
 
   try {
-    // Testa conexão com a API do Tintim (endpoint genérico de health check)
-    const r = await axios.get(`https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/health`, {
-      headers: { 'Authorization': `Bearer ${TINTIM_API_KEY}` },
+    const r = await axios.get(`https://s.tintim.app/api/v1/${TINTIM_ACCOUNT_CODE}/leadstatus`, {
+      params: { token: TINTIM_ACCOUNT_TOKEN },
       timeout: 8000
     });
-    result.ok = !!r.data;
-    result.message = `Conectado ao Workspace ${TINTIM_WORKSPACE_ID}`;
+    result.ok = Array.isArray(r.data);
+    result.message = result.ok ? `Conectado (conta ${TINTIM_ACCOUNT_CODE}, ${r.data.length} status cadastrados)` : 'Resposta inesperada do Tintim';
   } catch (e) {
     result.message = e.response?.data?.message || e.message || 'Erro ao conectar com Tintim';
   }
@@ -3933,22 +3985,22 @@ app.post('/api/settings/test/tintim', async (req, res) => {
   res.json({ success: true, data: result });
 });
 
-// GET /api/tintim/audit - auditoria de leads Tintim vs Pipedrive
+// GET /api/tintim/audit - deals do Pipedrive sem dados de trafego pago, mas com atribuicao real no Tintim
 app.get('/api/tintim/audit', async (req, res) => {
   try {
-    if (!TINTIM_API_KEY || !TINTIM_WORKSPACE_ID) {
+    if (!TINTIM_ACCOUNT_CODE || !TINTIM_ACCOUNT_TOKEN) {
       return res.json({
         success: false,
-        error: 'Tintim não configurado. Acesse Configurações e adicione a API Key e Workspace ID.',
-        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+        error: 'Tintim nao configurado. Acesse Configuracoes e adicione o Account Code e Account Token.',
+        data: { totalDeals: 0, missingTraffic: 0, scanned: 0, diagnosed: 0, leads: [] }
       });
     }
 
     if (!PIPEDRIVE_TOKEN) {
       return res.json({
         success: false,
-        error: 'Pipedrive não configurado. Acesse Configurações e adicione o token.',
-        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+        error: 'Pipedrive nao configurado. Acesse Configuracoes e adicione o token.',
+        data: { totalDeals: 0, missingTraffic: 0, scanned: 0, diagnosed: 0, leads: [] }
       });
     }
 
@@ -3957,67 +4009,87 @@ app.get('/api/tintim/audit', async (req, res) => {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
+    const scanLimit = Math.min(parseInt(req.query.limit, 10) || 60, 150);
 
-    try {
-      // Busca leads do Tintim (conversa com registros de contato)
-      const tintimLeads = await axios.get(
-        `https://api.tintim.io/v1/workspaces/${TINTIM_WORKSPACE_ID}/contacts`,
-        {
-          headers: { 'Authorization': `Bearer ${TINTIM_API_KEY}` },
-          timeout: 10000
-        }
-      );
+    const pipedriveDeals = await getPipedriveDeals(range.since, range.until).catch(() => []);
 
-      const tintimContacts = tintimLeads.data?.data || [];
+    // "Sem trafego pago no Pipedrive" = sem origem E sem campanha preenchidos, mas com telefone pra cruzar com o Tintim
+    const missingTraffic = pipedriveDeals.filter(d => !d.origem && !d.campanha && d.phone);
+    const toScan = missingTraffic.slice(0, scanLimit);
 
-      // Busca deals do Pipedrive para comparar
-      const pipedriveDeals = await getPipedriveDeals(range.since, range.until).catch(() => []);
-
-      // Identifica leads do Tintim que não têm dados de tráfego pago no Pipedrive
-      const leadsWithoutPaidTraffic = tintimContacts
-        .filter(contact => {
-          // Verifica se existe um deal no Pipedrive com origem em tráfego pago
-          const hasPaidTrafficDeal = pipedriveDeals.some(deal => {
-            const dealOrigin = deal[FIELD_ORIGEM] || '';
-            const dealCampaign = deal[FIELD_CAMPANHA] || '';
-            // Se tem origem e campanha, tem tráfego pago
-            return (dealOrigin && dealCampaign) || dealOrigin === 'Meta' || dealOrigin === 'Google Ads';
-          });
-          return !hasPaidTrafficDeal;
-        })
-        .map(contact => ({
-          id: contact.id,
-          name: contact.name || 'Sem nome',
-          email: contact.email || '-',
-          phone: contact.phone || '-',
-          lastInteraction: contact.lastMessageDate || contact.createdAt || '-',
-          source: 'Tintim',
-          status: 'Sem tráfego pago'
-        }));
-
-      res.json({
-        success: true,
-        range,
-        data: {
-          totalLeads: tintimContacts.length,
-          leadsWithoutPaidTraffic: leadsWithoutPaidTraffic.length,
-          leadsWithPaidTraffic: tintimContacts.length - leadsWithoutPaidTraffic.length,
-          leads: leadsWithoutPaidTraffic.slice(0, 100) // Limita a 100 para performance
-        }
-      });
-    } catch (tintimError) {
-      console.error('Erro ao buscar dados do Tintim:', tintimError.message);
-      res.json({
-        success: false,
-        error: `Erro ao conectar com Tintim: ${tintimError.response?.data?.message || tintimError.message}`,
-        data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
-      });
+    const diagnosed = [];
+    for (const deal of toScan) {
+      const tintimPhone = toTintimPhone(deal.phone);
+      const lead = await fetchTintimLead(tintimPhone);
+      const suggested = mapTintimLeadToPipedriveFields(lead);
+      if (suggested) {
+        diagnosed.push({
+          dealId: deal.id,
+          dealTitle: deal.title,
+          personName: deal.personName || deal.title || 'Sem nome',
+          phone: deal.phone,
+          addDate: deal.addDate,
+          tintimSource: (lead && lead.source) || '',
+          suggested
+        });
+      }
+      await new Promise(r => setTimeout(r, 150));
     }
+
+    res.json({
+      success: true,
+      range,
+      data: {
+        totalDeals: pipedriveDeals.length,
+        missingTraffic: missingTraffic.length,
+        scanned: toScan.length,
+        diagnosed: diagnosed.length,
+        leads: diagnosed
+      }
+    });
   } catch (error) {
     res.json({
       success: false,
       error: error.message,
-      data: { leadsWithoutPaidTraffic: 0, totalLeads: 0, leads: [] }
+      data: { totalDeals: 0, missingTraffic: 0, scanned: 0, diagnosed: 0, leads: [] }
+    });
+  }
+});
+
+// POST /api/tintim/audit/fix - grava no Pipedrive os campos de trafego pago sugeridos pelo Tintim
+app.post('/api/tintim/audit/fix', async (req, res) => {
+  try {
+    const { dealId, fields } = req.body || {};
+    if (!dealId || !fields) {
+      return res.status(400).json({ success: false, error: 'dealId e fields sao obrigatorios' });
+    }
+    if (!PIPEDRIVE_TOKEN) {
+      return res.status(400).json({ success: false, error: 'Pipedrive nao configurado' });
+    }
+
+    const updatePayload = {};
+    if (fields.origem) updatePayload[FIELD_ORIGEM] = fields.origem;
+    if (fields.campanha) updatePayload[FIELD_CAMPANHA] = fields.campanha;
+    if (fields.conjunto) updatePayload[FIELD_CONJUNTO] = fields.conjunto;
+    if (fields.palavraChave) updatePayload[FIELD_PALAVRA_CHAVE] = fields.palavraChave;
+    if (fields.plataforma) updatePayload[FIELD_PLATAFORMA] = fields.plataforma;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return res.status(400).json({ success: false, error: 'Nenhum campo valido para atualizar' });
+    }
+
+    await axios.put(`https://api.pipedrive.com/v1/deals/${dealId}`, updatePayload, {
+      params: { api_token: PIPEDRIVE_TOKEN }
+    });
+
+    invalidateCache();
+
+    res.json({ success: true, message: `Deal ${dealId} atualizado com dados do Tintim.` });
+  } catch (error) {
+    console.error('[tintim] Erro ao aplicar correcao no Pipedrive:', error.response?.data || error.message);
+    res.status(500).json({
+      success: false,
+      error: error.response?.data?.error || error.message
     });
   }
 });
