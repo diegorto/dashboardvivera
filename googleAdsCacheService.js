@@ -1,7 +1,7 @@
-// Le metricas de campanhas do Google Ads a partir de um cache local (data/google_ads_cache.json),
-// alimentado pelo endpoint POST /api/webhooks/google-ads (chamado por um Google Ads Script rodando
-// dentro da propria conta). Caminho paralelo enquanto o developer token nao tem Basic access aprovado.
-// Mesma interface de pipeboardGoogleAdsService.js / googleAdsDirectService.js (troca por 1 linha no server.js).
+// ARQUITETURA DEFINITIVA do Google Ads no dashboard:
+// le metricas de um cache local (data/google_ads_cache.json) alimentado de hora em hora pelo
+// Google Ads Script 'Vivera Dashboard Sync' (roda dentro da propria conta, POST /api/webhooks/google-ads).
+// Sem developer token / Basic access. Mesma interface dos services anteriores (troca por 1 linha no server.js).
 const fs = require('fs');
 const path = require('path');
 

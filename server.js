@@ -57,7 +57,7 @@ pipedriveLocalDB.startScheduledSync(360); // reduzido de 30min p/ 6h (safety-net
 
 const cors = require('cors');
 const path = require('path');
-const pipeboardGoogleAds = require('./googleAdsCacheService'); // Caminho paralelo via Google Ads Script + webhook (Basic access ainda nao aprovado). googleAdsDirectService.js fica pronto pra quando aprovar.
+const pipeboardGoogleAds = require('./googleAdsCacheService'); // ARQUITETURA DEFINITIVA: Google Ads Script (na propria conta) envia metricas de hora em hora via webhook. Sem developer token/Basic access. googleAdsDirectService.js mantido apenas como referencia.
 const pipeboardMetaAds = require('./pipeboardMetaAdsService');
 
 const app = express();
@@ -4306,9 +4306,9 @@ app.get('/auth/google/callback', async (req, res) => {
 });
 
 
-// ============ Webhook Google Ads Script (caminho paralelo, sem developer token) ============
-// Recebe metricas enviadas por um Google Ads Script rodando dentro da propria conta
-// (Ferramentas > Acoes em massa > Scripts), contornando o bloqueio de DEVELOPER_TOKEN_NOT_APPROVED.
+// ============ Webhook Google Ads Script (fluxo definitivo) ============
+// Recebe metricas enviadas de hora em hora pelo Google Ads Script 'Vivera Dashboard Sync'
+// rodando dentro da propria conta (Ferramentas > Acoes em massa > Scripts). Nao usa developer token.
 // Rota de leitura de arquivos de analise em data/ - protegida pelo mesmo secret do webhook
 app.get('/api/debug/data-file', (req, res) => {
   const s = loadSettingsFile();
