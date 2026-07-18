@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import tintimAuditService, { TintimAuditResponse, TintimLead } from '../services/tintimAuditService';
+import { Layout } from '../components';
 
 const AuditDashboard: React.FC = () => {
   const [data, setData] = useState<TintimAuditResponse | null>(null);
@@ -41,17 +42,20 @@ const AuditDashboard: React.FC = () => {
 
   if (loading) {
     return (
+      <Layout title="Auditoria" breadcrumb={['Dashboards', 'Auditoria']}>
       <div className="p-8 bg-gray-50 min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600">Carregando auditoria Tintim... (pode levar ate 10s)</p>
         </div>
       </div>
+    </Layout>
     );
   }
-  if (!data) return <div className="p-8">Erro ao carregar dados</div>;
+  if (!data) return <Layout title="Auditoria" breadcrumb={['Dashboards', 'Auditoria']}><div className="p-8">Erro ao carregar dados</div></Layout>;
 
   return (
+    <Layout title="Auditoria" breadcrumb={['Dashboards', 'Auditoria']}>
     <div className="p-8 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="mb-8">
@@ -145,6 +149,7 @@ const AuditDashboard: React.FC = () => {
         )}
       </div>
     </div>
+  </Layout>
   );
 };
 
