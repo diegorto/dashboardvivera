@@ -75,6 +75,14 @@ app.post('/api/admin/pipedrive-db/sync', async (req, res) => {
 
 app.use(cors());
 app.use(express.json());
+// SEGURANCA: bloqueia acesso publico a /data (settings.json contem secrets) e ao codigo-fonte
+app.use((req, res, next) => {
+  const p = req.path.toLowerCase();
+  if (p.startsWith('/data/') || p === '/data' || p === '/server.js' || p.endsWith('.env')) {
+    return res.status(404).send('Not found');
+  }
+  next();
+});
 app.use(express.static(__dirname));
 
 // ============================================
