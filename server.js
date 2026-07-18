@@ -4189,7 +4189,7 @@ async function warmCache() {
 
 
 // ============ Google Ads OAuth direto (substitui Pipeboard) ============
-const GOOGLE_ADS_OAUTH_REDIRECT_URI = process.env.GOOGLE_ADS_OAUTH_REDIRECT_URI || 'http://dashboard.viveraorofacial.com.br/auth/google/callback';
+const GOOGLE_ADS_OAUTH_REDIRECT_URI = process.env.GOOGLE_ADS_OAUTH_REDIRECT_URI || 'http://dashboard.viveraorofacial.com.br:8001/auth/google/callback'; // porta 8001: bypassa o Traefik do n8n (portas 80/443), sem tocar nele
 
 app.get('/auth/google/start', (req, res) => {
   const s = loadSettingsFile();
