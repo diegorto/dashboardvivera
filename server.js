@@ -4552,3 +4552,51 @@ Clique em Atualizar no dashboard para carregar dados
 Veja os logs aqui para diagnosticar problemas
   `);
 });
+
+// === CACHE-BASED DASHBOARD ENDPOINTS ===
+// GET /api/dashboard/executive - Lê CACHE local, não Pipedrive
+app.get('/api/dashboard/executive', (req, res) => {
+  try {
+    const deals = Object.values(pipedriveCache).filter(c => c.data && c.data.status);
+    const qualificados = deals.filter(d => d.data.status === 'won').length;
+    const emAndamento = deals.filter(d => d.data.status !== 'won' && d.data.status !== 'lost').length;
+    const perdidos = deals.filter(d => d.data.status === 'lost').length;
+    res.json({
+      timestamp: Date.now(),
+      kpis: {
+        totalDeals: deals.length,
+        qualificados,
+        emAndamento,
+        perdidos,
+        taxa: deals.length > 0 ? ((qualificados / deals.length) * 100).toFixed(2) : '0'
+      },
+      source: 'cache',
+      cacheSize: Object.keys(pipedriveCache).length
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/dashboard/sdr-panel - Lê CACHE local
+app.get('/api/dashboard/sdr-panel', (req, res) => {
+  try {
+    const deals = Object.values(pipedriveCache).filter(c => c.data);
+    res.json({
+      timestamp: Date.now(),
+      deals: deals.length,
+      cacheSize: Object.keys(pipedriveCache).length,
+      source: 'cache'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/dashboard/cache-status - Debug
+app.get('/api/dashboard/cache-status', (req, res) => {
+  res.json({
+    cacheSize: Object.keys(pipedriveCache).length,
+    cacheTimestamp: Math.max(...Object.values(pipedriveCache).map(c => c.cachedAt || 0))
+  });
+});
