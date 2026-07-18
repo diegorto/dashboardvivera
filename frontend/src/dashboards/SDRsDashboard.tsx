@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Layout } from '../components';
 import PipelineEventsCard from '../components/PipelineEventsCard';
 import { LoadingScreen, ErrorScreen } from '../utils/dashboardHelpers';
+import { useFilters } from '../contexts/FilterContext';
 
 interface SDRMetrics {
   leadsReceived: number;
@@ -35,6 +36,7 @@ interface SDRPanel {
   today: SDRWindowData;
   week: SDRWindowData;
   month: SDRWindowData;
+  custom?: SDRWindowData;
 }
 
 const METRIC_ROWS: { key: keyof SDRMetrics; label: string; money?: boolean; goalKey?: string }[] = [
@@ -42,9 +44,10 @@ const METRIC_ROWS: { key: keyof SDRMetrics; label: string; money?: boolean; goal
   { key: 'callsMade', label: 'Ligações Realizadas', goalKey: 'callsMade' },
   { key: 'callsAnswered', label: 'Ligações Atendidas', goalKey: 'callsAnswered' },
   { key: 'appointments', label: 'Agendamentos Realizados', goalKey: 'appointments' },
-  { key: 'attendances', label: 'Comparecimentos', goalKey: 'attendances' },
+  // Comparecimentos/Faltas removidos daqui: ficavam duplicados (e com dado desatualizado,
+  // baseado em activities) ao lado do card "Comparecimento, Faltas, Remarcacoes e Cancelamentos"
+  // abaixo, que usa o historico real de mudanca de etapa do Pipedrive.
   { key: 'cancellations', label: 'Desmarques' },
-  { key: 'noShows', label: 'Faltas' },
   { key: 'closingsCount', label: 'Fechamentos (nº)' },
   { key: 'opportunitiesValue', label: 'Oportunidades (R$)', money: true, goalKey: 'opportunitiesValue' },
   { key: 'closingsValue', label: 'Fechamentos (R$)', money: true, goalKey: 'closingsValue' },
@@ -129,16 +132,26 @@ const WindowCard: React.FC<{ data: SDRWindowData }> = ({ data }) => {
 };
 
 const SDRsDashboard: React.FC = () => {
+  const { filters } = useFilters();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panel, setPanel] = useState<SDRPanel | null>(null);
   const [bizDays, setBizDays] = useState<number>(0);
 
+  const isCustom = filters.period === 'custom' && !!filters.dateRange;
+  const customSince = isCustom ? filters.dateRange!.startDate.toISOString().slice(0, 10) : undefined;
+  const customUntil = isCustom ? filters.dateRange!.endDate.toISOString().slice(0, 10) : undefined;
+
   const load = async () => {
     try {
       setLoading(true);
       setError(null);
-      const r = await axios.get('/api/dashboard/sdr-panel');
+      const params: Record<string, string> = {};
+      if (customSince && customUntil) {
+        params.customSince = customSince;
+        params.customUntil = customUntil;
+      }
+      const r = await axios.get('/api/dashboard/sdr-panel', { params });
       setPanel(r.data.data);
       setBizDays(r.data.businessDaysInMonth);
     } catch (e) {
@@ -152,7 +165,7 @@ const SDRsDashboard: React.FC = () => {
     load();
     const interval = setInterval(load, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [customSince, customUntil]);
 
   if (error) return <ErrorScreen title="SDRs" error={error} onRetry={load} />;
   if (loading || !panel) return <LoadingScreen title="SDRs" />;
@@ -163,11 +176,17 @@ const SDRsDashboard: React.FC = () => {
         Metas semanais = meta diária × 5 dias úteis · Metas mensais = meta diária × <b>{bizDays} dias úteis</b> deste mês (seg–sex)
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 ${panel.custom ? 'xl:grid-cols-4' : 'xl:grid-cols-3'} gap-4`}>
         <WindowCard data={panel.today} />
         <WindowCard data={panel.week} />
         <WindowCard data={panel.month} />
+        {panel.custom && <WindowCard data={panel.custom} />}
       </div>
+      {!panel.custom && (
+        <div className="mt-2 text-[10px] text-[#94a3b8]">
+          Dica: escolha "Personalizado" no filtro de data do topo pra ver um 4º card com as métricas do período exato que você selecionar.
+        </div>
+      )}
 
       <div className="mt-4">
         <PipelineEventsCard />

@@ -1726,6 +1726,18 @@ function getPipedriveUsers() {
   return cached('users', fetchPipedriveUsersUncached);
 }
 
+function countBusinessDaysBetween(sinceISO, untilISO) {
+  let count = 0;
+  let cur = new Date(sinceISO + 'T00:00:00Z');
+  const end = new Date(untilISO + 'T00:00:00Z');
+  while (cur <= end) {
+    const dow = cur.getUTCDay();
+    if (dow !== 0 && dow !== 6) count++;
+    cur = new Date(cur.getTime() + 86400000);
+  }
+  return Math.max(count, 1);
+}
+
 function businessDaysInMonth(year, month1based) {
   const last = new Date(Date.UTC(year, month1based, 0)).getUTCDate();
   let n = 0;
@@ -2046,6 +2058,21 @@ app.get('/api/dashboard/sdr-panel', async (req, res) => {
         goalMult: bizDays
       }
     };
+
+    // Janela personalizada: so aparece quando o filtro de data do cabecalho esta em
+    // modo "custom" e o frontend manda customSince/customUntil (dias corridos, formato YYYY-MM-DD)
+    const customSince = req.query.customSince;
+    const customUntil = req.query.customUntil;
+    if (customSince && customUntil && customSince <= customUntil) {
+      const spanDays = Math.round((new Date(customUntil) - new Date(customSince)) / 86400000) + 1;
+      windows.custom = {
+        label: 'Personalizado',
+        prevLabel: 'Período Anterior Equivalente',
+        range: { since: customSince, until: customUntil },
+        prevRange: { since: _addDays(customSince, -spanDays), until: _addDays(customSince, -1) },
+        goalMult: countBusinessDaysBetween(customSince, customUntil)
+      };
+    }
 
     // Metricas de um SDR em um range
     const metricsFor = (sdrId, r) => {
