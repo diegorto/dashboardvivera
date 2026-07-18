@@ -31,9 +31,9 @@ const AuditDashboard: React.FC = () => {
   };
 
   const handleFixAll = async () => {
-    setFixing(new Set(data?.leads.map(l => l.leadId) || []));
+    setFixing(new Set(data?.leads.map(l => String(l.dealId)) || []));
     for (const lead of data?.leads || []) {
-      await tintimAuditService.fixLead(lead.leadId);
+      await tintimAuditService.fixLead(String(lead.dealId));
     }
     await loadAudit();
     setFixing(new Set());
@@ -115,27 +115,27 @@ const AuditDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y">
               {data.leads.map((lead: TintimLead) => (
-                <tr key={lead.leadId} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm text-gray-900">{lead.name}</td>
+                <tr key={lead.dealId} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 text-sm text-gray-900">{lead.personName || lead.dealTitle}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{lead.phone}</td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-gray-900">
-                      {lead.source && <div>📍 {lead.source}</div>}
-                      {lead.campaign && <div>📢 {lead.campaign}</div>}
+                      {lead.tintimSource && <div>📍 {lead.tintimSource}</div>}
+                      {lead.suggested?.campanha && <div>📢 {lead.suggested.campanha}</div>}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-red-600 text-xs">
-                      {lead.missingFields?.join(', ') || 'N/A'}
+                      {[(!lead.suggested?.origem || lead.suggested.origem === 'Não rastreada') ? 'Origem' : null, !lead.suggested?.campanha ? 'Campanha' : null, !lead.suggested?.plataforma ? 'Plataforma' : null].filter(Boolean).join(', ') || 'N/A'}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button
-                      onClick={() => handleFixLead(lead.leadId)}
-                      disabled={fixing.has(lead.leadId)}
+                      onClick={() => handleFixLead(String(lead.dealId))}
+                      disabled={fixing.has(String(lead.dealId))}
                       className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-400"
                     >
-                      {fixing.has(lead.leadId) ? 'Corrigindo...' : 'Corrigir'}
+                      {fixing.has(String(lead.dealId)) ? 'Corrigindo...' : 'Corrigir'}
                     </button>
                   </td>
                 </tr>

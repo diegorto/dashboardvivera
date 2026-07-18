@@ -38,6 +38,7 @@ const GoogleAdsDashboard: React.FC = () => {
   const { addNotification } = useAppStore();
 
   const [loading, setLoading] = useState(true);
+  const [integrationError, setIntegrationError] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [pipelineLeads, setPipelineLeads] = useState(0);
@@ -69,6 +70,13 @@ const GoogleAdsDashboard: React.FC = () => {
         api.get<any>('/google-ads/conversions', { params: { date_range: dateRangeParam } })
       ]);
 
+      const allFailed = [campaignsRes, metricsRes, conversionsRes].every((r: any) => r.status === 'rejected' || !r.value?.data?.success);
+      if (allFailed) {
+        const firstFulfilled: any = [campaignsRes, metricsRes, conversionsRes].find((r: any) => r.status === 'fulfilled');
+        setIntegrationError(firstFulfilled?.value?.data?.error || 'Google Ads: integração não configurada ou indisponível no momento.');
+      } else {
+        setIntegrationError(null);
+      }
       if (campaignsRes.status === 'fulfilled' && campaignsRes.value.data.success) {
         const campaignsData = campaignsRes.value.data.data || [];
         setCampaigns(campaignsData);
@@ -153,6 +161,14 @@ const GoogleAdsDashboard: React.FC = () => {
 
   return (
     <Layout title="Google Ads" breadcrumb={['Dashboards', 'Google Ads']}>
+      {integrationError && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 mb-6">
+          <p className="text-[12px] text-amber-800">
+            <span className="font-semibold">Google Ads indisponível.</span>{' '}
+            {integrationError} Os valores abaixo podem não refletir dados reais.
+          </p>
+        </div>
+      )}
       {/* Principais KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {/* Investimento */}

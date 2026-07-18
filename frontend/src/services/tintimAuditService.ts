@@ -1,12 +1,14 @@
 import axios from 'axios';
 
 export interface TintimLead {
-  leadId: string;
-  name: string;
+  dealId: number;
+  dealTitle: string;
+  personName: string;
+  addDate?: string;
   phone: string;
-  source?: string;
-  campaign?: string;
-  missingFields?: string[];
+  tintimSource?: string;
+  suggested?: { origem?: string; campanha?: string; conjunto?: string; palavraChave?: string; plataforma?: string; };
+  
 }
 
 export interface TintimAuditResponse {

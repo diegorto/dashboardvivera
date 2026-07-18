@@ -17,7 +17,26 @@ const CampaignsDashboard: React.FC = () => {
       setLoading(true); setError(null);
       const { since, until } = getDateRange(filters.period, filters.dateRange);
       const r = await axios.get('/api/dashboard/marketing/campaigns', { params: { since, until } });
-      setCampaigns(r.data.data);
+      const raw: Campaign[] = r.data.data || [];
+      const grouped = new Map<string, Campaign>();
+      for (const c of raw) {
+        const existing = grouped.get(c.id);
+        if (existing) {
+          existing.investment += c.investment || 0;
+          existing.leads += c.leads || 0;
+          existing.impressions = (existing.impressions || 0) + (c.impressions || 0);
+          existing.clicks = (existing.clicks || 0) + (c.clicks || 0);
+          existing.messages = (existing.messages || 0) + (c.messages || 0);
+        } else {
+          grouped.set(c.id, { ...c });
+        }
+      }
+      const aggregated = Array.from(grouped.values()).map(c => ({
+        ...c,
+        roas: c.investment > 0 ? c.revenue / c.investment : 0,
+        revPerLead: c.leads > 0 ? c.revenue / c.leads : 0,
+      }));
+      setCampaigns(aggregated);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro ao carregar');
     } finally { setLoading(false); }
