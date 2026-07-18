@@ -4309,6 +4309,19 @@ app.get('/auth/google/callback', async (req, res) => {
 // ============ Webhook Google Ads Script (caminho paralelo, sem developer token) ============
 // Recebe metricas enviadas por um Google Ads Script rodando dentro da propria conta
 // (Ferramentas > Acoes em massa > Scripts), contornando o bloqueio de DEVELOPER_TOKEN_NOT_APPROVED.
+// Rota de leitura de arquivos de analise em data/ - protegida pelo mesmo secret do webhook
+app.get('/api/debug/data-file', (req, res) => {
+  const s = loadSettingsFile();
+  const expected = s.googleAdsWebhookSecret || '';
+  const provided = req.headers['x-webhook-secret'] || (req.query && req.query.secret) || '';
+  if (!expected || provided !== expected) return res.status(401).send('unauthorized');
+  const name = String((req.query && req.query.f) || '').replace(/[^a-zA-Z0-9_.-]/g, '');
+  if (!name || !name.startsWith('_debug')) return res.status(400).send('apenas arquivos _debug*');
+  const fp = path.join(__dirname, 'data', name);
+  if (!fs.existsSync(fp)) return res.status(404).send('nao existe');
+  res.type('text/plain').send(fs.readFileSync(fp, 'utf8'));
+});
+
 app.post('/api/webhooks/google-ads', (req, res) => {
   try {
     const s = loadSettingsFile();
