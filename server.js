@@ -4331,7 +4331,9 @@ app.post('/api/webhooks/google-ads', (req, res) => {
       updatedAt: new Date().toISOString(),
       customerId: customerId || null,
       dateRange: dateRange || 'LAST_30_DAYS',
-      campaigns
+      campaigns,
+      keywords: Array.isArray(req.body.keywords) ? req.body.keywords : [],
+      search_terms: Array.isArray(req.body.search_terms) ? req.body.search_terms : []
     };
 
     const googleAdsCacheFile = path.join(__dirname, 'data', 'google_ads_cache.json');
