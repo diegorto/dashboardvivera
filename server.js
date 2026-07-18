@@ -147,6 +147,18 @@ const FIELD_CONJUNTO = '182132e7acfbec43315140ab18362f0e16ada0c4';
 const FIELD_PALAVRA_CHAVE = 'c9ee045e6537eb296d268102e99829b0dbda1b5b';
 const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a';
 const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
+const ORIGEM_LABELS = {
+  '86': 'Indicacao (dentro da clinica)',
+  '87': 'Indicacao de paciente',
+  '88': 'Instagram',
+  '89': 'Facebook',
+  '90': 'Google',
+  '91': 'Organico',
+  '92': 'Campanhas sazonais',
+  '93': 'Ja e paciente',
+  '96': 'Origem nao Identificada',
+  '114': 'Indicacao - Estimulo da CRC',
+};
 
 function maskSecret(value) {
   if (!value) return '';
@@ -1933,7 +1945,8 @@ app.get('/api/dashboard/executive/origins', async (req, res) => {
     // Agrupa leads por origem (campo customizado FIELD_ORIGEM)
     const byOrigin = {};
     dealsInRange.forEach(deal => {
-      const origem = deal.origem || 'Sem origem';
+      const origemRaw = deal.origem || '';
+      const origem = ORIGEM_LABELS[origemRaw] || origemRaw || 'Sem origem';
       if (!byOrigin[origem]) {
         byOrigin[origem] = { leads: [], won: [] };
       }
