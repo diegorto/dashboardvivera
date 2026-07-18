@@ -29,7 +29,7 @@ export default function ExecutiveDashboard() {
     <div className="space-y-6">
 
       {/* KPI Row 1 */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">Receita</div>
           <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">R$ 2.847.300</div>
@@ -106,7 +106,7 @@ export default function ExecutiveDashboard() {
             <div className="text-right"><div className="text-[20px] font-bold text-[#f59e0b] tabular-nums leading-none">24,5</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads/dia (media)</div></div>
           </div>
         </div>
-        <div className="grid grid-cols-12 divide-x divide-[#f1f5f9]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 divide-x divide-[#f1f5f9]">
           <div className="col-span-7 p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="text-[12px] font-semibold text-[#334155]">Evolucao diaria de leads</div>
@@ -203,7 +203,7 @@ export default function ExecutiveDashboard() {
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">189</div><div className="text-[10px] text-[#94a3b8]">vendas fechadas</div></div>
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 15.064</div><div className="text-[10px] text-[#94a3b8]">ticket medio geral</div></div></div>
         </div>
-        <div className="grid grid-cols-5 divide-x divide-[#f1f5f9]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 divide-x divide-[#f1f5f9]">
           {vendasPorFunil.map((canal: any) => (
             <div key={canal.canal} className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -233,7 +233,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Leads Meta + Google */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           { label: 'Meta Ads', color: '#6366f1', bg: '#eef2ff', stats: leadsMetaStats, daily: leadsMetaDaily, gradId: 'gradMeta' },
           { label: 'Google Ads', color: '#0ea5e9', bg: '#e0f2fe', stats: leadsGoogleStats, daily: leadsGoogleDaily, gradId: 'gradGoogle' },
@@ -251,7 +251,7 @@ export default function ExecutiveDashboard() {
               </div>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">+{src.stats.vsAnterior.total}% vs mai</span>
             </div>
-            <div className="grid grid-cols-5 divide-x divide-[#f1f5f9]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 divide-x divide-[#f1f5f9]">
               <div className="col-span-3 p-4">
                 <ResponsiveContainer width="100%" height={110}>
                   <AreaChart data={src.daily} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
@@ -303,7 +303,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Tempos no Funil: 4, 5, 6 */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-[#f1f5f9] flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-[#fef3c7] flex items-center justify-center text-xs font-bold text-[#d97706]">4</div>
@@ -320,7 +320,7 @@ export default function ExecutiveDashboard() {
                   <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} /><span className="text-[12px] font-semibold text-[#334155]">{c.label}</span></div>
                   <span className="text-[18px] font-bold text-[#0f172a] tabular-nums">{c.data.media}d</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="bg-[#f8fafc] rounded-lg px-3 py-2 text-center"><div className="text-[11px] font-bold text-[#334155] tabular-nums">{c.data.mediana}d</div><div className="text-[9px] text-[#94a3b8]">mediana</div></div>
                   <div className="bg-[#f8fafc] rounded-lg px-3 py-2 text-center"><div className="text-[11px] font-bold text-[#334155] tabular-nums">{c.data.p90}d</div><div className="text-[9px] text-[#94a3b8]">p90</div></div>
                 </div>
@@ -351,7 +351,7 @@ export default function ExecutiveDashboard() {
               <div><div className="text-[42px] font-bold text-[#10b981] tabular-nums leading-none">{tempoFunilData.indicacaoToAgendamento.media}d</div><div className="text-[11px] text-[#94a3b8] mt-1">tempo medio</div></div>
               <div className="text-right"><div className="text-[13px] font-semibold text-[#10b981]">Melhor canal</div><div className="text-[11px] text-[#64748b]">vs 2,8d total</div><div className="text-[11px] font-bold text-[#10b981]">-50% mais rapido</div></div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {[{ label: 'Mediana', value: `${tempoFunilData.indicacaoToAgendamento.mediana}d` }, { label: 'P90', value: `${tempoFunilData.indicacaoToAgendamento.p90}d` }, { label: 'Conv.', value: `${tempoFunilData.indicacaoToAgendamento.pctConv}%` }].map((s: any) => (
                 <div key={s.label} className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg px-3 py-2.5 text-center"><div className="text-[13px] font-bold text-[#0f172a] tabular-nums">{s.value}</div><div className="text-[9px] text-[#94a3b8] mt-0.5">{s.label}</div></div>
               ))}
@@ -401,7 +401,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Faltas + Cancelamentos */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
           <div className="px-5 py-3 border-b border-[#f1f5f9] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
@@ -415,7 +415,7 @@ export default function ExecutiveDashboard() {
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fee2e2] text-[#dc2626]">+{faltasData.vsAnterior}pp vs mai</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-[#f1f5f9]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-x divide-[#f1f5f9]">
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Por SDR</div>
               <table className="w-full text-[11px]">
@@ -483,7 +483,7 @@ export default function ExecutiveDashboard() {
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fef3c7] text-[#d97706]">+{cancelamentosData.vsAnterior}pp vs mai</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 divide-x divide-[#f1f5f9]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 divide-x divide-[#f1f5f9]">
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Motivos de cancelamento</div>
               <div className="space-y-2 mb-4">
@@ -498,7 +498,7 @@ export default function ExecutiveDashboard() {
                 <span className="text-[10px] text-[#64748b]">Antecedencia media do aviso</span>
                 <span className="text-[13px] font-bold text-[#0f172a]">{cancelamentosData.antecedenciaMedia}h antes</span>
               </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg px-3 py-2 text-center">
                   <div className="text-[13px] font-bold text-[#16a34a]">{cancelamentosData.reagendados}</div>
                   <div className="text-[9px] text-[#94a3b8]">reagendados</div>
@@ -550,7 +550,7 @@ export default function ExecutiveDashboard() {
               * IA Executiva - Interpretar com IA
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-[#f8fafc] rounded-xl p-4 text-center"><div className="text-[28px] font-bold text-[#0f172a] tabular-nums">{velocidadeResposta.tempoMedio} min</div><div className="text-[11px] text-[#94a3b8] mt-0.5">tempo medio de resposta</div></div>
             <div className="bg-[#f8fafc] rounded-xl p-4 text-center"><div className="text-[28px] font-bold text-[#6366f1] tabular-nums">{velocidadeResposta.pctMenos5min}%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">respondidos em menos de 5 min</div></div>
             <div className="bg-[#f8fafc] rounded-xl p-4 text-center"><div className="text-[28px] font-bold text-[#10b981] tabular-nums">+{fmt(velocidadeResposta.receitaExtra)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">receita extra (rapido vs. lento)</div></div>
@@ -585,7 +585,7 @@ export default function ExecutiveDashboard() {
             <span className="font-bold">&#9889; Impacto da velocidade:</span> Leads respondidos em menos de 2 minutos tem taxa de qualificacao de 83,1% e agendamento de 70,8% - contra apenas 30,7% e 13,9% em respostas apos 60 minutos. Responder mais rapido gera +R$ 329K em receita no periodo.
           </div>
           <div className="text-[12px] font-semibold text-[#334155] mb-3">Tempo medio de resposta por SDR</div>
-          <div className="grid grid-cols-5 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
             {velocidadeResposta.porSDR.map((sdr: any) => {
               const cor = sdr.tempo < 5 ? '#10b981' : sdr.tempo < 8 ? '#f59e0b' : '#ef4444'
               return (
@@ -628,14 +628,14 @@ export default function ExecutiveDashboard() {
               * IA Executiva - Interpretar com IA
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidos.total}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads perdidos</div></div>
             <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidos.pctDoTotal}%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">do total de leads</div></div>
             <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{fmt(leadsPerdidos.receitaNaoConvertida)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">receita nao convertida</div></div>
           </div>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-12 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-5">
             <div className="col-span-4">
               <div className="text-[12px] font-semibold text-[#334155] mb-2">Top Objecoes Globais</div>
               <div className="text-[10px] text-[#94a3b8] mb-3">Tags mais frequentes em todos os canais</div>
@@ -714,7 +714,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Receita vs Meta + Funil Executivo */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
         <div className="col-span-7 bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -762,7 +762,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* Receita por Fonte + Ranking + Receita por Procedimento */}
-      <div className="grid grid-cols-12 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
         <div className="col-span-3 bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[13px] font-semibold text-[#0f172a] mb-1">Receita por Fonte</div>
           <div className="text-[11px] text-[#94a3b8] mb-3">Junho 2025</div>
