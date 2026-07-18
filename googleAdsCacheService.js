@@ -1,0 +1,60 @@
+// Le metricas de campanhas do Google Ads a partir de um cache local (data/google_ads_cache.json),
+// alimentado pelo endpoint POST /api/webhooks/google-ads (chamado por um Google Ads Script rodando
+// dentro da propria conta). Caminho paralelo enquanto o developer token nao tem Basic access aprovado.
+// Mesma interface de pipeboardGoogleAdsService.js / googleAdsDirectService.js (troca por 1 linha no server.js).
+const fs = require('fs');
+const path = require('path');
+
+const CACHE_FILE = path.join(__dirname, 'data', 'google_ads_cache.json');
+
+function loadCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE)) {
+      return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+    }
+  } catch (e) {
+    console.error('[googleAdsCache] Erro ao ler cache:', e.message);
+  }
+  return { updatedAt: null, customerId: null, campaigns: [] };
+}
+
+async function testConnection() {
+  const cache = loadCache();
+  return !!cache.updatedAt;
+}
+
+async function listCustomers() {
+  const cache = loadCache();
+  if (!cache.customerId) return [];
+  return [{ id: cache.customerId, customer_id: cache.customerId }];
+}
+
+async function getCampaigns(customerId) {
+  const cache = loadCache();
+  return cache.campaigns || [];
+}
+
+async function getMetrics(customerId, dateRange = 'LAST_30_DAYS') {
+  const cache = loadCache();
+  return cache.campaigns || [];
+}
+
+async function getConversions(customerId, dateRange = 'LAST_30_DAYS') {
+  const cache = loadCache();
+  return (cache.campaigns || [])
+    .filter(c => (c.conversions || 0) > 0)
+    .map(c => ({
+      campaign_id: c.campaign_id,
+      campaign_name: c.campaign_name,
+      conversions: c.conversions,
+      conversions_value: c.conversions_value
+    }));
+}
+
+module.exports = {
+  testConnection,
+  listCustomers,
+  getCampaigns,
+  getMetrics,
+  getConversions
+};

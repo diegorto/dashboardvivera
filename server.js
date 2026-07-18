@@ -57,7 +57,7 @@ pipedriveLocalDB.startScheduledSync(30);
 
 const cors = require('cors');
 const path = require('path');
-const pipeboardGoogleAds = require('./googleAdsDirectService'); // OAuth direto Google Ads API (substitui Pipeboard)
+const pipeboardGoogleAds = require('./googleAdsCacheService'); // Caminho paralelo via Google Ads Script + webhook (Basic access ainda nao aprovado). googleAdsDirectService.js fica pronto pra quando aprovar.
 const pipeboardMetaAds = require('./pipeboardMetaAdsService');
 
 const app = express();
@@ -756,24 +756,25 @@ async function fetchPipedriveActivitiesUncached(since, until) {
 }
 
 // Busca as etapas (stages) do pipeline Inbound no Pipedrive
+// Busca as etapas (stages) do pipeline Inbound - le do cache interno (pipedriveLocalDB,
+// sincronizado em background) em vez de bater direto na API do Pipedrive.
 async function fetchPipedriveStagesUncached() {
   try {
-    const response = await axios.get('https://api.pipedrive.com/v1/stages', {
-      params: { api_token: PIPEDRIVE_TOKEN, pipeline_id: INBOUND_PIPELINE_ID }
-    });
-    if (response.data.success && response.data.data) {
-      return response.data.data.map(s => ({
+    const allStages = pipedriveLocalDB.getStages();
+    return allStages
+      .filter(s => String(s.pipeline_id) === String(INBOUND_PIPELINE_ID))
+      .map(s => ({
         id: s.id,
         name: s.name,
         order: s.order_nr
-      })).sort((a, b) => a.order - b.order);
-    }
-    return [];
+      }))
+      .sort((a, b) => a.order - b.order);
   } catch (error) {
-    console.error('Erro ao buscar stages Pipedrive:', error.response?.data?.error || error.message);
+    console.error('Erro ao ler stages do cache interno Pipedrive:', error.message);
     return [];
   }
 }
+
 
 // Busca todos os pipelines do Pipedrive e retorna mapa de id -> name
 async function fetchPipelineMapUncached() {
@@ -4238,6 +4239,47 @@ app.get('/auth/google/callback', async (req, res) => {
   } catch (e) {
     console.error('Erro OAuth Google Ads callback:', e.response ? e.response.data : e.message);
     res.status(500).send('Erro ao trocar codigo por token: ' + (e.response && e.response.data && e.response.data.error_description ? e.response.data.error_description : e.message));
+  }
+});
+
+
+// ============ Webhook Google Ads Script (caminho paralelo, sem developer token) ============
+// Recebe metricas enviadas por um Google Ads Script rodando dentro da propria conta
+// (Ferramentas > Acoes em massa > Scripts), contornando o bloqueio de DEVELOPER_TOKEN_NOT_APPROVED.
+app.post('/api/webhooks/google-ads', (req, res) => {
+  try {
+    const s = loadSettingsFile();
+    const expectedSecret = s.googleAdsWebhookSecret || process.env.GOOGLE_ADS_WEBHOOK_SECRET || '';
+    const providedSecret = req.headers['x-webhook-secret'] || (req.query && req.query.secret) || (req.body && req.body.secret) || '';
+
+    if (!expectedSecret) {
+      return res.status(500).json({ success: false, error: 'googleAdsWebhookSecret nao configurado em data/settings.json.' });
+    }
+    if (providedSecret !== expectedSecret) {
+      return res.status(401).json({ success: false, error: 'Secret invalido.' });
+    }
+
+    const { customerId, campaigns, dateRange } = req.body || {};
+    if (!Array.isArray(campaigns)) {
+      return res.status(400).json({ success: false, error: 'Body deve conter campaigns: [] (array).' });
+    }
+
+    const cacheData = {
+      updatedAt: new Date().toISOString(),
+      customerId: customerId || null,
+      dateRange: dateRange || 'LAST_30_DAYS',
+      campaigns
+    };
+
+    const googleAdsCacheFile = path.join(__dirname, 'data', 'google_ads_cache.json');
+    fs.mkdirSync(path.dirname(googleAdsCacheFile), { recursive: true });
+    fs.writeFileSync(googleAdsCacheFile, JSON.stringify(cacheData, null, 2));
+
+    console.log(`[google-ads-webhook] Recebido: ${campaigns.length} campanhas, customer ${customerId}, dateRange ${dateRange}`);
+    res.json({ success: true, campaigns_received: campaigns.length });
+  } catch (error) {
+    console.error('[google-ads-webhook] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
