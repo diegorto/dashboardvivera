@@ -130,6 +130,39 @@ async function syncNow() {
   }
 }
 
+// ---- Atualizacao incremental via webhook (evita full re-sync a cada evento) ----
+function upsertDeal(deal) {
+  if (!deal || deal.id == null) return;
+  const idx = _deals.findIndex(d => String(d.id) === String(deal.id));
+  if (idx >= 0) _deals[idx] = deal; else _deals.push(deal);
+  saveJSON(DEALS_FILE, _deals);
+  _meta.lastWebhookUpdateAt = Date.now();
+  _meta.dealCount = _deals.length;
+  saveJSON(META_FILE, _meta);
+}
+function removeDeal(id) {
+  if (id == null) return;
+  const idx = _deals.findIndex(d => String(d.id) === String(id));
+  if (idx >= 0) {
+    _deals.splice(idx, 1);
+    saveJSON(DEALS_FILE, _deals);
+    _meta.lastWebhookUpdateAt = Date.now();
+    _meta.dealCount = _deals.length;
+    saveJSON(META_FILE, _meta);
+  }
+}
+function upsertStage(stage) {
+  if (!stage || stage.id == null) return;
+  const idx = _stages.findIndex(s => String(s.id) === String(stage.id));
+  if (idx >= 0) _stages[idx] = stage; else _stages.push(stage);
+  saveJSON(STAGES_FILE, _stages);
+}
+function upsertPipeline(pipeline) {
+  if (!pipeline || pipeline.id == null) return;
+  const idx = _pipelines.findIndex(p => String(p.id) === String(pipeline.id));
+  if (idx >= 0) _pipelines[idx] = pipeline; else _pipelines.push(pipeline);
+  saveJSON(PIPELINES_FILE, _pipelines);
+}
 function getDeals() { return _deals; }
 function getStages() { return _stages; }
 function getPipelines() { return _pipelines; }
@@ -143,4 +176,4 @@ function startScheduledSync(intervalMinutes = 30) {
   console.log(`[pipedrive-db] Sync agendado a cada ${intervalMinutes} min (primeira em ~${Math.round(delayMs/1000)}s)`);
 }
 
-module.exports = { syncNow, getDeals, getStages, getPipelines, getMeta, isEmpty, startScheduledSync };
+module.exports = { syncNow, getDeals, getStages, getPipelines, getMeta, isEmpty, startScheduledSync, upsertDeal, removeDeal, upsertStage, upsertPipeline };

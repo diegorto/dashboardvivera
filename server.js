@@ -53,7 +53,7 @@ axios.interceptors.response.use(
 );
 
 const pipedriveLocalDB = require('./pipedriveLocalDB');
-pipedriveLocalDB.startScheduledSync(30);
+pipedriveLocalDB.startScheduledSync(360); // reduzido de 30min p/ 6h (safety-net) - atualizacao principal agora via webhook /api/webhooks/pipedrive
 
 const cors = require('cors');
 const path = require('path');
@@ -76,6 +76,64 @@ app.post('/api/admin/pipedrive-db/sync', async (req, res) => {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
+
+// ============================================
+// Webhook do Pipedrive - atualizacao incremental do cache interno (pipedriveLocalDB)
+// Substitui o polling periodico: o Pipedrive nos avisa quando algo muda,
+// e buscamos so aquele registro (1 chamada leve) em vez de re-sincronizar tudo.
+// Configurar em Pipedrive > Configuracoes > Ferramentas e apps > Webhooks,
+// apontando para https://SEU_DOMINIO/api/webhooks/pipedrive (precisa ser HTTPS).
+// ============================================
+app.post('/api/webhooks/pipedrive', async (req, res) => {
+  // Responde rapido - Pipedrive espera 200 em poucos segundos, senao desativa o webhook
+  res.status(200).json({ received: true });
+  try {
+    const body = req.body || {};
+    const meta = body.meta || {};
+    const entity = meta.entity || meta.object || (typeof body.event === 'string' ? body.event.split('.')[1] : null);
+    const action = meta.action || (typeof body.event === 'string' ? body.event.split('.')[0] : null);
+    const entityId = meta.entity_id || meta.id
+      || (body.current && body.current.id)
+      || (body.data && body.data.id)
+      || null;
+
+    if (!entity || entityId == null) {
+      console.log('[webhook] Payload Pipedrive nao reconhecido:', JSON.stringify(meta || body).slice(0, 300));
+      return;
+    }
+
+    const isDelete = action === 'delete' || action === 'deleted';
+
+    if (entity === 'deal') {
+      if (isDelete) {
+        pipedriveLocalDB.removeDeal(entityId);
+        console.log(`[webhook] Deal ${entityId} removido do cache interno`);
+      } else {
+        const resp = await axios.get(`https://api.pipedrive.com/v1/deals/${entityId}`, { params: { api_token: PIPEDRIVE_TOKEN } });
+        if (resp.data && resp.data.success && resp.data.data) {
+          pipedriveLocalDB.upsertDeal(resp.data.data);
+          console.log(`[webhook] Deal ${entityId} atualizado no cache interno`);
+        }
+      }
+    } else if (entity === 'stage') {
+      const resp = await axios.get(`https://api.pipedrive.com/v1/stages/${entityId}`, { params: { api_token: PIPEDRIVE_TOKEN } });
+      if (resp.data && resp.data.success && resp.data.data) {
+        pipedriveLocalDB.upsertStage(resp.data.data);
+        console.log(`[webhook] Stage ${entityId} atualizada no cache interno`);
+      }
+    } else if (entity === 'pipeline') {
+      const resp = await axios.get(`https://api.pipedrive.com/v1/pipelines/${entityId}`, { params: { api_token: PIPEDRIVE_TOKEN } });
+      if (resp.data && resp.data.success && resp.data.data) {
+        pipedriveLocalDB.upsertPipeline(resp.data.data);
+        console.log(`[webhook] Pipeline ${entityId} atualizado no cache interno`);
+      }
+    } else {
+      console.log(`[webhook] Entidade Pipedrive ignorada: ${entity}`);
+    }
+  } catch (error) {
+    console.error('[webhook] Erro ao processar webhook Pipedrive:', error.response?.data?.error || error.message);
+  }
+});
 
 // ============================================
 // Configuracoes runtime (SaaS Settings)
@@ -777,24 +835,21 @@ async function fetchPipedriveStagesUncached() {
 
 
 // Busca todos os pipelines do Pipedrive e retorna mapa de id -> name
+// Busca todos os pipelines e retorna mapa de id -> name - le do cache interno (pipedriveLocalDB)
 async function fetchPipelineMapUncached() {
   try {
-    const response = await axios.get('https://api.pipedrive.com/v1/pipelines', {
-      params: { api_token: PIPEDRIVE_TOKEN }
+    const allPipelines = pipedriveLocalDB.getPipelines();
+    const map = {};
+    allPipelines.forEach(p => {
+      map[String(p.id)] = p.name;
     });
-    if (response.data.success && response.data.data) {
-      const map = {};
-      response.data.data.forEach(p => {
-        map[String(p.id)] = p.name;
-      });
-      return map;
-    }
-    return {};
+    return map;
   } catch (error) {
-    console.error('Erro ao buscar pipelines Pipedrive:', error.response?.data?.error || error.message);
+    console.error('Erro ao ler pipelines do cache interno Pipedrive:', error.message);
     return {};
   }
 }
+
 
 // Cria ou atualiza uma atividade de attendance no Pipedrive
 // type: ACTIVITY_TYPE_ATTENDED ('compareceu') ou ACTIVITY_TYPE_MISSED ('faltou_reagendar')
@@ -4624,7 +4679,7 @@ app.post('/api/dashboard/pipeline-events/sync', (req, res) => {
   res.json({ success: true, message: 'Sync iniciado em background' });
 });
 loadCacheFromDisk();
-setInterval(warmCache, 5 * 60 * 1000);   // a cada 5 minutos
+setInterval(warmCache, 30 * 60 * 1000); // reduzido de 5min p/ 30min - deals/stages/pipelines ja vem do cache interno, so activities+Meta seguem ao vivo aqui
 loadPipelineEvents();
 setInterval(() => syncPipelineEvents({ full: false }), 4 * 60 * 60 * 1000); // pipeline-events: a cada 4h
 setTimeout(() => syncPipelineEvents({ full: _pipelineEvents.length === 0 }), 15000); // pipeline-events: primeira carga
