@@ -15,6 +15,7 @@ COPY backend ./backend
 COPY googleAdsMcpService.js ./
 COPY metaAdsMcpService.js ./
 COPY pipeboardGoogleAdsService.js ./
+COPY googleAdsDirectService.js ./
 COPY pipeboardMetaAdsService.js ./
 COPY pipedriveLocalDB.js ./
 
