@@ -57,7 +57,7 @@ pipedriveLocalDB.startScheduledSync(30);
 
 const cors = require('cors');
 const path = require('path');
-const pipeboardGoogleAds = require('./pipeboardGoogleAdsService');
+const pipeboardGoogleAds = require('./googleAdsDirectService'); // OAuth direto Google Ads API (substitui Pipeboard)
 const pipeboardMetaAds = require('./pipeboardMetaAdsService');
 
 const app = express();
@@ -4186,6 +4186,64 @@ async function warmCache() {
 }
 
 // ==================== GOOGLE ADS MCP ENDPOINTS ====================
+
+
+// ============ Google Ads OAuth direto (substitui Pipeboard) ============
+const GOOGLE_ADS_OAUTH_REDIRECT_URI = process.env.GOOGLE_ADS_OAUTH_REDIRECT_URI || 'http://dashboard.viveraorofacial.com.br/auth/google/callback';
+
+app.get('/auth/google/start', (req, res) => {
+  const s = loadSettingsFile();
+  const clientId = s.googleAdsClientId || process.env.GOOGLE_ADS_OAUTH_CLIENT_ID || '';
+  if (!clientId) {
+    return res.status(500).send('Google Ads OAuth Client ID nao configurado (googleAdsClientId em data/settings.json).');
+  }
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: GOOGLE_ADS_OAUTH_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/adwords',
+    access_type: 'offline',
+    prompt: 'consent'
+  });
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+  if (error) {
+    return res.status(400).send(`Erro na autorizacao Google: ${error}`);
+  }
+  if (!code) {
+    return res.status(400).send('Codigo de autorizacao ausente.');
+  }
+  try {
+    const s = loadSettingsFile();
+    const clientId = s.googleAdsClientId || process.env.GOOGLE_ADS_OAUTH_CLIENT_ID || '';
+    const clientSecret = s.googleAdsClientSecret || process.env.GOOGLE_ADS_OAUTH_CLIENT_SECRET || '';
+    if (!clientId || !clientSecret) {
+      return res.status(500).send('Google Ads OAuth client_id/client_secret nao configurados em data/settings.json.');
+    }
+    const tokenResp = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: GOOGLE_ADS_OAUTH_REDIRECT_URI,
+      grant_type: 'authorization_code'
+    }).toString(), { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+
+    const refreshToken = tokenResp.data.refresh_token;
+    if (!refreshToken) {
+      return res.status(400).send('Google nao retornou refresh_token. Revogue o acesso anterior em https://myaccount.google.com/permissions e tente novamente.');
+    }
+    const current = loadSettingsFile();
+    current.googleAdsRefreshToken = refreshToken;
+    saveSettingsFile(current);
+    res.send('Google Ads autorizado com sucesso. Pode fechar esta aba e voltar ao dashboard.');
+  } catch (e) {
+    console.error('Erro OAuth Google Ads callback:', e.response ? e.response.data : e.message);
+    res.status(500).send('Erro ao trocar codigo por token: ' + (e.response && e.response.data && e.response.data.error_description ? e.response.data.error_description : e.message));
+  }
+});
 
 // GET /api/google-ads/test - Testa conexão com Pipeboard Google Ads MCP
 // ==================== GOOGLE ADS ENDPOINTS ====================
