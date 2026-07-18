@@ -102,16 +102,17 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
 
   return (
     <div
+      className="sm:px-6 sm:py-3 sm:gap-4"
       style={{
         position: 'sticky',
         top: 0,
         zIndex: 20,
         backgroundColor: bgColor,
         borderBottom: `1px solid ${borderColor}`,
-        padding: '12px 24px',
+        padding: '8px 12px',
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
+        gap: '8px',
         transition: 'background-color 200ms',
       }}
     >
@@ -131,6 +132,7 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
       {/* Breadcrumb + Title */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
+          className="hidden sm:block"
           style={{
             fontSize: '11px',
             color: secondaryText,
@@ -176,7 +178,7 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
           onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgColor)}
         >
           <Calendar size={14} color={secondaryText} />
-          {getPeriodLabel()}
+          <span className="hidden sm:inline">{getPeriodLabel()}</span>
           <ChevronDown size={14} color={secondaryText} />
         </button>
 
@@ -448,7 +450,7 @@ const TopBar: React.FC<TopBarProps> = ({ title: customTitle, breadcrumb: customB
             onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = bgColor)}
           >
             <Download size={14} />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
         )}
 

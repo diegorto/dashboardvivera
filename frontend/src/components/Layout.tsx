@@ -45,10 +45,11 @@ const Layout: React.FC<LayoutProps> = ({ children, title, breadcrumb, right }) =
 
         {/* Content Area */}
         <main
+          className="sm:p-6"
           style={{
             flex: 1,
             overflowY: 'auto',
-            padding: '24px',
+            padding: '12px',
             backgroundColor: bgColor,
           }}
         >
