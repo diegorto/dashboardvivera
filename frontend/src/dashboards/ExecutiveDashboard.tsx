@@ -29,7 +29,7 @@ export default function ExecutiveDashboard() {
   const [execData, setExecData] = useState<any>(null)
   useEffect(() => {
     axios.get('/api/dashboard/executive')
-      .then(res => setExecData(res.data))
+      .then(res => setExecData(res.data?.data ?? res.data))
       .catch(err => console.error('Erro ao carregar dashboard executivo:', err))
   }, [])
   const d: any = execData || {}
