@@ -8,10 +8,10 @@ import { Layout } from '../components'
 import { useFilters } from '../contexts/FilterContext'
 import { getDateRange } from '../utils/dashboardHelpers'
 import {
-  leadsDaily, leadsBySource,
+  leadsDaily,
   leadsMetaDaily, leadsGoogleDaily, leadsMetaStats, leadsGoogleStats,
   tempoFunilData, faltasData, faltasPorSDR, cancelamentosData,
-  vendasPorFunil, velocidadeResposta, leadsPerdidos,
+  velocidadeResposta, leadsPerdidos,
   revenueVsGoal, revenueBySource, revenueByProcedure,
   professionalRanking, executiveFunnel, alertsData,
 } from '../data/mockData'
@@ -30,13 +30,41 @@ const fmt = (n: number | undefined | null) => {
 export default function ExecutiveDashboard() {
   const { filters } = useFilters()
   const [execData, setExecData] = useState<any>(null)
+  const [originsData, setOriginsData] = useState<any>(null)
   useEffect(() => {
     const { since, until, prevSince, prevUntil } = getDateRange(filters.period, filters.dateRange)
     axios.get('/api/dashboard/executive', { params: { since, until, prevSince, prevUntil } })
       .then(res => setExecData(res.data?.data ?? res.data))
       .catch(err => console.error('Erro ao carregar dashboard executivo:', err))
+      axios.get('/api/dashboard/executive/origins', { params: { since, until } })
+        .then(res => setOriginsData(res.data?.data ?? res.data))
+        .catch(err => console.error('Erro ao carregar leads por origem:', err))
   }, [filters.period, filters.dateRange])
   const d: any = execData || {}
+  const originsRaw = originsData?.byOrigin || []
+  const originsTotalLeads = originsRaw.reduce((s: number, o: any) => s + (o.leads || 0), 0)
+  const originsTotalRevenue = originsData?.summary?.totalRevenue || 0
+  const originsTotalWon = originsData?.summary?.totalWon || 0
+  const leadsBySourceReal = originsRaw.map((o: any, i: number) => ({
+    source: o.origem || 'Sem origem',
+    leads: o.leads,
+    pct: originsTotalLeads > 0 ? ((o.leads / originsTotalLeads) * 100).toFixed(0) : '0',
+    qualificados: o.won,
+    conv: o.conversionRate,
+    color: COLORS[i % COLORS.length],
+  }))
+  const vendasPorFunilReal = originsRaw.map((o: any, i: number) => ({
+    canal: o.origem || 'Sem origem',
+    cor: COLORS[i % COLORS.length],
+    vsAnterior: 0,
+    tipo: undefined,
+    receita: o.revenue,
+    pctReceita: originsTotalRevenue > 0 ? ((o.revenue / originsTotalRevenue) * 100).toFixed(0) : '0',
+    vendas: o.won,
+    ticket: o.won > 0 ? o.revenue / o.won : 0,
+    convLeadVenda: o.conversionRate,
+    leads: o.leads,
+  }))
   const execNum = (v: any, fallback = 0) => {
     const n = typeof v === 'string' ? parseFloat(v) : v
     return typeof n === 'number' && !isNaN(n) ? n : fallback
@@ -162,7 +190,7 @@ export default function ExecutiveDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {leadsBySource.map((s: any) => (
+                {leadsBySourceReal.map((s: any) => (
                   <tr key={s.source} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
@@ -211,17 +239,17 @@ export default function ExecutiveDashboard() {
               <span className="text-[#16a34a] text-sm font-bold">$</span>
             </div>
             <div>
-              <div className="text-[13px] font-semibold text-[#0f172a]">Vendas e Faturamento por Funil - Junho 2025</div>
+              <div className="text-[13px] font-semibold text-[#0f172a]">Vendas e Faturamento por Funil</div>
               <div className="text-[11px] text-[#94a3b8]">Receita gerada por cada canal de aquisicao todos os funis somados</div>
             </div>
           </div>
           <div className="flex items-center gap-8">
-            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 2,847M</div><div className="text-[10px] text-[#94a3b8]">receita total</div></div>
+            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">{fmt(originsTotalRevenue)}</div><div className="text-[10px] text-[#94a3b8]">receita total</div></div>
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">{execNum(d.sales?.value)}</div><div className="text-[10px] text-[#94a3b8]">vendas fechadas</div></div>
-            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 15.064</div><div className="text-[10px] text-[#94a3b8]">ticket medio geral</div></div></div>
+            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ {Math.round(originsTotalWon > 0 ? originsTotalRevenue / originsTotalWon : 0).toLocaleString('pt-BR')}</div><div className="text-[10px] text-[#94a3b8]">ticket medio geral</div></div></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 divide-x divide-[#f1f5f9]">
-          {vendasPorFunil.map((canal: any) => (
+          {vendasPorFunilReal.map((canal: any) => (
             <div key={canal.canal} className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
