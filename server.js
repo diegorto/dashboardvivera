@@ -4600,3 +4600,21 @@ app.get('/api/dashboard/cache-status', (req, res) => {
     cacheTimestamp: Math.max(...Object.values(pipedriveCache).map(c => c.cachedAt || 0))
   });
 });
+
+// === INICIAR POLLING DE PIPEDRIVE ===
+console.log('🔄 Iniciando Pipedrive polling (5min)...');
+setInterval(async () => {
+  try {
+    console.log(`[${new Date().toISOString()}] 🔄 Polling Pipedrive...`);
+    const resp = await axios.get(`https://api.pipedrive.com/v1/deals?limit=500&api_token=${process.env.PIPEDRIVE_API_TOKEN || process.env.PIPEDRIVE_TOKEN}`);
+    if (resp.data && resp.data.data) {
+      resp.data.data.forEach(deal => {
+        pipedriveCache[`deal_${deal.id}`] = { data: deal, cachedAt: Date.now() };
+      });
+      savePipedriveCacheDebounced();
+      console.log(`✅ Cache atualizado com ${resp.data.data.length} deals`);
+    }
+  } catch (err) {
+    console.error('❌ Polling error:', err.message);
+  }
+}, 5 * 60 * 1000);
