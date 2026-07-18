@@ -82,7 +82,7 @@ app.use(express.static(__dirname));
 // Prioridade: config/settings.json (editavel pela tela de Configuracoes) > .env
 // ============================================
 const fs = require('fs');
-const SETTINGS_FILE = path.join(__dirname, 'config', 'settings.json');
+const SETTINGS_FILE = path.join(__dirname, 'data', 'settings.json'); // persistido via volume ./data:/app/data (config/ nao tem volume e era apagado a cada deploy)
 
 function loadSettingsFile() {
   try {
