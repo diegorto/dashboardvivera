@@ -14,6 +14,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { id: 'executive', label: 'Executive Dashboard', icon: '◆', group: 'Intelligence', path: '/' },
   { id: 'crm', label: 'CRM Intelligence', icon: '⬡', group: 'Intelligence', path: '/crm' },
+  { id: 'auditoria', label: 'Auditoria Tintim', icon: '◉', group: 'Intelligence', path: '/auditoria' },
   { id: 'google-ads', label: 'Google Ads', icon: '🔍', group: 'Media', path: '/google-ads' },
   { id: 'meta-ads', label: 'Meta Ads', icon: '📱', group: 'Media', path: '/meta-ads' },
   { id: 'campaigns', label: 'Campaigns', icon: '▣', group: 'Media', path: '/campanhas' },
