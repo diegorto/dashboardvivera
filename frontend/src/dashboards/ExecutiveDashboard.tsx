@@ -61,7 +61,7 @@ export default function ExecutiveDashboard() {
       </div>
 
       {/* KPI Row 2 */}
-      <div className="grid grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
           { label: 'Ticket Medio', value: 'R$ 4.290', change: '+6.3%', ok: true },
           { label: 'Consultas Agendadas no Periodo', value: '47', sub: 'agendadas' },
