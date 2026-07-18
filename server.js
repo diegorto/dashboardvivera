@@ -670,6 +670,7 @@ async function fetchPipedriveDealsUncached(since, until) {
             lostTime: deal.lost_time || '',
             expectedCloseDate: deal.expected_close_date || '', // 🆕 Data prevista de fechamento
             updateTime: deal.update_time || '',
+          addTime: deal.add_time || '',
             campanha: deal[FIELD_CAMPANHA] || '',
             conjunto: deal[FIELD_CONJUNTO] || '',
             palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
@@ -1932,7 +1933,7 @@ app.get('/api/dashboard/executive/origins', async (req, res) => {
     // Agrupa leads por origem (campo customizado FIELD_ORIGEM)
     const byOrigin = {};
     dealsInRange.forEach(deal => {
-      const origem = deal[FIELD_ORIGEM] || 'Sem origem';
+      const origem = deal.origem || 'Sem origem';
       if (!byOrigin[origem]) {
         byOrigin[origem] = { leads: [], won: [] };
       }
