@@ -21,7 +21,7 @@ const tintimAuditService = {
   async getAudit(): Promise<TintimAuditResponse> {
     try {
       const response = await axios.get('/api/tintim/audit');
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Erro ao carregar auditoria Tintim:', error);
       return {

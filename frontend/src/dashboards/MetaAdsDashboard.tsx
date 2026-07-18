@@ -75,25 +75,40 @@ const MetaAdsDashboard: React.FC = () => {
         setMetrics(metricsData);
 
         const totals = metricsData.reduce(
-          (acc: any, m: Metric) => ({
+          (acc: any, m: any) => ({
             impressions: acc.impressions + (m.impressions || 0),
             clicks: acc.clicks + (m.clicks || 0),
-            cost: acc.cost + (m.cost || 0),
-            conversions: acc.conversions + (m.conversions || 0),
+            cost: acc.cost + (m.spend ?? m.cost ?? 0),
+            conversions: acc.conversions + (m.leads ?? m.conversions ?? 0),
             revenue: acc.revenue + (m.conversion_value || 0)
           }),
           { impressions: 0, clicks: 0, cost: 0, conversions: 0, revenue: 0 }
         );
 
         const platformLeads = totals.conversions;
-        const realPipelineLeads = Math.max(platformLeads * 0.65, 1);
+      let realRevenue = 0;
+      let realPipelineLeadsSum = 0;
+      let realClosedDeals = 0;
+      if (conversionsRes.status === 'fulfilled' && (conversionsRes as any).value.data.success) {
+        const convData = (conversionsRes as any).value.data.data || [];
+        const seenCampaigns = new Set<string>();
+        convData.forEach((c: any) => {
+          if (!seenCampaigns.has(c.campaign)) {
+            seenCampaigns.add(c.campaign);
+            realRevenue += Number(c.revenue) || 0;
+            realPipelineLeadsSum += Number(c.pipeline_leads) || 0;
+            realClosedDeals += Number(c.closed_deals) || 0;
+          }
+        });
+      }
+        const realPipelineLeads = realPipelineLeadsSum;
         const cpl = platformLeads > 0 ? totals.cost / platformLeads : 0;
-        const roi = totals.cost > 0 ? ((totals.revenue - totals.cost) / totals.cost) * 100 : 0;
+        const roi = totals.cost > 0 ? ((realRevenue - totals.cost) / totals.cost) * 100 : 0;
 
         setTotalStats({
           investment: totals.cost,
-          revenue: totals.revenue,
-          roas: totals.cost > 0 ? totals.revenue / totals.cost : 0,
+          revenue: realRevenue,
+          roas: totals.cost > 0 ? realRevenue / totals.cost : 0,
           roi: roi,
           platformLeads: platformLeads,
           pipelineLeads: realPipelineLeads,
@@ -212,7 +227,7 @@ const MetaAdsDashboard: React.FC = () => {
 
         <div className="bg-gradient-to-br from-[#fee2e2] to-[#fecaca] border border-[#dc2626] rounded-lg p-4">
           <div className="text-[10px] text-[#7f1d1d] font-semibold uppercase mb-1">Taxa Conv</div>
-          <div className="text-[18px] font-bold text-[#dc2626]">{(totalStats.pipelineLeads > 0 ? (totalStats.pipelineLeads / totalStats.platformLeads) * 100 : 0).toFixed(0)}%</div>
+          <div className="text-[18px] font-bold text-[#dc2626]">{(totalStats.platformLeads > 0 ? (totalStats.pipelineLeads / totalStats.platformLeads) * 100 : 0).toFixed(0)}%</div>
         </div>
       </div>
 
@@ -238,15 +253,15 @@ const MetaAdsDashboard: React.FC = () => {
                     <td className="py-3 px-3 text-[#0f172a] font-medium">{campaign.name}</td>
                     <td className="text-right py-3 px-3">
                       <span className={`text-[10px] px-2 py-1 rounded-full font-semibold ${
-                        campaign.status === 'ACTIVE' ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#fee2e2] text-[#dc2626]'
+                        !campaign.status ? 'bg-[#f1f5f9] text-[#64748b]' : campaign.status === 'ACTIVE' ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#fee2e2] text-[#dc2626]'
                       }`}>
-                        {campaign.status === 'ACTIVE' ? '✓ Ativa' : '✕ Pausada'}
+                        {!campaign.status ? '— N/D' : campaign.status === 'ACTIVE' ? '✓ Ativa' : '✕ Pausada'}
                       </span>
                     </td>
-                    <td className="text-right py-3 px-3 text-[#0f172a] font-semibold">{formatCurrency(campaign.cost || 0)}</td>
+                    <td className="text-right py-3 px-3 text-[#0f172a] font-semibold">{formatCurrency((campaign as any).spend ?? campaign.cost ?? 0)}</td>
                     <td className="text-right py-3 px-3 text-[#0f172a]">{formatNumber(campaign.impressions || 0)}</td>
                     <td className="text-right py-3 px-3 text-[#0f172a]">{formatNumber(campaign.clicks || 0)}</td>
-                    <td className="text-right py-3 px-3 text-[#10b981] font-semibold">{formatNumber(campaign.conversions || 0)}</td>
+                    <td className="text-right py-3 px-3 text-[#10b981] font-semibold">{formatNumber((campaign as any).leads ?? campaign.conversions ?? 0)}</td>
                   </tr>
                 ))}
               </tbody>

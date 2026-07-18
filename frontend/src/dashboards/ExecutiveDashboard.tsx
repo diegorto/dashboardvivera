@@ -2,6 +2,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
 } from 'recharts'
+import { useState, useEffect } from 'react'
+import axios from 'axios'
 import { Layout } from '../components'
 import {
   leadsDaily, leadsBySource,
@@ -24,6 +26,17 @@ const fmt = (n: number | undefined | null) => {
 }
 
 export default function ExecutiveDashboard() {
+  const [execData, setExecData] = useState<any>(null)
+  useEffect(() => {
+    axios.get('/api/dashboard/executive')
+      .then(res => setExecData(res.data))
+      .catch(err => console.error('Erro ao carregar dashboard executivo:', err))
+  }, [])
+  const d: any = execData || {}
+  const execNum = (v: any, fallback = 0) => {
+    const n = typeof v === 'string' ? parseFloat(v) : v
+    return typeof n === 'number' && !isNaN(n) ? n : fallback
+  }
   return (
     <Layout title="Executivo" breadcrumb={['Dashboards', 'Executivo']}>
     <div className="space-y-6">
@@ -32,44 +45,44 @@ export default function ExecutiveDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6"">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">Receita</div>
-          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">R$ 2.847.300</div>
-          <span className="text-[12px] font-semibold px-2 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">+12.4%</span>
-          <span className="text-[12px] text-[#94a3b8] ml-2">vs. mai</span>
+          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">{fmt(execNum(d.revenue?.value))}</div>
+          
+          <span className="text-[12px] text-[#94a3b8]">{d.revenue?.sub || "vs. periodo anterior"}</span>
         </div>
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">Meta de Faturamento Mensal</div>
-          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">R$ 350.000</div>
+          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">{fmt(execNum(d.goal?.value))}</div>
           <div className="flex items-center justify-between text-[12px] mb-1.5">
             <span className="text-[#64748b]">Alcançado</span>
-            <span className="font-semibold text-[#10b981]">R$ 284.730 (81,4%)</span>
+            <span className="font-semibold text-[#10b981]">{fmt(execNum(d.revenue?.value))} ({execNum(d.goalPct?.value)}%)</span>
           </div>
           <div className="h-2 bg-[#f1f5f9] rounded-full overflow-hidden mb-2">
-            <div className="h-full bg-[#10b981] rounded-full" style={{ width: '81.4%' }} />
+            <div className="h-full bg-[#10b981] rounded-full" style={{ width: `${Math.min(execNum(d.goalPct?.value), 100)}%` }} />
           </div>
-          <div className="text-[11px] text-[#10b981] font-medium">Faltam R$ 65.270 para bater a meta</div>
+          <div className="text-[11px] text-[#10b981] font-medium">{execNum(d.goal?.value) - execNum(d.revenue?.value) > 0 ? `Faltam ${fmt(execNum(d.goal?.value) - execNum(d.revenue?.value))} para bater a meta` : "Meta batida!"}</div>
         </div>
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">ROAS</div>
-          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">7,4x</div>
-          <span className="text-[12px] font-semibold px-2 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">+0.8%</span>
+          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">{execNum(d.roas?.value).toFixed(2)}x</div>
+          
         </div>
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">CAC</div>
-          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">R$ 387</div>
-          <span className="text-[12px] font-semibold px-2 py-0.5 rounded-md bg-[#fee2e2] text-[#dc2626]">-8.2%</span>
+          <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">{fmt(execNum(d.cac?.value))}</div>
+          
         </div>
       </div>
 
       {/* KPI Row 2 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
-          { label: 'Ticket Medio', value: 'R$ 4.290', change: '+6.3%', ok: true },
+          { label: 'Ticket Medio', value: fmt(execNum(d.avgTicket?.value)) },
           { label: 'Consultas Agendadas no Periodo', value: '47', sub: 'agendadas' },
           { label: 'Consultas Comparecidas no Periodo', value: '53', sub: 'comparecidas' },
           { label: 'Faltaram no Periodo', value: '10,6%', change: '-2.1%', ok: false },
-          { label: 'Leads', value: '734', change: '+18.3%', ok: true },
-          { label: 'Qualificados', value: '412', change: '+14.7%', ok: true },
-          { label: 'Vendas', value: '189', change: '+22.1%', ok: true },
+          { label: 'Leads', value: String(execNum(d.leads?.value)) },
+          { label: 'Qualificados', value: String(execNum(d.qualified?.value)) },
+          { label: 'Vendas', value: String(execNum(d.sales?.value)) },
         ].map((k: any) => (
           <div key={k.label} className="bg-white border border-[#e2e8f0] rounded-xl p-4">
             <div className="text-[10px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-2 leading-tight">{k.label}</div>
@@ -89,13 +102,13 @@ export default function ExecutiveDashboard() {
             </div>
             <div>
               <div className="text-[13px] font-semibold text-[#0f172a]">Leads Totais - Junho 2025</div>
-              <div className="text-[11px] text-[#94a3b8]">Todos os leads que entraram no periodo 01/06 a 30/06</div>
+              <div className="text-[11px] text-[#94a3b8]">Todos os leads que entraram no periodo selecionado</div>
             </div>
           </div>
           <div className="flex items-center gap-8">
-            <div className="text-right"><div className="text-[28px] font-bold text-[#0f172a] tabular-nums leading-none">734</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads totais</div></div>
-            <div className="text-right"><div className="text-[20px] font-bold text-[#10b981] tabular-nums leading-none">412</div><div className="text-[11px] text-[#94a3b8] mt-0.5">qualificados</div></div>
-            <div className="text-right"><div className="text-[20px] font-bold text-[#6366f1] tabular-nums leading-none">56,1%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">taxa qualif.</div></div>
+            <div className="text-right"><div className="text-[28px] font-bold text-[#0f172a] tabular-nums leading-none">{execNum(d.leads?.value)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads totais</div></div>
+            <div className="text-right"><div className="text-[20px] font-bold text-[#10b981] tabular-nums leading-none">{execNum(d.qualified?.value)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">qualificados</div></div>
+            <div className="text-right"><div className="text-[20px] font-bold text-[#6366f1] tabular-nums leading-none">{execNum(d.leads?.value) > 0 ? ((execNum(d.qualified?.value) / execNum(d.leads?.value)) * 100).toFixed(1).replace(".", ",") : "0,0"}%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">taxa qualif.</div></div>
             <div className="text-right">
               <div className="flex items-center gap-1 justify-end">
                 <span className="text-[20px] font-bold text-[#0f172a] tabular-nums leading-none">+18,3%</span>
@@ -175,10 +188,10 @@ export default function ExecutiveDashboard() {
               <tfoot>
                 <tr className="border-t-2 border-[#e2e8f0]">
                   <td className="pt-2.5 font-bold text-[#0f172a] text-[11px]">Total</td>
-                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">734</td>
+                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(d.leads?.value)}</td>
                   <td className="pt-2.5 text-[#94a3b8] text-[10px]">100%</td>
-                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">412</td>
-                  <td className="pt-2.5"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">56,1%</span></td>
+                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(d.qualified?.value)}</td>
+                  <td className="pt-2.5"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">{execNum(d.leads?.value) > 0 ? ((execNum(d.qualified?.value) / execNum(d.leads?.value)) * 100).toFixed(1).replace(".", ",") : "0,0"}%</span></td>
                 </tr>
               </tfoot>
             </table>
@@ -200,7 +213,7 @@ export default function ExecutiveDashboard() {
           </div>
           <div className="flex items-center gap-8">
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 2,847M</div><div className="text-[10px] text-[#94a3b8]">receita total</div></div>
-            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">189</div><div className="text-[10px] text-[#94a3b8]">vendas fechadas</div></div>
+            <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">{execNum(d.sales?.value)}</div><div className="text-[10px] text-[#94a3b8]">vendas fechadas</div></div>
             <div className="text-right"><div className="text-[20px] font-bold text-[#0f172a] tabular-nums">R$ 15.064</div><div className="text-[10px] text-[#94a3b8]">ticket medio geral</div></div></div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 divide-x divide-[#f1f5f9]">
@@ -751,8 +764,8 @@ export default function ExecutiveDashboard() {
                   </div>
                 </div>
                 <div className="h-6 bg-[#f1f5f9] rounded-md overflow-hidden">
-                  <div className="h-full rounded-md flex items-center px-2" style={{ width: `${(stage.value / 734) * 100}%`, backgroundColor: COLORS[i] + 'dd' }}>
-                    {(stage.value / 734) * 100 > 20 && <span className="text-[10px] text-white font-bold">{stage.value}</span>}
+                  <div className="h-full rounded-md flex items-center px-2" style={{ width: `${(stage.value / (execNum(d.leads?.value) || 734)) * 100}%`, backgroundColor: COLORS[i] + 'dd' }}>
+                    {(stage.value / (execNum(d.leads?.value) || 734)) * 100 > 20 && <span className="text-[10px] text-white font-bold">{stage.value}</span>}
                   </div>
                 </div>
               </div>
