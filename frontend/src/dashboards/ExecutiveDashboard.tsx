@@ -5,6 +5,8 @@ import {
 import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Layout } from '../components'
+import { useFilters } from '../contexts/FilterContext'
+import { getDateRange } from '../utils/dashboardHelpers'
 import {
   leadsDaily, leadsBySource,
   leadsMetaDaily, leadsGoogleDaily, leadsMetaStats, leadsGoogleStats,
@@ -26,12 +28,14 @@ const fmt = (n: number | undefined | null) => {
 }
 
 export default function ExecutiveDashboard() {
+  const { filters } = useFilters()
   const [execData, setExecData] = useState<any>(null)
   useEffect(() => {
-    axios.get('/api/dashboard/executive')
+    const { since, until, prevSince, prevUntil } = getDateRange(filters.period, filters.dateRange)
+    axios.get('/api/dashboard/executive', { params: { since, until, prevSince, prevUntil } })
       .then(res => setExecData(res.data?.data ?? res.data))
       .catch(err => console.error('Erro ao carregar dashboard executivo:', err))
-  }, [])
+  }, [filters.period, filters.dateRange])
   const d: any = execData || {}
   const execNum = (v: any, fallback = 0) => {
     const n = typeof v === 'string' ? parseFloat(v) : v
