@@ -633,81 +633,64 @@ function aggregateMetaAds(ads) {
 // Pipedrive: busca Deals (negocios) do funil Inbound dentro do periodo (filtra por add_time).
 // Campanha/Conjunto/Palavra-chave vivem no proprio Deal (campos "Trafego Pago").
 async function fetchPipedriveDealsUncached(since, until) {
+  // 🔒 Le do cache interno (pipedriveLocalDB, sincronizado em background a cada 30min)
+  // em vez de bater direto na API do Pipedrive a cada carga de pagina.
+  // Decisao de arquitetura: nenhum endpoint do dashboard deve consultar o Pipedrive
+  // ao vivo na hora do request - reduz consumo de API e evita 429 (rate limit).
   try {
     const deals = [];
-    let start = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-      const url = 'https://api.pipedrive.com/v1/deals';
-
-      const response = await axios.get(url, {
-        params: { api_token: PIPEDRIVE_TOKEN, limit: 500, start }
-      });
-
-      if (response.data.success && response.data.data) {
-        response.data.data.forEach(deal => {
-          if (INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
-
-          const addDate = (deal.add_time || '').slice(0, 10);
-          if (since && addDate && addDate < since) return;
-          if (until && addDate && addDate > until) return;
-
-          let email = '';
-          if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.email)) {
-            const primaryEmail = deal.person_id.email.find(e => e.primary) || deal.person_id.email[0];
-            email = primaryEmail ? primaryEmail.value : '';
-          }
-
-          // Extrair phone do paciente
-          let phone = '';
-          if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.phone)) {
-            const primaryPhone = deal.person_id.phone.find(p => p.primary) || deal.person_id.phone[0];
-            phone = primaryPhone ? primaryPhone.value : '';
-          }
-
-          deals.push({
-            id: deal.id,
-            title: deal.title,
-            status: deal.status,
-            addDate,
-            value: deal.status === 'won' ? (deal.value || 0) : 0,
-            rawValue: deal.value || 0,
-            stageId: deal.stage_id,
-            stageChangeTime: deal.stage_change_time || deal.add_time || '',
-            userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
-            userName: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.name : '',
-            lostReason: deal.lost_reason || '', // Campo detalhado de motivo da perda
-            wonTime: deal.won_time || '',
-            lostTime: deal.lost_time || '',
-            expectedCloseDate: deal.expected_close_date || '', // 🆕 Data prevista de fechamento
-            updateTime: deal.update_time || '',
-          addTime: deal.add_time || '',
-            campanha: deal[FIELD_CAMPANHA] || '',
-            conjunto: deal[FIELD_CONJUNTO] || '',
-            palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
-            plataforma: deal[FIELD_PLATAFORMA] || '',
-            origem: deal[FIELD_ORIGEM] || '',
-            personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
-            email,
-            phone // 🆕 Telefone do paciente
-          });
-        });
-
-        hasMore = response.data.additional_data?.pagination?.more_items_in_collection || false;
-        start = response.data.additional_data?.pagination?.next_start || 0;
-      } else {
-        hasMore = false;
+    const rawDeals = pipedriveLocalDB.getDeals();
+    rawDeals.forEach(deal => {
+      if (INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
+      const addDate = (deal.add_time || '').slice(0, 10);
+      if (since && addDate && addDate < since) return;
+      if (until && addDate && addDate > until) return;
+      let email = '';
+      if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.email)) {
+        const primaryEmail = deal.person_id.email.find(e => e.primary) || deal.person_id.email[0];
+        email = primaryEmail ? primaryEmail.value : '';
       }
-    }
-
-    console.log(`Total de deals no funil Inbound dentro do periodo: ${deals.length}`);
+      // Extrair phone do paciente
+      let phone = '';
+      if (deal.person_id && typeof deal.person_id === 'object' && Array.isArray(deal.person_id.phone)) {
+        const primaryPhone = deal.person_id.phone.find(p => p.primary) || deal.person_id.phone[0];
+        phone = primaryPhone ? primaryPhone.value : '';
+      }
+      deals.push({
+        id: deal.id,
+        title: deal.title,
+        status: deal.status,
+        addDate,
+        value: deal.status === 'won' ? (deal.value || 0) : 0,
+        rawValue: deal.value || 0,
+        stageId: deal.stage_id,
+        stageChangeTime: deal.stage_change_time || deal.add_time || '',
+        userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
+        userName: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.name : '',
+        lostReason: deal.lost_reason || '', // Campo detalhado de motivo da perda
+        wonTime: deal.won_time || '',
+        lostTime: deal.lost_time || '',
+        expectedCloseDate: deal.expected_close_date || '', // 🆕 Data prevista de fechamento
+        updateTime: deal.update_time || '',
+        addTime: deal.add_time || '',
+        campanha: deal[FIELD_CAMPANHA] || '',
+        conjunto: deal[FIELD_CONJUNTO] || '',
+        palavraChave: deal[FIELD_PALAVRA_CHAVE] || '',
+        plataforma: deal[FIELD_PLATAFORMA] || '',
+        origem: deal[FIELD_ORIGEM] || '',
+        personName: deal.person_name || (deal.person_id && deal.person_id.name) || '',
+        email,
+        phone
+      });
+    });
+    console.log(`Total de deals no funil Inbound dentro do periodo (cache interno): ${deals.length}`);
     return deals;
   } catch (error) {
-    console.error('Erro ao buscar deals Pipedrive:', error.response?.data?.error || error.message);
+    console.error('Erro ao ler deals do cache interno Pipedrive:', error.message);
     return [];
   }
 }
+
 
 // Tipos de atividade da agenda no Pipedrive da Vivera (key_string reais da conta)
 const ACTIVITY_TYPE_SCHEDULED = 'agendamento_realizado'; // "Agendamento Realizado"
