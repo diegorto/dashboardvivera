@@ -187,10 +187,13 @@ export default function ExecutiveDashboard() {
     alertsDataReal.push({ type: 'warning', text: `Possivel duplicata: telefone ${s.phone} - deal #${s.dealA.id} (R$ ${Number(s.dealA.value).toFixed(2)}) e deal #${s.dealB.id} (R$ ${Number(s.dealB.value).toFixed(2)}) - revisar antes de contar como receita`, time: periodLabel })
   })
   if (alertsDataReal.length === 0) alertsDataReal.push({ type: 'info', text: 'Nenhum alerta critico identificado no periodo selecionado', time: periodLabel })
-  const leadsBySourceReal = originsRaw.map((o: any, i: number) => ({
+    const originsRawForLeads = originsRaw.filter((o: any) => o.origem !== 'Ja e paciente')
+    const leadsSourceTotalLeads = originsRawForLeads.reduce((s: number, o: any) => s + (o.leads || 0), 0)
+    const leadsSourceTotalQualified = originsRawForLeads.reduce((s: number, o: any) => s + (o.won || 0), 0)
+  const leadsBySourceReal = originsRawForLeads.map((o: any, i: number) => ({
     source: o.origem || 'Sem origem',
     leads: o.leads,
-    pct: originsTotalLeads > 0 ? ((o.leads / originsTotalLeads) * 100).toFixed(0) : '0',
+    pct: leadsSourceTotalLeads > 0 ? ((o.leads / leadsSourceTotalLeads) * 100).toFixed(0) : '0',
     qualificados: o.won,
     conv: o.conversionRate,
     color: COLORS[i % COLORS.length],
@@ -362,10 +365,10 @@ export default function ExecutiveDashboard() {
               <tfoot>
                 <tr className="border-t-2 border-[#e2e8f0]">
                   <td className="pt-2.5 font-bold text-[#0f172a] text-[11px]">Total</td>
-                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(d.leads?.value)}</td>
+                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(leadsSourceTotalLeads)}</td>
                   <td className="pt-2.5 text-[#94a3b8] text-[10px]">100%</td>
-                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(d.qualified?.value)}</td>
-                  <td className="pt-2.5"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">{execNum(d.leads?.value) > 0 ? ((execNum(d.qualified?.value) / execNum(d.leads?.value)) * 100).toFixed(1).replace(".", ",") : "0,0"}%</span></td>
+                  <td className="pt-2.5 font-bold text-[#0f172a] tabular-nums">{execNum(leadsSourceTotalQualified)}</td>
+                  <td className="pt-2.5"><span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">{execNum(leadsSourceTotalLeads) > 0 ? ((execNum(leadsSourceTotalQualified) / execNum(leadsSourceTotalLeads)) * 100).toFixed(1).replace(".", ",") : "0,0"}%</span></td>
                 </tr>
               </tfoot>
             </table>
