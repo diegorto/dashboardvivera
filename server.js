@@ -53,7 +53,39 @@ axios.interceptors.response.use(
 );
 
 const pipedriveLocalDB = require('./pipedriveLocalDB');
-pipedriveLocalDB.startScheduledSync(360); // reduzido de 30min p/ 6h (safety-net) - atualizacao principal agora via webhook /api/webhooks/pipedrive
+let mirrorToVCRM = null;
+try {
+  ({ mirrorToVCRM } = require('./vivera-crm-mirror'));
+} catch (e) {
+  console.error('[vivera-crm-mirror] Falha ao carregar modulo (dashboard segue normalmente):', e.message);
+}
+// [substituido] startScheduledSync(360) - agora e UM job noturno unico, so entre 4:10-5:59 BRT (07:10-08:59 UTC).
+// Reusa o cap de 200 chamadas ja existente dentro de pipedriveLocalDB.syncNow() (nao duplica).
+// Atualizacao principal do dia a dia continua via webhook /api/webhooks/pipedrive.
+function isInsideNightlySyncWindowBRT() {
+  const now = new Date();
+  const totalMin = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const startMin = 7 * 60 + 10;  // 07:10 UTC = 04:10 BRT (UTC-3)
+  const endMin = 8 * 60 + 59;    // 08:59 UTC = 05:59 BRT
+  return totalMin >= startMin && totalMin <= endMin;
+}
+let _lastNightlySyncDateBRT = null;
+async function runNightlySyncIfWindow() {
+  if (!isInsideNightlySyncWindowBRT()) return;
+  const brtNow = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  const brtDateStr = brtNow.toISOString().slice(0, 10);
+  if (_lastNightlySyncDateBRT === brtDateStr) return; // ja rodou hoje, nao repete a cada 30min dentro da mesma janela
+  _lastNightlySyncDateBRT = brtDateStr;
+  console.log(`[nightly-sync] Janela noturna (${new Date().toISOString()} UTC) - iniciando sync Pipedrive (cap 200 chamadas)`);
+  try { await pipedriveLocalDB.syncNow(); } catch (e) { console.error('[nightly-sync] Erro no pipedriveLocalDB.syncNow:', e.message); }
+  try { if (mirrorToVCRM) { const vcrmResult = await mirrorToVCRM(pipedriveLocalDB); console.log('[nightly-sync] vivera_crm mirror:', JSON.stringify(vcrmResult)); } } catch (e) { console.error('[nightly-sync] Erro ao espelhar para vivera_crm:', e.message); }
+  try { await syncPipelineEvents({ full: false }); } catch (e) { console.error('[nightly-sync] Erro no syncPipelineEvents:', e.message); }
+  try { await backfillPipelineEventsByPriority({ maxCalls: 150 }); } catch (e) { console.error('[nightly-sync] Erro no backfillPipelineEventsByPriority:', e.message); }
+  try { await refreshPipedriveLiveSnapshot(); } catch (e) { console.error('[nightly-sync] Erro no refreshPipedriveLiveSnapshot:', e.message); }
+  console.log('[nightly-sync] Concluido.');
+}
+setInterval(runNightlySyncIfWindow, 30 * 60 * 1000);
+setTimeout(refreshPipedriveLiveSnapshot, 5000); // carga inicial de activities/users/people logo apos subir (nao e request de usuario)
 
 const cors = require('cors');
 const path = require('path');
@@ -242,6 +274,43 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 const _cache = new Map();
 const CACHE_FILE = path.join(__dirname, 'data', 'cache.json');
 
+// === Snapshot Pipedrive sem sync local (activities/users/people) ===
+// Regra do projeto: ZERO chamada ao vivo ao Pipedrive disparada por request de usuario.
+// activities/users/people nao tem sync via webhook (so deals/stages/pipelines tem no pipedriveLocalDB),
+// entao mantemos um snapshot em memoria atualizado SOMENTE no boot e na janela noturna (4:10 BRT) - nunca por request.
+const _pipedriveLiveSnapshot = { activities: [], users: [], people: [], updatedAt: 0 };
+function filterActivitiesByRange(activities, since, until) {
+  return (activities || []).filter(a => {
+    if (since && a.dueDate && a.dueDate < since) return false;
+    if (until && a.dueDate && a.dueDate > until) return false;
+    return true;
+  });
+}
+async function refreshPipedriveLiveSnapshot() {
+  try {
+    const [act, usr] = await Promise.allSettled([
+      fetchPipedriveActivitiesUncached(null, null),
+      fetchPipedriveUsersUncached()
+    ]);
+    let people = [];
+    try {
+      if (PIPEDRIVE_TOKEN) {
+        const r = await axios.get(`https://api.pipedrive.com/v1/persons?api_token=${PIPEDRIVE_TOKEN}&limit=500`);
+        people = (r.data && r.data.success) ? (r.data.data || []) : [];
+      }
+    } catch (e) {
+      console.error('[pipedrive-snapshot] Erro ao buscar people:', e.message);
+    }
+    if (act.status === 'fulfilled') _pipedriveLiveSnapshot.activities = act.value;
+    if (usr.status === 'fulfilled') _pipedriveLiveSnapshot.users = usr.value;
+    _pipedriveLiveSnapshot.people = people;
+    _pipedriveLiveSnapshot.updatedAt = Date.now();
+    console.log(`[pipedrive-snapshot] Atualizado: ${_pipedriveLiveSnapshot.activities.length} activities, ${_pipedriveLiveSnapshot.users.length} users, ${_pipedriveLiveSnapshot.people.length} people`);
+  } catch (e) {
+    console.error('[pipedrive-snapshot] Erro ao atualizar snapshot:', e.message);
+  }
+}
+
 function loadCacheFromDisk() {
   try {
     if (fs.existsSync(CACHE_FILE)) {
@@ -326,6 +395,21 @@ const PIPELINE_EVENTS_FILE = path.join(__dirname, 'data', 'pipeline_events.json'
 const PIPELINE_SYNC_STATE_FILE = path.join(__dirname, 'data', 'pipeline_sync_state.json');
 let _pipelineEvents = [];
 const _pipelineEventKeys = new Set();
+const PIPELINE_BACKFILL_STATE_FILE = path.join(__dirname, 'data', 'pipeline_backfill_state.json');
+let _flowFetchedDealIds = new Set();
+function loadBackfillState() {
+  try {
+    if (fs.existsSync(PIPELINE_BACKFILL_STATE_FILE)) {
+      const raw = JSON.parse(fs.readFileSync(PIPELINE_BACKFILL_STATE_FILE, 'utf8'));
+      _flowFetchedDealIds = new Set(raw.flowFetchedDealIds || []);
+    }
+  } catch (e) { console.error('[pipeline-backfill] Erro ao carregar estado:', e.message); }
+}
+function saveBackfillState() {
+  try {
+    fs.writeFileSync(PIPELINE_BACKFILL_STATE_FILE, JSON.stringify({ flowFetchedDealIds: Array.from(_flowFetchedDealIds), updatedAt: new Date().toISOString() }));
+  } catch (e) { console.error('[pipeline-backfill] Erro ao salvar estado:', e.message); }
+}
 
 function loadPipelineEvents() {
   try {
@@ -520,6 +604,55 @@ async function syncPipelineEvents({ full = false } = {}) {
   }
 }
 
+async function backfillPipelineEventsByPriority({ maxCalls = 150 } = {}) {
+  if (_pipelineSyncRunning) { console.log('[pipeline-backfill] Sync ja em andamento, ignorando.'); return { processed: 0 }; }
+  _pipelineSyncRunning = true;
+  try {
+    for (const e of _pipelineEvents) _flowFetchedDealIds.add(e.dealId);
+    const allDeals = pipedriveLocalDB.getDeals();
+    const candidates = allDeals
+      .filter(d => !_flowFetchedDealIds.has(d.id))
+      .sort((a, b) => (b.add_time || '').localeCompare(a.add_time || ''));
+    if (candidates.length === 0) { console.log('[pipeline-backfill] Nada pendente.'); return { processed: 0, remaining: 0 }; }
+    const batch = candidates.slice(0, maxCalls);
+    console.log('[pipeline-backfill] Processando ' + batch.length + ' de ' + candidates.length + ' pendentes, do mais recente pro mais antigo.');
+    let processed = 0;
+    for (const deal of batch) {
+      try {
+        const flowResp = await axios.get('https://api.pipedrive.com/v1/deals/' + deal.id + '/flow', { params: { api_token: PIPEDRIVE_TOKEN } });
+        const flowData = flowResp.data && flowResp.data.data;
+        if (Array.isArray(flowData)) {
+          const person = deal.person_id;
+          const personName = (person && typeof person === 'object' && person.name) || '';
+          const phone = normalizePipedrivePhone(person);
+          const ownerName = (deal.user_id && typeof deal.user_id === 'object') ? deal.user_id.name : '';
+          for (const item of flowData) {
+            if (item.object !== 'dealChange') continue;
+            const c = item.data || {};
+            if (c.field_key !== 'stage_id') continue;
+            const stageId = parseInt(c.new_value, 10);
+            if (!STAGE_EVENT_TYPES[stageId]) continue;
+            const enteredAt = c.log_time;
+            const key = deal.id + '|' + enteredAt + '|' + stageId;
+            if (_pipelineEventKeys.has(key)) continue;
+            _pipelineEventKeys.add(key);
+            _pipelineEvents.push({ dealId: deal.id, personName, phone, ownerName, stageId, eventKey: STAGE_EVENT_TYPES[stageId].key, enteredAt, oldStage: c.old_value });
+          }
+        }
+        _flowFetchedDealIds.add(deal.id);
+        processed++;
+      } catch (e) { console.error('[pipeline-backfill] Erro no /flow do deal ' + deal.id + ':', e.message); }
+      await new Promise(r => setTimeout(r, 80));
+    }
+    if (processed > 0) { savePipelineEventsToDisk(); saveBackfillState(); }
+    const remaining = candidates.length - processed;
+    console.log('[pipeline-backfill] Concluido: ' + processed + ' processados, ' + remaining + ' pendentes.');
+    return { processed, remaining };
+  } finally {
+    _pipelineSyncRunning = false;
+  }
+}
+
 // Agrupa por pessoa (telefone quando disponivel, senao nome) e numera as
 // ocorrencias de cada tipo de evento em ordem cronologica: 1a vez = so o verbo
 // ("compareceu"), 2a em diante = "compareceu 2a vez", etc.
@@ -569,11 +702,16 @@ function getMetaAds(since, until) {
 function getPipedriveDeals(since, until) {
   return cached(`deals:${since}:${until}:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveDealsUncached(since, until));
 }
+
+function getAllPipedriveDeals(since, until) {
+  return cached(`deals:${since}:${until}:allPipelines`, () => fetchPipedriveDealsUncached(since, until, { allPipelines: true }));
+}
 function getPipedriveStages() {
   return cached(`stages:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveStagesUncached());
 }
 function getPipedriveActivities(since, until) {
-  return cached(`activities:${since}:${until}`, () => fetchPipedriveActivitiesUncached(since, until));
+  // ZERO chamada ao vivo por request - le do snapshot atualizado no boot/janela noturna (4:10 BRT)
+  return Promise.resolve(filterActivitiesByRange(_pipedriveLiveSnapshot.activities, since, until));
 }
 function getPipelineMap() {
   return cached('pipelines:map', () => fetchPipelineMapUncached());
@@ -698,7 +836,7 @@ function aggregateMetaAds(ads) {
 
 // Pipedrive: busca Deals (negocios) do funil Inbound dentro do periodo (filtra por add_time).
 // Campanha/Conjunto/Palavra-chave vivem no proprio Deal (campos "Trafego Pago").
-async function fetchPipedriveDealsUncached(since, until) {
+async function fetchPipedriveDealsUncached(since, until, opts = {}) {
   // 🔒 Le do cache interno (pipedriveLocalDB, sincronizado em background a cada 30min)
   // em vez de bater direto na API do Pipedrive a cada carga de pagina.
   // Decisao de arquitetura: nenhum endpoint do dashboard deve consultar o Pipedrive
@@ -707,7 +845,7 @@ async function fetchPipedriveDealsUncached(since, until) {
     const deals = [];
     const rawDeals = pipedriveLocalDB.getDeals();
     rawDeals.forEach(deal => {
-      if (INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
+      if (!opts.allPipelines && INBOUND_PIPELINE_ID && deal.pipeline_id !== INBOUND_PIPELINE_ID) return;
       const addDate = (deal.add_time || '').slice(0, 10);
       if (since && addDate && addDate < since) return;
       if (until && addDate && addDate > until) return;
@@ -729,6 +867,7 @@ async function fetchPipedriveDealsUncached(since, until) {
         addDate,
         value: deal.status === 'won' ? (deal.value || 0) : 0,
         rawValue: deal.value || 0,
+        pipelineId: deal.pipeline_id,
         stageId: deal.stage_id,
         stageChangeTime: deal.stage_change_time || deal.add_time || '',
         userId: deal.user_id && typeof deal.user_id === 'object' ? deal.user_id.id : deal.user_id,
@@ -1402,11 +1541,12 @@ app.get('/api/dashboard/executive', async (req, res) => {
     tomorrowDate.setDate(tomorrowDate.getDate() + 1);
     const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
 
-    const [ads, prevAds, allDeals, allActivities] = await Promise.allSettled([
+    const [ads, prevAds, allDeals, allActivities, allCompanyDeals] = await Promise.allSettled([
       getMetaAds(range.since, range.until).catch(() => []),
       prevRange ? getMetaAds(prevRange.since, prevRange.until).catch(() => []) : Promise.resolve([]),
       getPipedriveDeals(null, null).catch(() => []),
-      getPipedriveActivities(null, null).catch(() => [])
+      getPipedriveActivities(null, null).catch(() => []),
+      getAllPipedriveDeals(null, null).catch(() => [])
     ]);
 
     // Extrair valores ou fallback para arrays vazios
@@ -1414,11 +1554,18 @@ app.get('/api/dashboard/executive', async (req, res) => {
     const prevAdsData = prevAds.status === 'fulfilled' ? prevAds.value : [];
     const dealsData = allDeals.status === 'fulfilled' ? allDeals.value : [];
     const activitiesData = allActivities.status === 'fulfilled' ? allActivities.value : [];
+    const allCompanyDealsData = allCompanyDeals.status === 'fulfilled' ? allCompanyDeals.value : [];
 
     // Agrega todas as metricas de um periodo (usado para o atual e o anterior)
-    const aggregate = (r, adsArr) => {
+    const aggregate = (r, adsArr, allDeals) => {
       const spend = adsArr.reduce((sum, ad) => sum + ad.spend, 0);
       const leads = adsArr.reduce((sum, ad) => sum + ad.leads, 0);
+      // Leads Totais do card precisa bater com o breakdown "Leads por Fonte" (todos os pipelines, nao so Inbound).
+      // 'leads' acima e o reportado pelo Meta Ads Manager (usado so pro CAC); 'realLeadsCount' e o total real do CRM.
+      const realLeadsCount = (allDeals || []).filter(d => {
+        const a = (d.addTime || '').slice(0, 10);
+        return a >= r.since && a <= r.until;
+      }).length;
       // Receita = orcamentos FECHADOS (won) no periodo, pela data de fechamento (won_time)
       const won = dealsData.filter(d => {
         if (d.status !== 'won') return false;
@@ -1426,19 +1573,31 @@ app.get('/api/dashboard/executive', async (req, res) => {
         return wonDate >= r.since && wonDate <= r.until;
       });
       const revenue = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+      // Receita TOTAL da empresa (todos os pipelines, nao so Inbound/marketing) - pedido do Diego
+      const wonAllPipelines = (allDeals || []).filter(d => {
+        if (d.status !== 'won') return false;
+        const wonDate = (d.wonTime || d.stageChangeTime || d.addTime || '').slice(0, 10);
+        return wonDate >= r.since && wonDate <= r.until;
+      });
+      const companyRevenue = wonAllPipelines.reduce((sum, d) => sum + (d.rawValue || 0), 0);
       // Agenda: atividades CONCLUIDAS por tipo (padrao Pipedrive da Vivera)
-      const attended = activitiesData.filter(
-        a => a.type === ACTIVITY_TYPE_ATTENDED && a.done &&
-          a.dueDate >= r.since && a.dueDate <= r.until
-      ).length;
-      const missed = activitiesData.filter(
-        a => a.type === ACTIVITY_TYPE_MISSED && a.done &&
-          a.dueDate >= r.since && a.dueDate <= r.until
-      ).length;
+      const attended = new Set(
+      _pipelineEvents
+        .filter(e => e.eventKey === 'comparecimento')
+        .filter(e => { const d = (e.enteredAt || '').slice(0, 10); return d >= r.since && d <= r.until; })
+        .map(e => e.dealId)
+    ).size;
+    const missed = new Set(
+      _pipelineEvents
+        .filter(e => e.eventKey === 'nao_compareceu')
+        .filter(e => { const d = (e.enteredAt || '').slice(0, 10); return d >= r.since && d <= r.until; })
+        .map(e => e.dealId)
+    ).size;
       return {
         spend,
-        leads,
+        leads: realLeadsCount,
         revenue,
+        companyRevenue,
         dealsWon: won.length,
         roi: spend > 0 ? (revenue / spend) * 100 : 0,
         roas: spend > 0 ? revenue / spend : 0,
@@ -1450,8 +1609,8 @@ app.get('/api/dashboard/executive', async (req, res) => {
       };
     };
 
-    const cur = aggregate(range, adsData);
-    const prev = prevRange ? aggregate(prevRange, prevAdsData) : null;
+    const cur = aggregate(range, adsData, allCompanyDealsData);
+    const prev = prevRange ? aggregate(prevRange, prevAdsData, allCompanyDealsData) : null;
 
     // Variacao % vs periodo anterior; undefined (omitido no JSON) quando nao ha base
     const pct = (curVal, prevVal) => {
@@ -1469,22 +1628,22 @@ app.get('/api/dashboard/executive', async (req, res) => {
     // KPIs calculados (todos os dados vem do Pipedrive/Meta; variacoes = vs periodo anterior)
     const kpis = {
       revenue: {
-        value: cur.revenue,
-        change: pct(cur.revenue, prev && prev.revenue),
+        value: cur.companyRevenue,
+        change: pct(cur.companyRevenue, prev && prev.companyRevenue),
         sub: 'vs. período anterior'
       },
       goal: {
         // META: usa valor configurado na tela de Configuracoes; fallback receita+15%
-        value: MONTHLY_GOAL > 0 ? MONTHLY_GOAL : cur.revenue * 1.15
+        value: MONTHLY_GOAL > 0 ? MONTHLY_GOAL : cur.companyRevenue * 1.15
       },
       goalPct: {
         value: MONTHLY_GOAL > 0
-          ? ((cur.revenue / MONTHLY_GOAL) * 100).toFixed(1)
-          : ((cur.revenue / (cur.revenue * 1.15 || 1)) * 100).toFixed(1)
+          ? ((cur.companyRevenue / MONTHLY_GOAL) * 100).toFixed(1)
+          : ((cur.companyRevenue / (cur.companyRevenue * 1.15 || 1)) * 100).toFixed(1)
       },
       forecast: {
-        value: cur.revenue * 1.20, // FORECAST = receita + 20%
-        change: pct(cur.revenue, prev && prev.revenue)
+        value: cur.companyRevenue * 1.20, // FORECAST = receita + 20%
+        change: pct(cur.companyRevenue, prev && prev.companyRevenue)
       },
       roi: {
         value: cur.roi.toFixed(0),
@@ -1783,7 +1942,8 @@ async function fetchPipedriveUsersUncached() {
   }
 }
 function getPipedriveUsers() {
-  return cached('users', fetchPipedriveUsersUncached);
+  // ZERO chamada ao vivo por request - le do snapshot atualizado no boot/janela noturna (4:10 BRT)
+  return Promise.resolve(_pipedriveLiveSnapshot.users);
 }
 
 function countBusinessDaysBetween(sinceISO, untilISO) {
@@ -1970,7 +2130,7 @@ app.get('/api/dashboard/executive/origins', async (req, res) => {
     };
     const [adsResult, dealsResult] = await Promise.allSettled([
       getMetaAds(range.since, range.until).catch(() => []),
-      getPipedriveDeals(null, null).catch(() => [])
+      getAllPipedriveDeals(null, null).catch(() => [])
     ]);
 
     const ads = adsResult.status === 'fulfilled' ? adsResult.value : [];
@@ -2069,11 +2229,54 @@ app.get('/api/dashboard/executive/origins', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/executive/revenue-breakdown?since=&until= - Receita TOTAL por origem (todos os pipelines, nao so Inbound)
+app.get('/api/dashboard/executive/revenue-breakdown', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+
+    const [dealsResult, pipelineMapResult] = await Promise.allSettled([
+      getAllPipedriveDeals(null, null),
+      getPipelineMap()
+    ]);
+    const allDeals = dealsResult.status === 'fulfilled' ? dealsResult.value : [];
+    const pipelineMap = pipelineMapResult.status === 'fulfilled' ? pipelineMapResult.value : {};
+
+    const won = allDeals.filter(d => {
+      if (d.status !== 'won') return false;
+      const wonDate = (d.wonTime || d.stageChangeTime || d.addTime || '').slice(0, 10);
+      return wonDate >= since && wonDate <= until;
+    });
+
+    const byOrigin = {};
+    won.forEach(d => {
+      const origemRaw = d.origem || '';
+      // BUGFIX: origem real (traffic source) e funil/pipeline sao dimensoes diferentes.
+      // Nao usar nome do pipeline (Inbound, Recepcao, Indicacao...) como fallback de origem.
+      const label = ORIGEM_LABELS[origemRaw] || origemRaw || 'Sem origem';
+      if (!byOrigin[label]) byOrigin[label] = { label, revenue: 0, count: 0 };
+      byOrigin[label].revenue += (d.rawValue || 0);
+      byOrigin[label].count += 1;
+    });
+
+    const total = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+    const breakdown = Object.values(byOrigin)
+      .map(o => ({ ...o, pct: total > 0 ? parseFloat(((o.revenue / total) * 100).toFixed(1)) : 0 }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    res.json({ success: true, range: { since, until }, total, breakdown });
+  } catch (error) {
+    console.error('Erro ao calcular revenue-breakdown:', error.message);
+    res.json({ success: false, error: error.message, range: {}, total: 0, breakdown: [] });
+  }
+});
+
 app.get('/api/dashboard/sdr-panel', async (req, res) => {
   try {
     const [users, allDeals, allActivities] = await Promise.all([
       getPipedriveUsers(),
-      getPipedriveDeals(null, null),
+      getAllPipedriveDeals(null, null),
       getPipedriveActivities(null, null)
     ]);
 
@@ -3779,32 +3982,11 @@ app.get('/api/filters/options', async (req, res) => {
   }
 
   try {
-    const allDeals = await cached('deals', async () => {
-      const deals = await Promise.all(
-        PIPEDRIVE_TOKEN ? [
-          axios.get(`https://api.pipedrive.com/v1/deals?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
-        ] : []
-      );
-      return deals[0]?.data?.success ? deals[0].data.data : [];
-    });
+    const allDeals = await (function(){ return pipedriveLocalDB.getDeals(); })();
 
-    const allActivities = await cached('activities', async () => {
-      const activities = await Promise.all(
-        PIPEDRIVE_TOKEN ? [
-          axios.get(`https://api.pipedrive.com/v1/activities?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
-        ] : []
-      );
-      return activities[0]?.data?.success ? activities[0].data.data : [];
-    });
+    const allActivities = await (function(){ return _pipedriveLiveSnapshot.activities; })();
 
-    const allPeople = await cached('people', async () => {
-      const people = await Promise.all(
-        PIPEDRIVE_TOKEN ? [
-          axios.get(`https://api.pipedrive.com/v1/persons?api_token=${PIPEDRIVE_TOKEN}&limit=500`),
-        ] : []
-      );
-      return people[0]?.data?.success ? people[0].data.data : [];
-    });
+    const allPeople = await (function(){ return _pipedriveLiveSnapshot.people; })();
 
     // Extrair opções únicas do Pipedrive
     // Procedimentos: campo customizado ou título do deal
@@ -4232,7 +4414,7 @@ async function warmCache() {
 
     await Promise.all([
       refreshKey(`deals:null:null:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveDealsUncached(null, null)),
-      refreshKey('activities:null:null', () => fetchPipedriveActivitiesUncached(null, null)),
+    // [removido] refreshKey('activities:null:null', ...) - activities so atualiza no boot/janela noturna via refreshPipedriveLiveSnapshot(), nunca a cada 30min
       refreshKey(`stages:${INBOUND_PIPELINE_ID}`, () => fetchPipedriveStagesUncached()),
       // Meta: range padrao "este mes" + mesmo trecho do mes anterior (comparacao) + range default
       refreshKey(`meta:${fmt(monthStart)}:${fmt(today)}`, () => fetchMetaAdsUncached(fmt(monthStart), fmt(today))),
@@ -4704,9 +4886,193 @@ app.post('/api/dashboard/pipeline-events/sync', (req, res) => {
 loadCacheFromDisk();
 setInterval(warmCache, 30 * 60 * 1000); // reduzido de 5min p/ 30min - deals/stages/pipelines ja vem do cache interno, so activities+Meta seguem ao vivo aqui
 loadPipelineEvents();
-setInterval(() => syncPipelineEvents({ full: false }), 4 * 60 * 60 * 1000); // pipeline-events: a cada 4h
+loadBackfillState();
+// [removido] setInterval de 4h ao vivo o dia todo - syncPipelineEvents agora roda so na janela noturna (ver runNightlySyncIfWindow)
 setTimeout(() => syncPipelineEvents({ full: _pipelineEvents.length === 0 }), 15000); // pipeline-events: primeira carga
 setTimeout(warmCache, 3000);              // primeira carga logo apos subir
+
+app.get('/api/debug/pipedrive-snapshot', (req, res) => {
+  const typeCounts = {};
+  (_pipedriveLiveSnapshot.activities || []).forEach(a => { typeCounts[a.type || '(vazio)'] = (typeCounts[a.type || '(vazio)'] || 0) + 1; });
+  res.json({
+    updatedAt: _pipedriveLiveSnapshot.updatedAt,
+    activitiesTotal: (_pipedriveLiveSnapshot.activities || []).length,
+    activitiesByType: typeCounts,
+    usersTotal: (_pipedriveLiveSnapshot.users || []).length,
+    peopleTotal: (_pipedriveLiveSnapshot.people || []).length
+  });
+});
+
+app.get('/api/dashboard/executive/channel-leads', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const allDeals = await getAllPipedriveDeals(null, null);
+    const dealsArr = allDeals || [];
+    function computeChannel(matchOrigem) {
+      const leads = dealsArr.filter(d => {
+        const addDate = (d.addTime || '').slice(0, 10);
+        if (!addDate || addDate < since || addDate > until) return false;
+        const origemLabel = ORIGEM_LABELS[d.origem] || d.origem || '';
+        return matchOrigem(origemLabel);
+      });
+      const dealIds = new Set(leads.map(d => d.id));
+      const qualified = new Set(
+        _pipelineEvents.filter(e => e.eventKey === 'qualificado' && dealIds.has(e.dealId)).map(e => e.dealId)
+      ).size;
+      const attended = new Set(
+        _pipelineEvents.filter(e => e.eventKey === 'comparecimento' && dealIds.has(e.dealId)).map(e => e.dealId)
+      ).size;
+      const scheduled = new Set(
+        (_pipedriveLiveSnapshot.activities || [])
+          .filter(a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && dealIds.has(a.dealId))
+          .map(a => a.dealId)
+      ).size;
+      const won = leads.filter(d => d.status === 'won');
+      const revenue = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
+      const pct = (num, den) => den > 0 ? parseFloat(((num / den) * 100).toFixed(1)) : 0;
+      return {
+        leads: leads.length,
+        qualified, qualifiedPct: pct(qualified, leads.length),
+        scheduled, scheduledPct: pct(scheduled, leads.length),
+        attended, attendedPct: pct(attended, leads.length),
+        revenue,
+        avgTicket: won.length > 0 ? parseFloat((revenue / won.length).toFixed(2)) : 0,
+        dealsWon: won.length
+      };
+    }
+    const meta = computeChannel(o => o === 'Facebook' || o === 'Instagram');
+    const google = computeChannel(o => o === 'Google');
+    res.json({ success: true, range: { since, until }, meta, google });
+  } catch (error) {
+    console.error('Erro em channel-leads:', error.message);
+    res.json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/dashboard/executive/origin-leads', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const origemQuery = String(req.query.origem || '').toLowerCase();
+    const allDeals = await getAllPipedriveDeals(null, null);
+    // Um deal pode ter entrado (addTime) num mes e sido ganho (wonTime) em outro.
+    // O drill-down precisa cobrir tanto o card de LEADS (base: addTime) quanto o de RECEITA (base: wonTime),
+    // entao aceitamos o deal se qualquer uma das duas datas cair no periodo selecionado.
+    const inRange = (allDeals || []).filter(d => {
+      const added = (d.addTime || '').slice(0, 10);
+      const won = (d.wonTime || '').slice(0, 10);
+      const addedInRange = added >= since && added <= until;
+      const wonInRange = won && won >= since && won <= until;
+      return addedInRange || wonInRange;
+    });
+    const statusLabel = { open: 'Em andamento', won: 'Ganho', lost: 'Perdido' };
+    const matched = inRange.filter(d => {
+      const label = (ORIGEM_LABELS[d.origem] || d.origem || 'Sem origem');
+      if (origemQuery === 'sem origem') return !d.origem || label.toLowerCase() === 'sem origem' || !ORIGEM_LABELS[d.origem];
+      return label.toLowerCase() === origemQuery;
+    });
+    const leads = matched.map(d => ({
+      nome: d.personName || 'Sem nome',
+      contato: d.phone || d.email || 'Sem contato',
+      data: (d.addTime || '').slice(0, 10),
+      valor: 'R$ ' + (d.rawValue || 0).toLocaleString('pt-BR'),
+      etapa: statusLabel[d.status] || d.status || '-',
+      dealId: d.id
+    })).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+    res.json({ success: true, range: { since, until }, origem: origemQuery, total: leads.length, leads });
+  } catch (error) {
+    console.error('Erro em origin-leads:', error.message);
+    res.json({ success: false, error: error.message, total: 0, leads: [] });
+  }
+});
+
+app.get('/api/dashboard/executive/faltas', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const events = _pipelineEvents.filter(e => {
+      if (e.eventKey !== 'nao_compareceu') return false;
+      const d = (e.enteredAt || '').slice(0, 10);
+      return d >= since && d <= until;
+    });
+    const dealIds = [...new Set(events.map(e => e.dealId))];
+    const allDeals = await getPipedriveDeals(null, null);
+    const dealById = {};
+    (allDeals || []).forEach(d => { dealById[d.id] = d; });
+    const allDealsInRange = (allDeals || []).filter(d => { const a = (d.addTime || '').slice(0, 10); return a >= since && a <= until; });
+    const taxa = allDealsInRange.length ? +(dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
+    const receitaPerdida = dealIds.reduce((s, id) => s + ((dealById[id] || {}).rawValue || 0), 0);
+    const diaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    const porDiaCount = {};
+    events.forEach(e => {
+      const dt = new Date((e.enteredAt || '').slice(0, 10) + 'T12:00:00');
+      const dia = diaNomes[dt.getDay()];
+      porDiaCount[dia] = (porDiaCount[dia] || 0) + 1;
+    });
+    const maxDia = Math.max(1, ...Object.values(porDiaCount));
+    const porDia = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'].map(dia => ({ dia, count: porDiaCount[dia] || 0, fator: (porDiaCount[dia] || 0) / maxDia, pct: (porDiaCount[dia] || 0) }));
+    const ultimasFaltas = [...events].sort((a, b) => (b.enteredAt || '').localeCompare(a.enteredAt || '')).slice(0, 4).map(e => {
+      const d = dealById[e.dealId] || {};
+      return { paciente: d.personName || 'Paciente', data: (e.enteredAt || '').slice(0, 10), horario: '', valor: d.rawValue || 0, procedimento: '' };
+    });
+    res.json({ success: true, range: { since, until }, total: dealIds.length, taxa, receitaPerdida, vsAnterior: 0, porDia, ultimasFaltas, _gap: 'faltas por SDR nao disponivel - sem mapeamento de dono/SDR no historico de eventos de pipeline' });
+  } catch (error) {
+    console.error('Erro em faltas:', error.message);
+    res.json({ success: false, error: error.message, total: 0, taxa: 0, receitaPerdida: 0, vsAnterior: 0, porDia: [], ultimasFaltas: [] });
+  }
+});
+
+app.get('/api/dashboard/executive/cancelamentos', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const events = _pipelineEvents.filter(e => {
+      if (e.eventKey !== 'cancelou') return false;
+      const d = (e.enteredAt || '').slice(0, 10);
+      return d >= since && d <= until;
+    });
+    const dealIds = [...new Set(events.map(e => e.dealId))];
+    const remarcouDealIds = new Set(_pipelineEvents.filter(e => e.eventKey === 'remarcou').map(e => e.dealId));
+    const allDeals = await getPipedriveDeals(null, null);
+    const dealById = {};
+    (allDeals || []).forEach(d => { dealById[d.id] = d; });
+    const allDealsInRange = (allDeals || []).filter(d => { const a = (d.addTime || '').slice(0, 10); return a >= since && a <= until; });
+    const taxa = allDealsInRange.length ? +(dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
+    let receitaPerdida = 0, receitaRecuperada = 0, reagendadosCount = 0;
+    const detalhes = dealIds.map(id => {
+      const d = dealById[id] || {};
+      const reagendado = remarcouDealIds.has(id);
+      if (reagendado) { reagendadosCount++; receitaRecuperada += (d.rawValue || 0); } else { receitaPerdida += (d.rawValue || 0); }
+      return { dealId: id, paciente: d.personName || 'Paciente', reagendado, valor: d.rawValue || 0 };
+    });
+    const ultimosCancelamentos = detalhes.slice(-5).reverse();
+    const pctReagendado = dealIds.length ? +(reagendadosCount / dealIds.length * 100).toFixed(1) : 0;
+    res.json({
+      success: true,
+      range: { since, until },
+      total: dealIds.length,
+      taxa,
+      reagendados: reagendadosCount,
+      pctReagendado,
+      receitaPerdida,
+      receitaRecuperada,
+      vsAnterior: 0,
+      antecedenciaMedia: null,
+      porMotivo: [],
+      ultimosCancelamentos,
+      events: events.length,
+      _gap: 'motivo de cancelamento e antecedencia media nao disponiveis no Pipedrive (sem campo estruturado) - reportado ao Diego'
+    });
+  } catch (error) {
+    console.error('Erro em cancelamentos:', error.message);
+    res.json({ success: false, error: error.message, total: 0 });
+  }
+});
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => {
@@ -4728,30 +5094,41 @@ Veja os logs aqui para diagnosticar problemas
   `);
 });
 
-// === CACHE-BASED DASHBOARD ENDPOINTS ===
-// GET /api/dashboard/executive - Lê CACHE local, não Pipedrive
-app.get('/api/dashboard/executive', (req, res) => {
+app.get('/api/dashboard/executive/leads-perdidos', async (req, res) => {
   try {
-    const deals = Object.values(pipedriveCache).filter(c => c.data && c.data.status);
-    const qualificados = deals.filter(d => d.data.status === 'won').length;
-    const emAndamento = deals.filter(d => d.data.status !== 'won' && d.data.status !== 'lost').length;
-    const perdidos = deals.filter(d => d.data.status === 'lost').length;
-    res.json({
-      timestamp: Date.now(),
-      kpis: {
-        totalDeals: deals.length,
-        qualificados,
-        emAndamento,
-        perdidos,
-        taxa: deals.length > 0 ? ((qualificados / deals.length) * 100).toFixed(2) : '0'
-      },
-      source: 'cache',
-      cacheSize: Object.keys(pipedriveCache).length
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const allDeals = await getAllPipedriveDeals(null, null);
+    const inRange = (allDeals || []).filter(d => { const a = (d.addTime || '').slice(0, 10); return a >= since && a <= until; });
+    const lost = inRange.filter(d => d.status === 'lost');
+    const total = inRange.length;
+    const totalPerdidos = lost.length;
+    const pct = total ? +(totalPerdidos / total * 100).toFixed(1) : 0;
+    const receitaNaoConvertida = lost.reduce((s, d) => s + (d.rawValue || 0), 0);
+    const reasonCounts = {};
+    lost.forEach(d => { const r = (d.lostReason || '').trim() || 'Sem motivo registrado'; reasonCounts[r] = (reasonCounts[r] || 0) + 1; });
+    const topObjecoes = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([tag, count]) => ({ tag, pct: totalPerdidos ? Math.round(count / totalPerdidos * 100) : 0 }));
+    const byCanal = {};
+    lost.forEach(d => {
+      const label = ORIGEM_LABELS[d.origem] || d.origem || 'Sem origem';
+      if (!byCanal[label]) byCanal[label] = [];
+      byCanal[label].push(d);
     });
+    const porCanal = Object.entries(byCanal).sort((a, b) => b[1].length - a[1].length).map(([canal, deals]) => {
+      const rc = {};
+      deals.forEach(d => { const r = (d.lostReason || '').trim() || 'Sem motivo registrado'; rc[r] = (rc[r] || 0) + 1; });
+      const detalhes = Object.entries(rc).sort((a, b) => b[1] - a[1]).map(([motivo, count]) => ({ motivo, pct: Math.round(count / deals.length * 100) }));
+      return { canal, count: deals.length, pct: totalPerdidos ? +(deals.length / totalPerdidos * 100).toFixed(1) : 0, topMotivo: detalhes[0]?.motivo || '-', tags: detalhes.slice(0, 2).map(d => d.motivo), detalhes };
+    });
+    res.json({ success: true, range: { since, until }, total: totalPerdidos, pct, receitaNaoConvertida, topObjecoes, porCanal });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Erro em leads-perdidos:', error.message);
+    res.json({ success: false, error: error.message, total: 0, pct: 0, receitaNaoConvertida: 0, topObjecoes: [], porCanal: [] });
   }
 });
+
+// [removido] rota duplicada /api/dashboard/executive (codigo morto - Express nunca alcancava aqui, a rota real e a async la em cima)
 
 // GET /api/dashboard/sdr-panel - Lê CACHE local
 app.get('/api/dashboard/sdr-panel', (req, res) => {
@@ -4776,20 +5153,4 @@ app.get('/api/dashboard/cache-status', (req, res) => {
   });
 });
 
-// === INICIAR POLLING DE PIPEDRIVE ===
-console.log('🔄 Iniciando Pipedrive polling (5min)...');
-setInterval(async () => {
-  try {
-    console.log(`[${new Date().toISOString()}] 🔄 Polling Pipedrive...`);
-    const resp = await axios.get(`https://api.pipedrive.com/v1/deals?limit=500&api_token=${process.env.PIPEDRIVE_API_TOKEN || process.env.PIPEDRIVE_TOKEN}`);
-    if (resp.data && resp.data.data) {
-      resp.data.data.forEach(deal => {
-        pipedriveCache[`deal_${deal.id}`] = { data: deal, cachedAt: Date.now() };
-      });
-      savePipedriveCacheDebounced();
-      console.log(`✅ Cache atualizado com ${resp.data.data.length} deals`);
-    }
-  } catch (err) {
-    console.error('❌ Polling error:', err.message);
-  }
-}, 5 * 60 * 1000);
+// [removido] polling ao vivo de Pipedrive a cada 5min (288x/dia) - redundante com pipedriveLocalDB (webhook + sync noturno 4:10 BRT)
