@@ -15,7 +15,7 @@ import {
   tempoFunilData, faltasData, faltasPorSDR, cancelamentosData,
   velocidadeResposta, leadsPerdidos,
   revenueVsGoal, revenueBySource, revenueByProcedure,
-  professionalRanking, executiveFunnel, alertsData,
+  executiveFunnel, alertsData,
 } from '../data/mockData'
 
 const COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6']
@@ -51,6 +51,7 @@ export default function ExecutiveDashboard() {
   const [cancelamentosApiData, setCancelamentosApiData] = useState<any>(null)
   const [leadsPerdidosApiData, setLeadsPerdidosApiData] = useState<any>(null)
   const [faltasApiData, setFaltasApiData] = useState<any>(null)
+  const [professionalRankingApiData, setProfessionalRankingApiData] = useState<any>(null)
   const { drillDown, openDrillDown, closeDrillDown } = useDrillDown()
   const handleOriginClick = (origem: string) => {
     const { since, until } = getDateRange(filters.period, filters.dateRange)
@@ -85,6 +86,8 @@ export default function ExecutiveDashboard() {
       .then(res => setLeadsPerdidosApiData(res.data))
     axios.get('/api/dashboard/executive/faltas', { params: { since, until } })
       .then(res => setFaltasApiData(res.data))
+    axios.get('/api/dashboard/executive/professional-ranking', { params: { since, until } })
+      .then(res => setProfessionalRankingApiData(res.data))
       .catch(err => console.error('Erro ao carregar receita por origem:', err))
   }, [filters.period, filters.dateRange])
   const d: any = execData || {}
@@ -125,6 +128,7 @@ export default function ExecutiveDashboard() {
     ['Não Compareceu', ['Não Compareceu - reagendar']],
     ['Ganho', ['Ganho']],
   ];
+  const professionalRankingReal = (professionalRankingApiData?.data || []).map((p: any) => ({ name: p.name, specialty: p.specialty, revenue: p.revenue, conversion: p.conversion }))
   const funnelAll = funnelData?.data?.funnel || [];
   const funnelRaw = FUNNEL_MILESTONES.map(([label, names]) => { const matches = funnelAll.filter((f: any) => names.includes((f.stage || '').trim())); const value = matches.reduce((s: number, f: any) => s + (f.value || 0), 0); const order = matches.length ? Math.min(...matches.map((f: any) => (f.order === undefined ? 999 : f.order))) : 999; return { stage: label, value, order }; })
   const funnelTotal = funnelRaw.reduce((sum: number, f: any) => sum + (f.value || 0), 0)
@@ -969,7 +973,7 @@ export default function ExecutiveDashboard() {
               </tr>
             </thead>
             <tbody>
-              {professionalRanking.map((p, i) => (
+              {professionalRankingReal.map((p: any, i: number) => (
                 <tr key={p.name} className="border-b border-[#f8fafc] hover:bg-[#f8fafc] transition-colors">
                   <td className="px-5 py-3 font-bold text-[#94a3b8]">{i + 1}</td>
                   <td className="px-3 py-3"><div className="font-semibold text-[#0f172a]">{p.name}</div><div className="text-[10px] text-[#94a3b8]">{p.specialty}</div></td>

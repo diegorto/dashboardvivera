@@ -245,6 +245,27 @@ const FIELD_CONJUNTO = '182132e7acfbec43315140ab18362f0e16ada0c4';
 const FIELD_PALAVRA_CHAVE = 'c9ee045e6537eb296d268102e99829b0dbda1b5b';
 const FIELD_PLATAFORMA = '0051c071b9be4c9103f8a91ef538dcc3d43e6e9a';
 const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
+
+// Campo 'Origem' no Pipedrive e do tipo enum (opcoes fixas), nao aceita texto livre.
+// Mapeia os valores de origem sugeridos pelo Tintim para o ID da opcao correspondente no Pipedrive.
+const ORIGEM_ENUM_MAP = {
+  'meta ads': 89,       // Facebook (Meta/Instagram Ads)
+  'facebook ads': 89,
+  'facebook': 89,
+  'instagram': 88,
+  'google ads': 90,
+  'google': 90,
+  'organico': 91,
+  'orgânico': 91,
+  'nao rastreada': 96,  // Origem nao Identificada
+  'não rastreada': 96,
+  'outras': 96,
+};
+function mapOrigemToPipedriveOption(origem) {
+  if (!origem) return null;
+  const key = String(origem).trim().toLowerCase();
+  return ORIGEM_ENUM_MAP[key] || null;
+}
 const ORIGEM_LABELS = {
   '86': 'Indicacao (dentro da clinica)',
   '87': 'Indicacao de paciente',
@@ -2122,6 +2143,57 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
       error: error.message,
       data: { funnel: [], revenue: { byPipeline: [], total: 0, count: 0 } }
     });
+  }
+});
+
+// GET /api/dashboard/executive/professional-ranking - Ranking real de profissionais via etiquetas do Pipedrive, direto do vivera_crm (0 chamadas API)
+const mysql = require('mysql2/promise');
+let _crmRankingPool = null;
+function getCrmRankingPool() {
+  if (!_crmRankingPool) {
+    _crmRankingPool = mysql.createPool({
+      host: process.env.CRM_DB_HOST || '127.0.0.1',
+      port: parseInt(process.env.CRM_DB_PORT || '3306', 10),
+      user: process.env.CRM_DB_USER || 'crm',
+      password: process.env.CRM_DB_PASSWORD || 'crmdev123',
+      database: process.env.CRM_DB_NAME || 'vivera_crm',
+      waitForConnections: true,
+      connectionLimit: 3,
+    });
+  }
+  return _crmRankingPool;
+}
+const DOCTOR_LABELS = [
+  { name: 'Dra Kissya', labelId: 13 },
+  { name: 'Dra Jéssica', labelId: 36 },
+  { name: 'DR. DIEGO', labelId: 47 },
+];
+app.get('/api/dashboard/executive/professional-ranking', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const pool = getCrmRankingPool();
+    const results = [];
+    for (const doc of DOCTOR_LABELS) {
+      const [rows] = await pool.execute(
+        'SELECT d.status, d.value, d.procedure_name FROM deals d INNER JOIN deal_labels dl ON dl.deal_id = d.id WHERE dl.label_id = ? AND d.add_date >= ? AND d.add_date < DATE_ADD(?, INTERVAL 1 DAY)',
+        [doc.labelId, since, until]
+      );
+      const total = rows.length;
+      const won = rows.filter(r => r.status === 'won');
+      const revenue = won.reduce((s, r) => s + parseFloat(r.value || 0), 0);
+      const conversion = total > 0 ? Math.round((won.length / total) * 1000) / 10 : 0;
+      const procCounts = {};
+      won.forEach(r => { const p = (r.procedure_name || '').trim(); if (p) procCounts[p] = (procCounts[p] || 0) + 1; });
+      const specialty = Object.entries(procCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).map(e => e[0]).join(', ') || 'Sem procedimento registrado';
+      results.push({ name: doc.name, specialty, revenue: Math.round(revenue), conversion, totalDeals: total, wonDeals: won.length });
+    }
+    results.sort((a, b) => b.revenue - a.revenue);
+    res.json({ success: true, range: { since, until }, data: results });
+  } catch (error) {
+    console.error('[professional-ranking] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message, data: [] });
   }
 });
 
@@ -4343,7 +4415,14 @@ app.post('/api/tintim/audit/fix', async (req, res) => {
     }
 
     const updatePayload = {};
-    if (fields.origem) updatePayload[FIELD_ORIGEM] = fields.origem;
+    if (fields.origem) {
+      const origemOptionId = mapOrigemToPipedriveOption(fields.origem);
+      if (origemOptionId) {
+        updatePayload[FIELD_ORIGEM] = origemOptionId;
+      } else {
+        console.log(`[tintim] Origem "${fields.origem}" sem mapeamento para opcao do Pipedrive - campo Origem nao sera alterado para o deal ${__dealId}`);
+      }
+    }
     if (fields.campanha) updatePayload[FIELD_CAMPANHA] = fields.campanha;
     if (fields.conjunto) updatePayload[FIELD_CONJUNTO] = fields.conjunto;
     if (fields.palavraChave) updatePayload[FIELD_PALAVRA_CHAVE] = fields.palavraChave;
@@ -4353,14 +4432,15 @@ app.post('/api/tintim/audit/fix', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Nenhum campo valido para atualizar' });
     }
 
-    await axios.put(`https://api.pipedrive.com/v1/deals/${_dealId}`, updatePayload, {
+    await axios.put(`https://api.pipedrive.com/v1/deals/${__dealId}`, updatePayload, {
       params: { api_token: PIPEDRIVE_TOKEN }
     });
 
     invalidateCache();
 
-    res.json({ success: true, message: `Deal ${_dealId} atualizado com dados do Tintim.` });
+    res.json({ success: true, message: `Deal ${__dealId} atualizado com dados do Tintim.` });
   } catch (error) {
+    console.error('[tintim-debug] FULL ERROR status=', error.response?.status, 'data=', JSON.stringify(error.response?.data), 'message=', error.message, 'cfgurl=', error.config?.url, 'cfgdata=', error.config?.data);
     console.error('[tintim] Erro ao aplicar correcao no Pipedrive:', error.response?.data || error.message);
     res.status(500).json({
       success: false,
