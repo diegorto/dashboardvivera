@@ -80,7 +80,7 @@ async function runNightlySyncIfWindow() {
   try { await pipedriveLocalDB.syncNow(); } catch (e) { console.error('[nightly-sync] Erro no pipedriveLocalDB.syncNow:', e.message); }
   try { if (mirrorToVCRM) { const vcrmResult = await mirrorToVCRM(pipedriveLocalDB); console.log('[nightly-sync] vivera_crm mirror:', JSON.stringify(vcrmResult)); } } catch (e) { console.error('[nightly-sync] Erro ao espelhar para vivera_crm:', e.message); }
   try { await syncPipelineEvents({ full: false }); } catch (e) { console.error('[nightly-sync] Erro no syncPipelineEvents:', e.message); }
-  try { await backfillPipelineEventsByPriority({ maxCalls: 150 }); } catch (e) { console.error('[nightly-sync] Erro no backfillPipelineEventsByPriority:', e.message); }
+  try { await backfillPipelineEventsByPriority({ maxCalls: Infinity }); } catch (e) { console.error('[nightly-sync] Erro no backfillPipelineEventsByPriority:', e.message); }
   try { await refreshPipedriveLiveSnapshot(); } catch (e) { console.error('[nightly-sync] Erro no refreshPipedriveLiveSnapshot:', e.message); }
   console.log('[nightly-sync] Concluido.');
 }
@@ -641,7 +641,7 @@ async function backfillPipelineEventsByPriority({ maxCalls = 150 } = {}) {
         }
         _flowFetchedDealIds.add(deal.id);
         processed++;
-      } catch (e) { console.error('[pipeline-backfill] Erro no /flow do deal ' + deal.id + ':', e.message); }
+      } catch (e) { console.error('[pipeline-backfill] Erro no /flow do deal ' + deal.id + ':', e.message); if (e.response && e.response.status === 429) { console.error('[pipeline-backfill] Cota diaria da API esgotada, parando por hoje.'); break; } }
       await new Promise(r => setTimeout(r, 80));
     }
     if (processed > 0) { savePipelineEventsToDisk(); saveBackfillState(); }
