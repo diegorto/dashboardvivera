@@ -7,6 +7,8 @@ import axios from 'axios'
 import { Layout } from '../components'
 import { useFilters } from '../contexts/FilterContext'
 import { getDateRange } from '../utils/dashboardHelpers'
+import { useDrillDown } from '../hooks/useDrillDown'
+import ExecutiveDrillDownDrawer from '../components/ExecutiveDrillDownDrawer'
 import {
   leadsDaily,
   leadsMetaDaily, leadsGoogleDaily, leadsMetaStats, leadsGoogleStats,
@@ -29,8 +31,39 @@ const fmt = (n: number | undefined | null) => {
 
 export default function ExecutiveDashboard() {
   const { filters } = useFilters()
+  const { since, until } = getDateRange(filters.period, filters.dateRange)
+  const periodLabel = (() => {
+    if (!since || !until) return ''
+    const d1 = new Date(since + 'T00:00:00')
+    const d2 = new Date(until + 'T00:00:00')
+    const monthsPt = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+    if (d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth()) {
+      return monthsPt[d1.getMonth()] + ' ' + d1.getFullYear()
+    }
+    const fmt = (d: Date) => String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear()
+    return fmt(d1) + ' - ' + fmt(d2)
+  })()
   const [execData, setExecData] = useState<any>(null)
   const [originsData, setOriginsData] = useState<any>(null)
+  const [channelLeadsData, setChannelLeadsData] = useState<any>(null)
+  const [revenueBreakdownData, setRevenueBreakdownData] = useState<any>(null)
+  const [funnelData, setFunnelData] = useState<any>(null)
+  const [cancelamentosApiData, setCancelamentosApiData] = useState<any>(null)
+  const [leadsPerdidosApiData, setLeadsPerdidosApiData] = useState<any>(null)
+  const [faltasApiData, setFaltasApiData] = useState<any>(null)
+  const { drillDown, openDrillDown, closeDrillDown } = useDrillDown()
+  const handleOriginClick = (origem: string) => {
+    const { since, until } = getDateRange(filters.period, filters.dateRange)
+    axios.get('/api/dashboard/executive/origin-leads', { params: { since, until, origem } })
+      .then(res => openDrillDown('origin-leads', undefined, res.data?.leads || [], `Leads - ${origem}`))
+      .catch(err => console.error('Erro ao carregar leads da origem:', err))
+  }
+  const handleRevenueCardClick = () => {
+    const { since, until } = getDateRange(filters.period, filters.dateRange)
+    axios.get('/api/dashboard/executive/revenue-breakdown', { params: { since, until } })
+      .then(res => openDrillDown('revenue-by-source', undefined, res.data, 'Receita por Origem'))
+      .catch(err => console.error('Erro ao carregar breakdown de receita:', err))
+  }
   useEffect(() => {
     const { since, until, prevSince, prevUntil } = getDateRange(filters.period, filters.dateRange)
     axios.get('/api/dashboard/executive', { params: { since, until, prevSince, prevUntil } })
@@ -39,12 +72,94 @@ export default function ExecutiveDashboard() {
       axios.get('/api/dashboard/executive/origins', { params: { since, until } })
         .then(res => setOriginsData(res.data?.data ?? res.data))
         .catch(err => console.error('Erro ao carregar leads por origem:', err))
+    axios.get('/api/dashboard/executive/channel-leads', { params: { since, until } })
+      .then(res => setChannelLeadsData(res.data))
+      .catch(err => console.error('Erro ao carregar leads por canal:', err))
+    axios.get('/api/dashboard/executive/revenue-breakdown', { params: { since, until } })
+      .then(res => setRevenueBreakdownData(res.data))
+    axios.get('/api/dashboard/executive/funnel', { params: { since, until } })
+      .then(res => setFunnelData(res.data))
+    axios.get('/api/dashboard/executive/cancelamentos', { params: { since, until } })
+      .then(res => setCancelamentosApiData(res.data))
+    axios.get('/api/dashboard/executive/leads-perdidos', { params: { since, until } })
+      .then(res => setLeadsPerdidosApiData(res.data))
+    axios.get('/api/dashboard/executive/faltas', { params: { since, until } })
+      .then(res => setFaltasApiData(res.data))
+      .catch(err => console.error('Erro ao carregar receita por origem:', err))
   }, [filters.period, filters.dateRange])
   const d: any = execData || {}
   const originsRaw = originsData?.byOrigin || []
   const originsTotalLeads = originsRaw.reduce((s: number, o: any) => s + (o.leads || 0), 0)
   const originsTotalRevenue = originsData?.summary?.totalRevenue || 0
   const originsTotalWon = originsData?.summary?.totalWon || 0
+  const cl = channelLeadsData || {}
+  function buildChannelStats(name: string, s: any) {
+    s = s || {}
+    return {
+      name,
+      leads: s.leads || 0,
+      total: s.leads || 0,
+      pctQualificados: s.qualifiedPct || 0,
+      qualificados: s.qualified || 0,
+      pctAgendamento: s.scheduledPct || 0,
+      agendados: s.scheduled || 0,
+      pctComparecimento: s.attendedPct || 0,
+      compareceram: s.attended || 0,
+      receita: s.revenue || 0,
+      ticketMedio: s.avgTicket || 0,
+      pctCompVsTotal: s.leads ? +((s.attended || 0) / s.leads * 100).toFixed(1) : 0,
+      vsAnterior: { total: 0 }
+    }
+  }
+  const leadsMetaStatsReal = buildChannelStats('Meta', cl.meta)
+  const leadsGoogleStatsReal = buildChannelStats('Google', cl.google)
+  const revenueBySourceReal = (revenueBreakdownData?.breakdown || []).map((b: any) => ({ name: b.label, value: b.revenue, pct: b.pct, count: b.count }))
+  const revenueBreakdownTotal = revenueBreakdownData?.total || 0
+  const funnelRaw = (funnelData?.data?.funnel || []).filter((f: any) => !/^D\s*\+|^Dia seguinte/i.test(f.stage || ''))
+  const funnelTotal = funnelRaw.reduce((sum: number, f: any) => sum + (f.value || 0), 0)
+  const executiveFunnelReal = [...funnelRaw].sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999)).map((f: any) => ({ stage: f.stage, value: f.value, pct: funnelTotal ? (f.value / funnelTotal * 100).toFixed(1) : 0 }))
+  const ca = cancelamentosApiData || {}
+  const cancelamentosDataReal = {
+    total: ca.total || 0,
+    taxa: ca.taxa || 0,
+    pctReagendado: ca.pctReagendado || 0,
+    reagendados: ca.reagendados || 0,
+    receitaPerdida: ca.receitaPerdida || 0,
+    receitaRecuperada: ca.receitaRecuperada || 0,
+    vsAnterior: ca.vsAnterior || 0,
+    antecedenciaMedia: ca.antecedenciaMedia,
+    porMotivo: ca.porMotivo || [],
+    ultimosCancelamentos: ca.ultimosCancelamentos || []
+  }
+  const lp = leadsPerdidosApiData || {}
+  const leadsPerdidosReal = {
+    total: lp.total || 0,
+    pct: lp.pct || 0,
+    pctDoTotal: lp.pct || 0,
+    receitaNaoConvertida: lp.receitaNaoConvertida || 0,
+    topObjecoes: lp.topObjecoes || [],
+    porCanal: lp.porCanal || []
+  }
+  const fa = faltasApiData || {}
+  const faltasDataReal = {
+    total: fa.total || 0,
+    taxa: fa.taxa || 0,
+    receitaPerdida: fa.receitaPerdida || 0,
+    vsAnterior: fa.vsAnterior || 0,
+    porDia: fa.porDia || [],
+    ultimasFaltas: fa.ultimasFaltas || []
+  }
+  const alertsDataReal: any[] = []
+  if (faltasDataReal.taxa > 15) alertsDataReal.push({ type: 'critical', text: `Taxa de no-show em ${faltasDataReal.taxa}% no periodo - acima do ideal (meta <10%)`, time: periodLabel })
+  if (cancelamentosDataReal.taxa > 10) alertsDataReal.push({ type: 'warning', text: `Taxa de cancelamento em ${cancelamentosDataReal.taxa}% dos deals do periodo`, time: periodLabel })
+  if (leadsPerdidosReal.pct > 30) alertsDataReal.push({ type: 'warning', text: `${leadsPerdidosReal.pct}% dos leads do periodo foram perdidos (${leadsPerdidosReal.total} leads)`, time: periodLabel })
+  if ((d.leads?.value || 0) > 0) {
+    const qualPct = (d.qualified?.value || 0) / d.leads.value * 100
+    if (qualPct < 5) alertsDataReal.push({ type: 'critical', text: `Taxa de qualificacao muito baixa: ${qualPct.toFixed(1)}% dos leads`, time: periodLabel })
+  }
+  if (leadsPerdidosReal.topObjecoes[0]) alertsDataReal.push({ type: 'info', text: `Principal motivo de perda: ${leadsPerdidosReal.topObjecoes[0].tag} (${leadsPerdidosReal.topObjecoes[0].pct}% dos perdidos)`, time: periodLabel })
+  if ((d.goal?.value || 0) > 0 && (d.revenue?.value || 0) < d.goal.value) alertsDataReal.push({ type: 'info', text: `Faltam ${fmt(d.goal.value - d.revenue.value)} para bater a meta do periodo`, time: periodLabel })
+  if (alertsDataReal.length === 0) alertsDataReal.push({ type: 'info', text: 'Nenhum alerta critico identificado no periodo selecionado', time: periodLabel })
   const leadsBySourceReal = originsRaw.map((o: any, i: number) => ({
     source: o.origem || 'Sem origem',
     leads: o.leads,
@@ -75,7 +190,7 @@ export default function ExecutiveDashboard() {
 
       {/* KPI Row 1 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-5 cursor-pointer hover:shadow-md transition-shadow" onClick={handleRevenueCardClick}>
           <div className="text-[11px] font-semibold uppercase tracking-widest text-[#94a3b8] mb-3">Receita</div>
           <div className="text-[32px] font-bold text-[#0f172a] tabular-nums leading-none mb-3">{fmt(execNum(d.revenue?.value))}</div>
           
@@ -133,7 +248,7 @@ export default function ExecutiveDashboard() {
               <span className="text-[#6366f1] text-sm font-bold">L</span>
             </div>
             <div>
-              <div className="text-[13px] font-semibold text-[#0f172a]">Leads Totais - Junho 2025</div>
+              <div className="text-[13px] font-semibold text-[#0f172a]">Leads Totais - {periodLabel}</div>
               <div className="text-[11px] text-[#94a3b8]">Todos os leads que entraram no periodo selecionado</div>
             </div>
           </div>
@@ -191,7 +306,7 @@ export default function ExecutiveDashboard() {
               </thead>
               <tbody>
                 {leadsBySourceReal.map((s: any) => (
-                  <tr key={s.source} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
+                  <tr key={s.source} className="border-b border-[#f8fafc] hover:bg-[#f8fafc] cursor-pointer" onClick={() => handleOriginClick(s.source)}>
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
@@ -280,8 +395,8 @@ export default function ExecutiveDashboard() {
       {/* Leads Meta + Google */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
         {[
-          { label: 'Meta Ads', color: '#6366f1', bg: '#eef2ff', stats: leadsMetaStats, daily: leadsMetaDaily, gradId: 'gradMeta' },
-          { label: 'Google Ads', color: '#0ea5e9', bg: '#e0f2fe', stats: leadsGoogleStats, daily: leadsGoogleDaily, gradId: 'gradGoogle' },
+          { label: 'Meta Ads', color: '#6366f1', bg: '#eef2ff', stats: leadsMetaStatsReal, daily: leadsMetaDaily, gradId: 'gradMeta' },
+          { label: 'Google Ads', color: '#0ea5e9', bg: '#e0f2fe', stats: leadsGoogleStatsReal, daily: leadsGoogleDaily, gradId: 'gradGoogle' },
         ].map((src) => (
           <div key={src.label} className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-[#f1f5f9]">
@@ -291,7 +406,7 @@ export default function ExecutiveDashboard() {
                 </div>
                 <div>
                   <div className="text-[13px] font-semibold text-[#0f172a]">Leads - {src.label}</div>
-                  <div className="text-[10px] text-[#94a3b8]">Junho 2025</div>
+                  <div className="text-[10px] text-[#94a3b8]">{periodLabel}</div>
                 </div>
               </div>
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[#dcfce7] text-[#16a34a]">+{src.stats.vsAnterior.total}% vs mai</span>
@@ -451,13 +566,13 @@ export default function ExecutiveDashboard() {
           <div className="px-5 py-3 border-b border-[#f1f5f9] flex items-center justify-between">
             <div className="flex items-center gap-1 sm:gap-2 md:gap-3.5">
               <div className="w-7 h-7 rounded-lg bg-[#fee2e2] flex items-center justify-center text-xs font-bold text-[#dc2626]">7</div>
-              <div><div className="text-[13px] font-semibold text-[#0f172a]">Faltas (No-show) - Junho 2025</div><div className="text-[10px] text-[#94a3b8]">Consultas em que o paciente nao apareceu sem aviso</div></div>
+              <div><div className="text-[13px] font-semibold text-[#0f172a]">Faltas (No-show) - {periodLabel}</div><div className="text-[10px] text-[#94a3b8]">Consultas em que o paciente nao apareceu sem aviso</div></div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-              <div className="text-right"><div className="text-[20px] font-bold text-[#ef4444] tabular-nums">{faltasData.total}</div><div className="text-[9px] text-[#94a3b8]">faltas</div></div>
-              <div className="text-right"><div className="text-[20px] font-bold text-[#ef4444] tabular-nums">{faltasData.taxa}%</div><div className="text-[9px] text-[#94a3b8]">taxa no-show</div></div>
-              <div className="text-right"><div className="text-[15px] font-bold text-[#dc2626] tabular-nums">{fmt(faltasData.receitaPerdida)}</div><div className="text-[9px] text-[#94a3b8]">receita perdida</div></div>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fee2e2] text-[#dc2626]">+{faltasData.vsAnterior}pp vs mai</span>
+              <div className="text-right"><div className="text-[20px] font-bold text-[#ef4444] tabular-nums">{faltasDataReal.total}</div><div className="text-[9px] text-[#94a3b8]">faltas</div></div>
+              <div className="text-right"><div className="text-[20px] font-bold text-[#ef4444] tabular-nums">{faltasDataReal.taxa}%</div><div className="text-[9px] text-[#94a3b8]">taxa no-show</div></div>
+              <div className="text-right"><div className="text-[15px] font-bold text-[#dc2626] tabular-nums">{fmt(faltasDataReal.receitaPerdida)}</div><div className="text-[9px] text-[#94a3b8]">receita perdida</div></div>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fee2e2] text-[#dc2626]">+{faltasDataReal.vsAnterior}pp vs mai</span>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 divide-x divide-[#f1f5f9]">
@@ -488,7 +603,7 @@ export default function ExecutiveDashboard() {
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Faltas por dia da semana</div>
               <div className="flex gap-1 mb-4">
-                {faltasData.porDia.map((d: any) => (
+                {faltasDataReal.porDia.map((d: any) => (
                   <div key={d.dia} className="flex-1 text-center">
                     <div className="mx-auto rounded-md mb-1" style={{ height: `${(d.faltas / 8) * 48}px`, minHeight: 6, backgroundColor: '#ef4444', opacity: 0.6 + (d.faltas / 8) * 0.4, width: '100%' }} />
                     <div className="text-[9px] text-[#94a3b8]">{d.dia}</div>
@@ -498,7 +613,7 @@ export default function ExecutiveDashboard() {
               </div>
               <div className="text-[11px] font-semibold text-[#334155] mb-2">Ultimas faltas</div>
               <div className="space-y-1.5">
-                {faltasData.ultimasFaltas.slice(0, 4).map((f: any, i: number) => (
+                {faltasDataReal.ultimasFaltas.slice(0, 4).map((f: any, i: number) => (
                   <div key={i} className="flex items-center justify-between text-[10px] py-1 border-b border-[#f8fafc]">
                     <div><span className="font-semibold text-[#334155]">{f.paciente}</span><span className="text-[#94a3b8] ml-1.5">{f.data} {f.horario}</span></div>
                     <div className="text-right"><span className="text-[#0f172a] font-semibold">{f.valor}</span><span className="text-[#94a3b8] ml-1.5">{f.procedimento}</span></div>
@@ -518,21 +633,21 @@ export default function ExecutiveDashboard() {
           <div className="px-5 py-3 border-b border-[#f1f5f9] flex items-center justify-between">
             <div className="flex items-center gap-1 sm:gap-2 md:gap-3.5">
               <div className="w-7 h-7 rounded-lg bg-[#fef3c7] flex items-center justify-center text-xs font-bold text-[#d97706]">8</div>
-              <div><div className="text-[13px] font-semibold text-[#0f172a]">Cancelamentos / Desmarques - Junho 2025</div><div className="text-[10px] text-[#94a3b8]">Consultas desmarcadas com ou sem reagendamento</div></div>
+              <div><div className="text-[13px] font-semibold text-[#0f172a]">Cancelamentos / Desmarques - {periodLabel}</div><div className="text-[10px] text-[#94a3b8]">Consultas desmarcadas com ou sem reagendamento</div></div>
             </div>
             <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
-              <div className="text-right"><div className="text-[20px] font-bold text-[#f59e0b] tabular-nums">{cancelamentosData.total}</div><div className="text-[9px] text-[#94a3b8]">cancelamentos</div></div>
-              <div className="text-right"><div className="text-[20px] font-bold text-[#f59e0b] tabular-nums">{cancelamentosData.taxa}%</div><div className="text-[9px] text-[#94a3b8]">taxa canc.</div></div>
-              <div className="text-right"><div className="text-[15px] font-bold text-[#10b981] tabular-nums">{cancelamentosData.pctReagendado}%</div><div className="text-[9px] text-[#94a3b8]">reagendados</div></div>
-              <div className="text-right"><div className="text-[14px] font-bold text-[#dc2626] tabular-nums">{fmt(cancelamentosData.receitaPerdida)}</div><div className="text-[9px] text-[#94a3b8]">receita perdida</div></div>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fef3c7] text-[#d97706]">+{cancelamentosData.vsAnterior}pp vs mai</span>
+              <div className="text-right"><div className="text-[20px] font-bold text-[#f59e0b] tabular-nums">{cancelamentosDataReal.total}</div><div className="text-[9px] text-[#94a3b8]">cancelamentos</div></div>
+              <div className="text-right"><div className="text-[20px] font-bold text-[#f59e0b] tabular-nums">{cancelamentosDataReal.taxa}%</div><div className="text-[9px] text-[#94a3b8]">taxa canc.</div></div>
+              <div className="text-right"><div className="text-[15px] font-bold text-[#10b981] tabular-nums">{cancelamentosDataReal.pctReagendado}%</div><div className="text-[9px] text-[#94a3b8]">reagendados</div></div>
+              <div className="text-right"><div className="text-[14px] font-bold text-[#dc2626] tabular-nums">{fmt(cancelamentosDataReal.receitaPerdida)}</div><div className="text-[9px] text-[#94a3b8]">receita perdida</div></div>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[#fef3c7] text-[#d97706]">+{cancelamentosDataReal.vsAnterior}pp vs mai</span>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 divide-x divide-[#f1f5f9]">
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Motivos de cancelamento</div>
               <div className="space-y-2 mb-4">
-                {cancelamentosData.porMotivo.map((m: any) => (
+                {cancelamentosDataReal.porMotivo.map((m: any) => (
                   <div key={m.motivo}>
                     <div className="flex justify-between text-[10px] mb-1"><span className="text-[#475569]">{m.motivo}</span><span className="font-bold text-[#0f172a]">{m.count} <span className="text-[#94a3b8] font-normal">({m.pct}%)</span></span></div>
                     <div className="h-1.5 bg-[#f1f5f9] rounded-full"><div className="h-full rounded-full bg-[#f59e0b]" style={{ width: `${m.pct}%` }} /></div>
@@ -541,25 +656,25 @@ export default function ExecutiveDashboard() {
               </div>
               <div className="bg-[#f8fafc] rounded-lg px-3 py-2.5 flex items-center justify-between">
                 <span className="text-[10px] text-[#64748b]">Antecedencia media do aviso</span>
-                <span className="text-[13px] font-bold text-[#0f172a]">{cancelamentosData.antecedenciaMedia}h antes</span>
+                <span className="text-[13px] font-bold text-[#0f172a]">{cancelamentosDataReal.antecedenciaMedia}h antes</span>
               </div>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-lg px-3 py-2 text-center">
-                  <div className="text-[13px] font-bold text-[#16a34a]">{cancelamentosData.reagendados}</div>
+                  <div className="text-[13px] font-bold text-[#16a34a]">{cancelamentosDataReal.reagendados}</div>
                   <div className="text-[9px] text-[#94a3b8]">reagendados</div>
-                  <div className="text-[11px] font-semibold text-[#16a34a]">{fmt(cancelamentosData.receitaRecuperada)}</div>
+                  <div className="text-[11px] font-semibold text-[#16a34a]">{fmt(cancelamentosDataReal.receitaRecuperada)}</div>
                 </div>
                 <div className="bg-[#fef2f2] border border-[#fecaca] rounded-lg px-3 py-2 text-center">
-                  <div className="text-[13px] font-bold text-[#dc2626]">{cancelamentosData.total - cancelamentosData.reagendados}</div>
+                  <div className="text-[13px] font-bold text-[#dc2626]">{cancelamentosDataReal.total - cancelamentosDataReal.reagendados}</div>
                   <div className="text-[9px] text-[#94a3b8]">nao reagendados</div>
-                  <div className="text-[11px] font-semibold text-[#dc2626]">{fmt(cancelamentosData.receitaPerdida)}</div>
+                  <div className="text-[11px] font-semibold text-[#dc2626]">{fmt(cancelamentosDataReal.receitaPerdida)}</div>
                 </div>
               </div>
             </div>
             <div className="p-4">
               <div className="text-[11px] font-semibold text-[#334155] mb-3">Ultimos cancelamentos</div>
               <div className="space-y-2">
-                {cancelamentosData.ultimosCancelamentos.map((c: any, i: number) => (
+                {cancelamentosDataReal.ultimosCancelamentos.map((c: any, i: number) => (
                   <div key={i} className="p-2.5 rounded-lg border text-[10px]"
                     style={{ borderColor: c.reagendado ? '#bbf7d0' : '#fecaca', backgroundColor: c.reagendado ? '#f0fdf4' : '#fef2f2' }}>
                     <div className="flex items-center justify-between mb-1">
@@ -666,7 +781,7 @@ export default function ExecutiveDashboard() {
               <div className="w-8 h-8 rounded-lg bg-[#fee2e2] flex items-center justify-center text-sm font-bold text-[#dc2626]">X</div>
               <div>
                 <div className="text-[13px] font-semibold text-[#0f172a]">Leads Perdidos - Motivos de Perda por Canal de Origem</div>
-                <div className="text-[11px] text-[#94a3b8]">Tags de objecao e analise de churn de funil - Junho 2025</div>
+                <div className="text-[11px] text-[#94a3b8]">Tags de objecao e analise de churn de funil - {periodLabel}</div>
               </div>
             </div>
             <button className="flex items-center gap-1.5 text-[11px] font-semibold text-[#6366f1] hover:text-[#4f46e5] transition-colors whitespace-nowrap">
@@ -674,9 +789,9 @@ export default function ExecutiveDashboard() {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
-            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidos.total}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads perdidos</div></div>
-            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidos.pctDoTotal}%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">do total de leads</div></div>
-            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{fmt(leadsPerdidos.receitaNaoConvertida)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">receita nao convertida</div></div>
+            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidosReal.total}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">leads perdidos</div></div>
+            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{leadsPerdidosReal.pctDoTotal}%</div><div className="text-[11px] text-[#94a3b8] mt-0.5">do total de leads</div></div>
+            <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-4 text-center"><div className="text-[26px] font-bold text-[#dc2626] tabular-nums">{fmt(leadsPerdidosReal.receitaNaoConvertida)}</div><div className="text-[11px] text-[#94a3b8] mt-0.5">receita nao convertida</div></div>
           </div>
         </div>
         <div className="p-5">
@@ -685,7 +800,7 @@ export default function ExecutiveDashboard() {
               <div className="text-[12px] font-semibold text-[#334155] mb-2">Top Objecoes Globais</div>
               <div className="text-[10px] text-[#94a3b8] mb-3">Tags mais frequentes em todos os canais</div>
               <div className="flex flex-wrap gap-1.5 mb-5">
-                {leadsPerdidos.topObjecoes.map((obj: any) => (
+                {leadsPerdidosReal.topObjecoes.map((obj: any) => (
                   <div key={obj.tag} className="flex items-center gap-1 px-2 py-1 bg-[#f1f5f9] rounded-lg border border-[#e2e8f0]">
                     <span className="text-[11px] font-semibold text-[#475569]">{obj.tag}</span>
                     <span className="text-[10px] font-bold text-[#0f172a]">{obj.count}</span>
@@ -695,7 +810,7 @@ export default function ExecutiveDashboard() {
               </div>
               <div className="text-[12px] font-semibold text-[#334155] mb-3">Perdidos por Canal</div>
               <div className="space-y-2">
-                {leadsPerdidos.porCanal.map((c) => (
+                {leadsPerdidosReal.porCanal.map((c: any) => (
                   <div key={c.canal} className="flex items-center gap-2 sm:gap-3 md:gap-4">
                     <div className="w-24 text-[10px] text-[#475569] shrink-0 truncate">{c.canal}</div>
                     <div className="flex-1 h-5 bg-[#f1f5f9] rounded-md overflow-hidden">
@@ -719,7 +834,7 @@ export default function ExecutiveDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leadsPerdidos.porCanal.map((c) => (
+                  {leadsPerdidosReal.porCanal.map((c: any) => (
                     <tr key={c.canal} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
                       <td className="py-2 pr-2"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.cor }} /><span className="font-medium text-[#334155]">{c.canal}</span></div></td>
                       <td className="py-2 pr-2 font-bold text-[#dc2626] tabular-nums">{c.perdidos}</td>
@@ -735,7 +850,7 @@ export default function ExecutiveDashboard() {
               <div className="text-[12px] font-semibold text-[#334155] mb-3">Motivos de Perda Detalhados</div>
               <div className="text-[10px] text-[#94a3b8] mb-3">Breakdown por canal</div>
               <div className="space-y-3">
-                {leadsPerdidos.porCanal.filter((c) => c.detalhes.length > 0).map((canal: any) => (
+                {leadsPerdidosReal.porCanal.filter((c: any) => c.detalhes.length > 0).map((canal: any) => (
                   <div key={canal.canal} className="border border-[#e2e8f0] rounded-lg overflow-hidden">
                     <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: canal.cor + '18' }}>
                       <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: canal.cor }} />
@@ -784,9 +899,9 @@ export default function ExecutiveDashboard() {
         </div>
         <div className="col-span-5 bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[13px] font-semibold text-[#0f172a] mb-1">Funil Executivo</div>
-          <div className="text-[11px] text-[#94a3b8] mb-4">Junho 2025</div>
+          <div className="text-[11px] text-[#94a3b8] mb-4">{periodLabel}</div>
           <div className="space-y-2.5">
-            {executiveFunnel.map((stage: any, i: number) => (
+            {executiveFunnelReal.map((stage: any, i: number) => (
               <div key={stage.stage}>
                 <div className="flex items-center justify-between text-[11px] mb-1">
                   <span className="text-[#475569] font-medium">{stage.stage}</span>
@@ -810,17 +925,17 @@ export default function ExecutiveDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 lg:gap-6">
         <div className="col-span-3 bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[13px] font-semibold text-[#0f172a] mb-1">Receita por Fonte</div>
-          <div className="text-[11px] text-[#94a3b8] mb-3">Junho 2025</div>
+          <div className="text-[11px] text-[#94a3b8] mb-3">{periodLabel}</div>
           <div className="flex justify-center mb-3">
             <PieChart width={140} height={140}>
-              <Pie data={revenueBySource} cx={65} cy={65} innerRadius={42} outerRadius={62} dataKey="value" stroke="none">
-                {revenueBySource.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
+              <Pie data={revenueBySourceReal} cx={65} cy={65} innerRadius={42} outerRadius={62} dataKey="value" stroke="none">
+                {revenueBySourceReal.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
               </Pie>
             </PieChart>
           </div>
           <div className="space-y-2">
-            {revenueBySource.map((s, i) => (
-              <div key={s.name} className="flex items-center justify-between text-[11px]">
+            {revenueBySourceReal.map((s: any, i: number) => (
+              <div key={s.name} className="flex items-center justify-between text-[11px] cursor-pointer hover:bg-[#f8fafc] rounded px-1" onClick={() => handleOriginClick(s.name)}>
                 <div className="flex items-center gap-1 sm:gap-2 md:gap-3"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i] }} /><span className="text-[#475569]">{s.name}</span></div>
                 <span className="font-semibold text-[#0f172a] tabular-nums">{s.pct}%</span>
               </div>
@@ -875,10 +990,10 @@ export default function ExecutiveDashboard() {
       <div className="bg-white border border-[#e2e8f0] rounded-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#f1f5f9]">
           <div className="text-[13px] font-semibold text-[#0f172a]">Alertas Executivos</div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#fee2e2] text-[#dc2626]">{alertsData.length} alertas</span>
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#fee2e2] text-[#dc2626]">{alertsDataReal.length} alertas</span>
         </div>
         <div className="divide-y divide-[#f1f5f9]">
-          {alertsData.map((a: any, i: number) => {
+          {alertsDataReal.map((a: any, i: number) => {
             const dot = { critical: '#ef4444', warning: '#f59e0b', success: '#10b981', info: '#6366f1' }[a.type as string] ?? '#94a3b8'
             return (
               <div key={i} className="flex items-center gap-2 sm:gap-3 md:gap-4 lg:gap-6 px-5 py-3.5 hover:bg-[#f8fafc] transition-colors">
@@ -892,6 +1007,7 @@ export default function ExecutiveDashboard() {
       </div>
 
     </div>
+      <ExecutiveDrillDownDrawer drillDown={drillDown} onClose={closeDrillDown} />
     </Layout>
   )
 }

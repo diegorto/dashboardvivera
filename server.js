@@ -1987,10 +1987,14 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
 
     // Buscar stages de todos os pipelines e mapear stage_id -> name
       const stageMap = {};
+      const stageOrderMap = {};
       try {
         const localStages = pipedriveLocalDB.getStages();
         localStages.forEach(stage => {
-          stageMap[stage.id] = (stage.name || '').trim();
+          const _nm = (stage.name || '').trim();
+        stageMap[stage.id] = _nm;
+        const _ord = (typeof stage.order_nr === 'number') ? stage.order_nr : 999;
+        if (stageOrderMap[_nm] === undefined || _ord < stageOrderMap[_nm]) stageOrderMap[_nm] = _ord;
         });
       } catch (error) {
         console.error('Erro ao montar stageMap (banco local):', error.message);
@@ -2040,6 +2044,7 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
       const stageDeals = dealsByStage[stageName];
       return {
         stage: stageName,
+        order: (stageOrderMap[stageName] !== undefined) ? stageOrderMap[stageName] : 999,
         value: stageDeals.length,
         deals: stageDeals.map(d => ({
           id: d.id,
@@ -2051,7 +2056,7 @@ app.get('/api/dashboard/executive/funnel', async (req, res) => {
           personName: d.person_name || (d.person_id && d.person_id.name) || '-'
         }))
       };
-    }).sort((a, b) => b.value - a.value);
+    }).sort((a, b) => a.order - b.order);
 
     // Receita por Funil (apenas deals WON)
     const wonDeals = allDeals.filter(d => {
