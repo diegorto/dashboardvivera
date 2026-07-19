@@ -53,6 +53,7 @@ export default function ExecutiveDashboard() {
   const [faltasApiData, setFaltasApiData] = useState<any>(null)
   const [professionalRankingApiData, setProfessionalRankingApiData] = useState<any>(null)
   const [revenueByProcedureApiData, setRevenueByProcedureApiData] = useState<any>(null)
+  const [duplicateAuditApiData, setDuplicateAuditApiData] = useState<any>(null)
   const { drillDown, openDrillDown, closeDrillDown } = useDrillDown()
   const handleOriginClick = (origem: string) => {
     const { since, until } = getDateRange(filters.period, filters.dateRange)
@@ -91,6 +92,9 @@ export default function ExecutiveDashboard() {
       .then(res => setProfessionalRankingApiData(res.data))
     axios.get('/api/dashboard/executive/revenue-by-procedure', { params: { since, until } })
       .then(res => setRevenueByProcedureApiData(res.data))
+    axios.get('/api/dashboard/executive/duplicate-audit', { params: { since, until } })
+      .then(res => setDuplicateAuditApiData(res.data))
+      .catch(err => console.error('Erro ao carregar auditoria de duplicatas:', err))
       .catch(err => console.error('Erro ao carregar receita por origem:', err))
   }, [filters.period, filters.dateRange])
   const d: any = execData || {}
@@ -178,6 +182,10 @@ export default function ExecutiveDashboard() {
   }
   if (leadsPerdidosReal.topObjecoes[0]) alertsDataReal.push({ type: 'info', text: `Principal motivo de perda: ${leadsPerdidosReal.topObjecoes[0].tag} (${leadsPerdidosReal.topObjecoes[0].pct}% dos perdidos)`, time: periodLabel })
   if ((d.goal?.value || 0) > 0 && (d.revenue?.value || 0) < d.goal.value) alertsDataReal.push({ type: 'info', text: `Faltam ${fmt(d.goal.value - d.revenue.value)} para bater a meta do periodo`, time: periodLabel })
+  const dupSuspects = (duplicateAuditApiData?.suspects || [])
+  dupSuspects.forEach((s: any) => {
+    alertsDataReal.push({ type: 'warning', text: `Possivel duplicata: telefone ${s.phone} - deal #${s.dealA.id} (R$ ${Number(s.dealA.value).toFixed(2)}) e deal #${s.dealB.id} (R$ ${Number(s.dealB.value).toFixed(2)}) - revisar antes de contar como receita`, time: periodLabel })
+  })
   if (alertsDataReal.length === 0) alertsDataReal.push({ type: 'info', text: 'Nenhum alerta critico identificado no periodo selecionado', time: periodLabel })
   const leadsBySourceReal = originsRaw.map((o: any, i: number) => ({
     source: o.origem || 'Sem origem',

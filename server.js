@@ -2264,6 +2264,52 @@ app.get('/api/dashboard/executive/revenue-by-procedure', async (req, res) => {
 });
 
 // GET /api/dashboard/executive/origins - Leads por origem (Google, Instagram, Meta, Indicação) com ROAS
+app.get('/api/dashboard/executive/duplicate-audit', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const pool = getCrmRankingPool();
+    const [rows] = await pool.query(
+      `SELECT d.id, d.pipedrive_id, d.title, d.value, d.won_date, p.phone, p.name AS patient_name, p.id AS patient_id
+       FROM deals d
+       JOIN patients p ON p.id = d.patient_id
+       WHERE d.status = 'won' AND d.won_date >= ? AND d.won_date < DATE_ADD(?, INTERVAL 1 DAY)`,
+      [since, until]
+    );
+    const byPhone = new Map();
+    for (const r of rows) {
+      const norm = r.phone ? String(r.phone).replace(/\D/g, '') : null;
+      if (!norm) continue;
+      if (!byPhone.has(norm)) byPhone.set(norm, []);
+      byPhone.get(norm).push(r);
+    }
+    const suspects = [];
+    for (const [phone, deals] of byPhone.entries()) {
+      if (deals.length < 2) continue;
+      for (let a1 = 0; a1 < deals.length; a1++) {
+        for (let b1 = a1 + 1; b1 < deals.length; b1++) {
+          const a = deals[a1], b = deals[b1];
+          const va = parseFloat(a.value), vb = parseFloat(b.value);
+          const diff = Math.abs(va - vb);
+          const tol = 0.05 * Math.max(va, vb);
+          if (diff <= tol) {
+            suspects.push({
+              phone,
+              dealA: { id: a.id, pipedriveId: a.pipedrive_id, title: a.title, value: va, wonDate: a.won_date, patientName: a.patient_name },
+              dealB: { id: b.id, pipedriveId: b.pipedrive_id, title: b.title, value: vb, wonDate: b.won_date, patientName: b.patient_name },
+            });
+          }
+        }
+      }
+    }
+    res.json({ success: true, range: { since, until }, totalWonDeals: rows.length, suspects });
+  } catch (error) {
+    console.error('[duplicate-audit] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.get('/api/dashboard/executive/origins', async (req, res) => {
   try {
     const defaults = defaultDateRange();
