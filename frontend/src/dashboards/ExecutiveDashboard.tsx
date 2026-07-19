@@ -115,9 +115,20 @@ export default function ExecutiveDashboard() {
   const leadsGoogleStatsReal = buildChannelStats('Google', cl.google)
   const revenueBySourceReal = (revenueBreakdownData?.breakdown || []).map((b: any) => ({ name: b.label, value: b.revenue, pct: b.pct, count: b.count }))
   const revenueBreakdownTotal = revenueBreakdownData?.total || 0
-  const funnelRaw = (funnelData?.data?.funnel || []).filter((f: any) => !/^D\s*\+|^Dia seguinte/i.test(f.stage || ''))
+  const FUNNEL_MILESTONES: [string, string[]][] = [
+    ['Entrada', ['Entrada']],
+    ['Indicação Recebida', ['Indicação Recebida']],
+    ['Contato Realizado', ['Contato Realizado']],
+    ['Qualificado', ['Qualificado']],
+    ['Agendamento Realizado', ['Agendamento Realizado']],
+    ['Comparecimento', ['Comparecimento', 'Compareceu']],
+    ['Não Compareceu', ['Não Compareceu - reagendar']],
+    ['Ganho', ['Ganho']],
+  ];
+  const funnelAll = funnelData?.data?.funnel || [];
+  const funnelRaw = FUNNEL_MILESTONES.map(([label, names]) => { const matches = funnelAll.filter((f: any) => names.includes((f.stage || '').trim())); const value = matches.reduce((s: number, f: any) => s + (f.value || 0), 0); const order = matches.length ? Math.min(...matches.map((f: any) => (f.order === undefined ? 999 : f.order))) : 999; return { stage: label, value, order }; })
   const funnelTotal = funnelRaw.reduce((sum: number, f: any) => sum + (f.value || 0), 0)
-  const executiveFunnelReal = [...funnelRaw].sort((a: any, b: any) => (a.order ?? 999) - (b.order ?? 999)).map((f: any) => ({ stage: f.stage, value: f.value, pct: funnelTotal ? (f.value / funnelTotal * 100).toFixed(1) : 0 }))
+  const executiveFunnelReal = funnelRaw.map((f: any) => ({ stage: f.stage, value: f.value, pct: funnelTotal ? (f.value / funnelTotal * 100).toFixed(1) : 0 }))
   const ca = cancelamentosApiData || {}
   const cancelamentosDataReal = {
     total: ca.total || 0,
