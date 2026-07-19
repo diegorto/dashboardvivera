@@ -2205,6 +2205,41 @@ app.get('/api/dashboard/executive/professional-ranking', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/executive/revenue-by-procedure - Receita por categoria de procedimento, direto do vivera_crm (0 chamadas API)
+app.get('/api/dashboard/executive/revenue-by-procedure', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const pool = getCrmRankingPool();
+    const [rows] = await pool.query(
+      `SELECT procedure_name, value, status FROM deals WHERE add_date >= ? AND add_date < DATE_ADD(?, INTERVAL 1 DAY)`,
+      [since, until]
+    );
+    const won = rows.filter(r => r.status === 'won');
+    const CATEGORY_RULES = [
+      { name: 'Implantes', pattern: /implante/i },
+      { name: 'Invisalign', pattern: /invisalign/i },
+      { name: 'Ultraformer', pattern: /ultraformer/i },
+      { name: 'Evolution', pattern: /evolution/i },
+    ];
+    const buckets = {};
+    for (const r of won) {
+      const text = r.procedure_name || '';
+      const match = CATEGORY_RULES.find(rule => rule.pattern.test(text));
+      const category = match ? match.name : 'Outros';
+      buckets[category] = (buckets[category] || 0) + parseFloat(r.value || 0);
+    }
+    const data = Object.entries(buckets)
+      .map(([name, revenue]) => ({ name, revenue: Math.round(revenue) }))
+      .sort((a, b) => b.revenue - a.revenue);
+    res.json({ success: true, range: { since, until }, data });
+  } catch (error) {
+    console.error('[revenue-by-procedure] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // GET /api/dashboard/executive/origins - Leads por origem (Google, Instagram, Meta, Indicação) com ROAS
 app.get('/api/dashboard/executive/origins', async (req, res) => {
   try {

@@ -14,7 +14,7 @@ import {
   leadsMetaDaily, leadsGoogleDaily, leadsMetaStats, leadsGoogleStats,
   tempoFunilData, faltasData, faltasPorSDR, cancelamentosData,
   velocidadeResposta, leadsPerdidos,
-  revenueVsGoal, revenueBySource, revenueByProcedure,
+  revenueVsGoal, revenueBySource,
   executiveFunnel, alertsData,
 } from '../data/mockData'
 
@@ -52,6 +52,7 @@ export default function ExecutiveDashboard() {
   const [leadsPerdidosApiData, setLeadsPerdidosApiData] = useState<any>(null)
   const [faltasApiData, setFaltasApiData] = useState<any>(null)
   const [professionalRankingApiData, setProfessionalRankingApiData] = useState<any>(null)
+  const [revenueByProcedureApiData, setRevenueByProcedureApiData] = useState<any>(null)
   const { drillDown, openDrillDown, closeDrillDown } = useDrillDown()
   const handleOriginClick = (origem: string) => {
     const { since, until } = getDateRange(filters.period, filters.dateRange)
@@ -88,6 +89,8 @@ export default function ExecutiveDashboard() {
       .then(res => setFaltasApiData(res.data))
     axios.get('/api/dashboard/executive/professional-ranking', { params: { since, until } })
       .then(res => setProfessionalRankingApiData(res.data))
+    axios.get('/api/dashboard/executive/revenue-by-procedure', { params: { since, until } })
+      .then(res => setRevenueByProcedureApiData(res.data))
       .catch(err => console.error('Erro ao carregar receita por origem:', err))
   }, [filters.period, filters.dateRange])
   const d: any = execData || {}
@@ -129,6 +132,7 @@ export default function ExecutiveDashboard() {
     ['Ganho', ['Ganho']],
   ];
   const professionalRankingReal = (professionalRankingApiData?.data || []).map((p: any) => ({ name: p.name, specialty: p.specialty, revenue: p.revenue, conversion: p.conversion }))
+  const revenueByProcedureReal = (revenueByProcedureApiData?.data || []).map((p: any) => ({ name: p.name, revenue: p.revenue }));
   const funnelAll = funnelData?.data?.funnel || [];
   const funnelRaw = FUNNEL_MILESTONES.map(([label, names]) => { const matches = funnelAll.filter((f: any) => names.includes((f.stage || '').trim())); const value = matches.reduce((s: number, f: any) => s + (f.value || 0), 0); const order = matches.length ? Math.min(...matches.map((f: any) => (f.order === undefined ? 999 : f.order))) : 999; return { stage: label, value, order }; })
   const funnelTotal = funnelRaw.reduce((sum: number, f: any) => sum + (f.value || 0), 0)
@@ -988,13 +992,13 @@ export default function ExecutiveDashboard() {
         <div className="col-span-4 bg-white border border-[#e2e8f0] rounded-xl p-5">
           <div className="text-[13px] font-semibold text-[#0f172a] mb-4">Receita por Procedimento</div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={revenueByProcedure} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
+            <BarChart data={revenueByProcedureReal} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
               <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => 'R$' + (v / 1000).toFixed(0) + 'K'} />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} width={80} />
               <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ fontSize: 12, border: '1px solid #e2e8f0', borderRadius: 8 }} />
-              <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={22} name="Receita">
-                {revenueByProcedure.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
+              <Bar dataKey="revenue" radius={[0, 4, 4, 0]} maxBarSize={22} name="Receita">
+                {revenueByProcedureReal.map((_: any, i: number) => <Cell key={i} fill={COLORS[i]} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
