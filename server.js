@@ -1560,6 +1560,22 @@ app.get('/api/dashboard/executive', async (req, res) => {
       since: req.query.since || defaults.since,
       until: req.query.until || defaults.until
     };
+
+    let qualifiedByPositionIds = new Set();
+    try {
+      const crmPoolForQualified = getCrmRankingPool();
+      const [qualRows] = await crmPoolForQualified.query(
+        `SELECT d.pipedrive_id FROM deals d
+         LEFT JOIN stages s ON s.id = d.stage_id
+         WHERE d.pipeline_id = 1
+           AND d.add_date >= ? AND d.add_date < DATE_ADD(?, INTERVAL 1 DAY)
+           AND (d.status = 'won' OR (s.sort IS NOT NULL AND s.sort >= 9))`,
+        [range.since, range.until]
+      );
+      qualifiedByPositionIds = new Set(qualRows.map(r => String(r.pipedrive_id)).filter(Boolean));
+    } catch (e) {
+      console.error('[executive/qualified-fallback] Erro:', e.message);
+    }
     // Periodo anterior equivalente (calculado pelo frontend conforme o filtro selecionado)
     const prevRange = (req.query.prevSince && req.query.prevUntil)
       ? { since: req.query.prevSince, until: req.query.prevUntil }
@@ -1714,15 +1730,22 @@ app.get('/api/dashboard/executive', async (req, res) => {
         // Lead qualificado = deal que JA PASSOU pelo estagio "Qualificado" (id 3) em algum
         // momento dentro do periodo -- nao apenas quem esta parado la agora. Usa o historico
         // de transicoes de estagio (_pipelineEvents), o mesmo mecanismo do card de Comparecimento.
-        value: new Set(
-          _pipelineEvents
-            .filter(e => e.eventKey === 'qualificado')
-            .filter(e => {
-              const d = (e.enteredAt || '').slice(0, 10);
-              return d >= range.since && d <= range.until;
-            })
-            .map(e => e._dealId)
-        ).size,
+        value: (() => {
+          const historicalIds = new Set(
+            _pipelineEvents
+              .filter(e => e.eventKey === 'qualificado')
+              .filter(e => {
+                const d = (e.enteredAt || '').slice(0, 10);
+                return d >= range.since && d <= range.until;
+              })
+              .map(e => String(e._dealId))
+          );
+          // Fallback: deals sem historico completo mas cuja POSICAO ATUAL ja passou de Qualificado
+          // (Agendamento Realizado, Comparecimento, etc.) ou que ja foram Ganhos - complementa
+          // o historico de transicoes sem esperar backfill completo.
+          for (const id of qualifiedByPositionIds) historicalIds.add(id);
+          return historicalIds.size;
+        })(),
         change: pct(cur.dealsWon, prev && prev.dealsWon)
       },
       sales: {
