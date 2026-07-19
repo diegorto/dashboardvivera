@@ -11,6 +11,9 @@ export type DrillDownType =
   | 'response-speed-sdr'
   | 'lost-leads-channel'
   | 'lost-leads-objection'
+  | 'revenue-by-source'
+  | 'origin-leads'
+  | 'campaign-leads'
   | null;
 
 export interface DrillDownState {

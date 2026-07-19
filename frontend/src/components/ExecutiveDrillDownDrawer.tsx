@@ -93,7 +93,52 @@ const ExecutiveDrillDownDrawer: React.FC<DrillDownDrawerProps> = ({ drillDown, o
             </div>
           )}
 
-          {drillDown.type === 'sales-by-funnel' && (
+          {drillDown.type === 'origin-leads' && (
+          <div className="space-y-2">
+            {(!drillDown.data || drillDown.data.length === 0) && (
+              <p className="text-sm text-[#94a3b8] py-4">Nenhum lead encontrado para este segmento no periodo.</p>
+            )}
+            {drillDown.data?.map((lead: any, idx: number) => (
+              <div key={idx} className="border border-[#e2e8f0] rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[#0f172a] text-sm">{lead.nome}</span>
+                  <span className="text-xs text-[#94a3b8]">{lead.data}</span>
+                </div>
+                <div className="text-xs text-[#64748b] mt-1">{lead.contato}</div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#f1f5f9] text-[#334155]">{lead.etapa}</span>
+                  <span className="text-xs font-semibold text-[#0f172a]">{lead.valor}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {drillDown.type === 'campaign-leads' && (
+          <div className="space-y-2">
+            {(!drillDown.data || drillDown.data.length === 0) && (
+              <p className="text-sm text-[#94a3b8] py-4">Nenhum lead encontrado nesta campanha no periodo.</p>
+            )}
+            {drillDown.data?.map((lead: any, idx2: number) => (
+              <div key={idx2} className="border border-[#e2e8f0] rounded-lg p-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-[#0f172a]">{lead.title}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${lead.isWon ? 'bg-[#dcfce7] text-[#16a34a]' : 'bg-[#f1f5f9] text-[#64748b]'}`}>
+                    {lead.isWon ? 'Comprou' : 'Em aberto'}
+                  </span>
+                </div>
+                <div className="text-xs text-[#64748b] mt-1">Criativo: {lead.criativo}</div>
+                <div className="text-xs text-[#64748b]">Conjunto: {lead.conjunto}</div>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs text-[#94a3b8]">{lead.entryDate ? String(lead.entryDate).slice(0, 10) : '-'}{lead.closeDate ? ' → ' + String(lead.closeDate).slice(0, 10) : ''}</span>
+                  <span className="text-xs font-semibold text-[#0f172a]">{lead.daysToClose !== null && lead.daysToClose !== undefined ? lead.daysToClose + 'd' : '-'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {drillDown.type === 'sales-by-funnel' && (
             <div className="space-y-4">
               {drillDown.data?.map((funnel: any, idx: number) => (
                 <div
@@ -216,6 +261,33 @@ const ExecutiveDrillDownDrawer: React.FC<DrillDownDrawerProps> = ({ drillDown, o
                   <p className="text-sm text-[#94a3b8] mt-1">{objection.percentage.toFixed(1)}% das objeções</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {drillDown.type === 'revenue-by-source' && (
+            <div className="space-y-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#e2e8f0]">
+                    <th className="text-left py-2 text-[#94a3b8] font-semibold">Origem</th>
+                    <th className="text-right py-2 text-[#94a3b8] font-semibold">Receita</th>
+                    <th className="text-right py-2 text-[#94a3b8] font-semibold">%</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drillDown.data?.breakdown?.map((o: any, idx: number) => (
+                    <tr key={idx} className="border-b border-[#f8fafc]">
+                      <td className="py-3 text-[#0f172a]">{o.label}</td>
+                      <td className="py-3 text-right text-[#0f172a] font-semibold">
+                        {o.revenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </td>
+                      <td className="py-3 text-right text-[#0f172a] font-semibold">
+                        {o.pct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
 

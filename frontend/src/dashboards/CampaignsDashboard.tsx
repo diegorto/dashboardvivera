@@ -4,9 +4,21 @@ import { Layout } from '../components';
 import { useFilters } from '../contexts/FilterContext';
 import { getDateRange, fmtCurrency, fmtNumber, fmtMult, LoadingScreen, ErrorScreen, MiniKpi, CardBox, Th, Td, ExportButton } from '../utils/dashboardHelpers';
 import { Campaign } from '../services/marketingDashboardService';
+import { useDrillDown } from '../hooks/useDrillDown';
+import ExecutiveDrillDownDrawer from '../components/ExecutiveDrillDownDrawer';
 
 const CampaignsDashboard: React.FC = () => {
   const { filters } = useFilters();
+  const { drillDown, openDrillDown, closeDrillDown } = useDrillDown();
+  const handleCampaignClick = async (name: string) => {
+    try {
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
+      const r = await axios.get('/api/dashboard/executive/campaign-leads', { params: { since, until, campaign: name } });
+      openDrillDown('campaign-leads', name, r.data.data || [], name);
+    } catch (e) {
+      console.error('Erro ao carregar leads da campanha:', e);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -76,7 +88,7 @@ const CampaignsDashboard: React.FC = () => {
             </thead>
             <tbody>
               {sorted.map(c => (
-                <tr key={c.id} className="border-b border-[#f8fafc] hover:bg-[#f8fafc]">
+                <tr key={c.id} onClick={() => handleCampaignClick(c.name)} className="cursor-pointer hover:bg-[#f8fafc] border-b border-[#f8fafc] hover:bg-[#f8fafc]">
                   <Td bold>{c.name}</Td>
                   <Td right mono>{fmtCurrency(c.investment)}</Td>
                   <Td right mono>{fmtNumber(c.leads)}</Td>
@@ -90,6 +102,7 @@ const CampaignsDashboard: React.FC = () => {
         </div>
         {campaigns.length === 0 && <div className="text-center py-8 text-gray-500">Nenhuma campanha no período</div>}
       </CardBox>
+    <ExecutiveDrillDownDrawer drillDown={drillDown} onClose={closeDrillDown} />
     </Layout>
   );
 };
