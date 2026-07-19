@@ -2861,6 +2861,41 @@ app.get('/api/dashboard/marketing/campaigns', async (req, res) => {
   }
 });
 
+// GET /api/dashboard/executive/campaign-leads - Drill-down por campanha: leads com criativo/conjunto e tempo ate compra
+app.get('/api/dashboard/executive/campaign-leads', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const campaignName = req.query.campaign || '';
+    const deals = await getPipedriveDeals(since, until);
+    const now = Date.now();
+    const leads = deals
+      .filter(d => (d.campanha || '') === campaignName)
+      .map(d => {
+        const entryMs = d.addTime ? new Date(d.addTime).getTime() : null;
+        const closeMs = d.wonTime ? new Date(d.wonTime).getTime() : null;
+        const refMs = closeMs || now;
+        const days = (entryMs && refMs) ? Math.max(0, Math.round((refMs - entryMs) / 86400000)) : null;
+        return {
+          title: d.title || '(sem nome)',
+          criativo: d.palavraChave || '-',
+          conjunto: d.conjunto || '-',
+          campanha: d.campanha || '-',
+          entryDate: d.addTime || null,
+          closeDate: d.wonTime || null,
+          isWon: !!d.wonTime,
+          daysToClose: days,
+        };
+      })
+      .sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''));
+    res.json({ success: true, campaign: campaignName, range: { since, until }, count: leads.length, data: leads });
+  } catch (error) {
+    console.error('[campaign-leads] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message, data: [] });
+  }
+});
+
 // GET /api/dashboard/marketing/trend - Gráfico de tendência (receita vs investimento)
 app.get('/api/dashboard/marketing/trend', async (req, res) => {
   try {
