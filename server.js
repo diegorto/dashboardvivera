@@ -59,14 +59,14 @@ try {
 } catch (e) {
   console.error('[vivera-crm-mirror] Falha ao carregar modulo (dashboard segue normalmente):', e.message);
 }
-// [substituido] startScheduledSync(360) - agora e UM job noturno unico, so entre 4:10-5:59 BRT (07:10-08:59 UTC).
+// [substituido] startScheduledSync(360) - agora e UM job noturno unico, so entre 4:10-5:59 BRT (05:00-06:49 UTC = 02:00-03:49 BRT).
 // Reusa o cap de 200 chamadas ja existente dentro de pipedriveLocalDB.syncNow() (nao duplica).
 // Atualizacao principal do dia a dia continua via webhook /api/webhooks/pipedrive.
 function isInsideNightlySyncWindowBRT() {
   const now = new Date();
   const totalMin = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const startMin = 7 * 60 + 10;  // 07:10 UTC = 04:10 BRT (UTC-3)
-  const endMin = 8 * 60 + 59;    // 08:59 UTC = 05:59 BRT
+  const startMin = 5 * 60;  // 05:00 UTC = 02:00 BRT (UTC-3)
+  const endMin = 6 * 60 + 49;    // 06:49 UTC = 03:49 BRT
   return totalMin >= startMin && totalMin <= endMin;
 }
 let _lastNightlySyncDateBRT = null;
@@ -415,7 +415,7 @@ function loadPipelineEvents() {
   try {
     if (fs.existsSync(PIPELINE_EVENTS_FILE)) {
       _pipelineEvents = JSON.parse(fs.readFileSync(PIPELINE_EVENTS_FILE, 'utf8'));
-      _pipelineEvents.forEach(e => _pipelineEventKeys.add(`${e.dealId}|${e.enteredAt}|${e.stageId}`));
+      _pipelineEvents.forEach(e => _pipelineEventKeys.add(`${e._dealId}|${e.enteredAt}|${e.stageId}`));
       console.log(`[pipeline-events] ${_pipelineEvents.length} eventos carregados do disco`);
     }
   } catch (e) {
@@ -582,7 +582,7 @@ async function syncPipelineEvents({ full = false } = {}) {
           if (_pipelineEventKeys.has(key)) continue;
           _pipelineEventKeys.add(key);
           _pipelineEvents.push({
-            dealId: deal.id, personName, phone, ownerName, stageId,
+            _dealId: deal.id, personName, phone, ownerName, stageId,
             eventKey: STAGE_EVENT_TYPES[stageId].key, enteredAt, oldStage: c.old_value
           });
           found++;
@@ -608,7 +608,7 @@ async function backfillPipelineEventsByPriority({ maxCalls = 150 } = {}) {
   if (_pipelineSyncRunning) { console.log('[pipeline-backfill] Sync ja em andamento, ignorando.'); return { processed: 0 }; }
   _pipelineSyncRunning = true;
   try {
-    for (const e of _pipelineEvents) _flowFetchedDealIds.add(e.dealId);
+    for (const e of _pipelineEvents) _flowFetchedDealIds.add(e._dealId);
     const allDeals = pipedriveLocalDB.getDeals();
     const candidates = allDeals
       .filter(d => !_flowFetchedDealIds.has(d.id))
@@ -636,7 +636,7 @@ async function backfillPipelineEventsByPriority({ maxCalls = 150 } = {}) {
             const key = deal.id + '|' + enteredAt + '|' + stageId;
             if (_pipelineEventKeys.has(key)) continue;
             _pipelineEventKeys.add(key);
-            _pipelineEvents.push({ dealId: deal.id, personName, phone, ownerName, stageId, eventKey: STAGE_EVENT_TYPES[stageId].key, enteredAt, oldStage: c.old_value });
+            _pipelineEvents.push({ _dealId: deal.id, personName, phone, ownerName, stageId, eventKey: STAGE_EVENT_TYPES[stageId].key, enteredAt, oldStage: c.old_value });
           }
         }
         _flowFetchedDealIds.add(deal.id);
@@ -940,7 +940,7 @@ async function fetchPipedriveActivitiesUncached(since, until) {
             userId: act.user_id,
             userName: act.owner_name || '',
             personName: act.person_name || '',
-            dealId: act.deal_id,
+            _dealId: act.deal_id,
             dealTitle: act.deal_title || ''
           });
         });
@@ -1001,16 +1001,16 @@ async function fetchPipelineMapUncached() {
 // Cria ou atualiza uma atividade de attendance no Pipedrive
 // type: ACTIVITY_TYPE_ATTENDED ('compareceu') ou ACTIVITY_TYPE_MISSED ('faltou_reagendar')
 // personId: pessoa (contato/paciente)
-// dealId: negocio
+// _dealId: negocio
 // userId: profissional/SDR que fez o agendamento
 // dueDate: data da atividade (YYYY-MM-DD)
 // dueTime: hora da atividade (HH:MM)
-async function createAttendanceActivity(type, { personId, dealId, userId, dueDate, dueTime, subject }) {
+async function createAttendanceActivity(type, { personId, _dealId, userId, dueDate, dueTime, subject }) {
   try {
     const payload = {
       type,
       person_id: personId,
-      deal_id: dealId,
+      deal_id: _dealId,
       user_id: userId,
       due_date: dueDate,
       due_time: dueTime || '09:00',
@@ -1037,15 +1037,15 @@ async function createAttendanceActivity(type, { personId, dealId, userId, dueDat
 }
 
 // POST /api/attendance/sync - Sincroniza comparecimento/falta de um agendamento
-// Body: { dealId, personId, userId, dueDate, dueTime, status: 'attended'|'missed'|'rescheduled', subject? }
+// Body: { _dealId, personId, userId, dueDate, dueTime, status: 'attended'|'missed'|'rescheduled', subject? }
 app.post('/api/attendance/sync', async (req, res) => {
   try {
-    const { dealId, personId, userId, dueDate, dueTime, status, subject } = req.body;
+    const { _dealId, personId, userId, dueDate, dueTime, status, subject } = req.body;
 
-    if (!dealId || !personId || !userId || !dueDate || !status) {
+    if (!_dealId || !personId || !userId || !dueDate || !status) {
       return res.status(400).json({
         success: false,
-        error: 'Parâmetros obrigatórios faltando: dealId, personId, userId, dueDate, status'
+        error: 'Parâmetros obrigatórios faltando: _dealId, personId, userId, dueDate, status'
       });
     }
 
@@ -1060,7 +1060,7 @@ app.post('/api/attendance/sync', async (req, res) => {
     let activityType = status === 'attended' ? ACTIVITY_TYPE_ATTENDED : ACTIVITY_TYPE_MISSED;
     const result = await createAttendanceActivity(activityType, {
       personId,
-      dealId,
+      _dealId,
       userId,
       dueDate,
       dueTime,
@@ -1119,7 +1119,7 @@ app.get('/api/attendance/sync-today', async (req, res) => {
         method: 'POST',
         endpoint: '/api/attendance/sync',
         body: {
-          dealId: 123,
+          _dealId: 123,
           personId: 456,
           userId: 789,
           dueDate: today,
@@ -1163,15 +1163,15 @@ app.get('/api/attendance/pending', async (req, res) => {
     // Agendamentos que já têm comparecimento/falta marcado
     const withAttendance = new Set();
     activities.forEach(a => {
-      if ((a.type === ACTIVITY_TYPE_ATTENDED || a.type === ACTIVITY_TYPE_MISSED) && a.dealId) {
-        withAttendance.add(`${a.dealId}-${a.userId}`);
+      if ((a.type === ACTIVITY_TYPE_ATTENDED || a.type === ACTIVITY_TYPE_MISSED) && a._dealId) {
+        withAttendance.add(`${a._dealId}-${a.userId}`);
       }
     });
 
     // Agendamentos que AINDA NÃO têm comparecimento/falta
     const scheduled = activities.filter(a => {
       if (a.type !== ACTIVITY_TYPE_SCHEDULED) return false;
-      const key = `${a.dealId}-${a.userId}`;
+      const key = `${a._dealId}-${a.userId}`;
       return !withAttendance.has(key);
     });
 
@@ -1187,9 +1187,9 @@ app.get('/api/attendance/pending', async (req, res) => {
         userId: a.userId,
         patient: a.personName,
         dealTitle: a.dealTitle,
-        dealId: a.dealId,
+        _dealId: a._dealId,
         subject: a.subject,
-        syncUrl: `/api/attendance/sync (POST) com dealId=${a.dealId}, userId=${a.userId}`
+        syncUrl: `/api/attendance/sync (POST) com _dealId=${a._dealId}, userId=${a.userId}`
       }))
     });
   } catch (error) {
@@ -1235,7 +1235,7 @@ app.get('/api/attendance/diagnostic', async (req, res) => {
         subject: a.subject,
         done: a.done,
         personId: a.personId,
-        dealId: a.dealId,
+        _dealId: a._dealId,
         userId: a.userId
       });
     });
@@ -1272,7 +1272,7 @@ app.get('/api/attendance/diagnostic', async (req, res) => {
 });
 
 // POST /api/attendance/sync-bulk - Sincroniza múltiplos attendance de uma vez
-// Body: { appointments: [{ dealId, personId, userId, dueDate, dueTime, status }, ...] }
+// Body: { appointments: [{ _dealId, personId, userId, dueDate, dueTime, status }, ...] }
 app.post('/api/attendance/sync-bulk', async (req, res) => {
   try {
     const { appointments } = req.body;
@@ -1286,9 +1286,9 @@ app.post('/api/attendance/sync-bulk', async (req, res) => {
 
     const results = [];
     for (const apt of appointments) {
-      const { dealId, personId, userId, dueDate, dueTime, status } = apt;
+      const { _dealId, personId, userId, dueDate, dueTime, status } = apt;
 
-      if (!dealId || !personId || !userId || !dueDate || !status) {
+      if (!_dealId || !personId || !userId || !dueDate || !status) {
         results.push({ ...apt, success: false, error: 'Parâmetros faltando' });
         continue;
       }
@@ -1296,7 +1296,7 @@ app.post('/api/attendance/sync-bulk', async (req, res) => {
       const activityType = status === 'attended' ? ACTIVITY_TYPE_ATTENDED : ACTIVITY_TYPE_MISSED;
       const result = await createAttendanceActivity(activityType, {
         personId,
-        dealId,
+        _dealId,
         userId,
         dueDate,
         dueTime,
@@ -1585,13 +1585,13 @@ app.get('/api/dashboard/executive', async (req, res) => {
       _pipelineEvents
         .filter(e => e.eventKey === 'comparecimento')
         .filter(e => { const d = (e.enteredAt || '').slice(0, 10); return d >= r.since && d <= r.until; })
-        .map(e => e.dealId)
+        .map(e => e._dealId)
     ).size;
     const missed = new Set(
       _pipelineEvents
         .filter(e => e.eventKey === 'nao_compareceu')
         .filter(e => { const d = (e.enteredAt || '').slice(0, 10); return d >= r.since && d <= r.until; })
-        .map(e => e.dealId)
+        .map(e => e._dealId)
     ).size;
       return {
         spend,
@@ -1692,7 +1692,7 @@ app.get('/api/dashboard/executive', async (req, res) => {
               const d = (e.enteredAt || '').slice(0, 10);
               return d >= range.since && d <= range.until;
             })
-            .map(e => e.dealId)
+            .map(e => e._dealId)
         ).size,
         change: pct(cur.dealsWon, prev && prev.dealsWon)
       },
@@ -4294,7 +4294,7 @@ app.get('/api/tintim/audit', async (req, res) => {
       const suggested = mapTintimLeadToPipedriveFields(lead);
       if (suggested) {
         diagnosed.push({
-          dealId: deal.id,
+          _dealId: deal.id,
           dealTitle: deal.title,
           personName: deal.personName || deal.title || 'Sem nome',
           phone: deal.phone,
@@ -4329,9 +4329,9 @@ app.get('/api/tintim/audit', async (req, res) => {
 // POST /api/tintim/audit/fix - grava no Pipedrive os campos de trafego pago sugeridos pelo Tintim
 app.post('/api/tintim/audit/fix', async (req, res) => {
   try {
-    const { dealId, fields } = req.body || {};
-    if (!dealId || !fields) {
-      return res.status(400).json({ success: false, error: 'dealId e fields sao obrigatorios' });
+    const { _dealId, leadId, fields, trafego } = req.body || {}; const __dealId = _dealId || leadId; const _fields = fields || (trafego ? { trafego } : null);
+    if (!__dealId || !_fields) {
+      return res.status(400).json({ success: false, error: '_dealId e fields sao obrigatorios' });
     }
     if (!PIPEDRIVE_TOKEN) {
       return res.status(400).json({ success: false, error: 'Pipedrive nao configurado' });
@@ -4348,13 +4348,13 @@ app.post('/api/tintim/audit/fix', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Nenhum campo valido para atualizar' });
     }
 
-    await axios.put(`https://api.pipedrive.com/v1/deals/${dealId}`, updatePayload, {
+    await axios.put(`https://api.pipedrive.com/v1/deals/${_dealId}`, updatePayload, {
       params: { api_token: PIPEDRIVE_TOKEN }
     });
 
     invalidateCache();
 
-    res.json({ success: true, message: `Deal ${dealId} atualizado com dados do Tintim.` });
+    res.json({ success: true, message: `Deal ${_dealId} atualizado com dados do Tintim.` });
   } catch (error) {
     console.error('[tintim] Erro ao aplicar correcao no Pipedrive:', error.response?.data || error.message);
     res.status(500).json({
@@ -4866,7 +4866,7 @@ app.get('/api/dashboard/pipeline-events/detail', (req, res) => {
       occurrence: occurrenceParam,
       count: rows.length,
       rows: rows.map(r => ({
-        personName: r.personName, phone: r.phone, dealId: r.dealId,
+        personName: r.personName, phone: r.phone, _dealId: r._dealId,
         ownerName: r.ownerName, label: r.label, enteredAt: r.enteredAt
       }))
     });
@@ -4917,17 +4917,17 @@ app.get('/api/dashboard/executive/channel-leads', async (req, res) => {
         const origemLabel = ORIGEM_LABELS[d.origem] || d.origem || '';
         return matchOrigem(origemLabel);
       });
-      const dealIds = new Set(leads.map(d => d.id));
+      const _dealIds = new Set(leads.map(d => d.id));
       const qualified = new Set(
-        _pipelineEvents.filter(e => e.eventKey === 'qualificado' && dealIds.has(e.dealId)).map(e => e.dealId)
+        _pipelineEvents.filter(e => e.eventKey === 'qualificado' && _dealIds.has(e._dealId)).map(e => e._dealId)
       ).size;
       const attended = new Set(
-        _pipelineEvents.filter(e => e.eventKey === 'comparecimento' && dealIds.has(e.dealId)).map(e => e.dealId)
+        _pipelineEvents.filter(e => e.eventKey === 'comparecimento' && _dealIds.has(e._dealId)).map(e => e._dealId)
       ).size;
       const scheduled = new Set(
         (_pipedriveLiveSnapshot.activities || [])
-          .filter(a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && dealIds.has(a.dealId))
-          .map(a => a.dealId)
+          .filter(a => a.type === ACTIVITY_TYPE_SCHEDULED && a.done && _dealIds.has(a._dealId))
+          .map(a => a._dealId)
       ).size;
       const won = leads.filter(d => d.status === 'won');
       const revenue = won.reduce((sum, d) => sum + (d.rawValue || 0), 0);
@@ -4980,7 +4980,7 @@ app.get('/api/dashboard/executive/origin-leads', async (req, res) => {
       data: (d.addTime || '').slice(0, 10),
       valor: 'R$ ' + (d.rawValue || 0).toLocaleString('pt-BR'),
       etapa: statusLabel[d.status] || d.status || '-',
-      dealId: d.id
+      _dealId: d.id
     })).sort((a, b) => (b.data || '').localeCompare(a.data || ''));
     res.json({ success: true, range: { since, until }, origem: origemQuery, total: leads.length, leads });
   } catch (error) {
@@ -4999,13 +4999,13 @@ app.get('/api/dashboard/executive/faltas', async (req, res) => {
       const d = (e.enteredAt || '').slice(0, 10);
       return d >= since && d <= until;
     });
-    const dealIds = [...new Set(events.map(e => e.dealId))];
+    const _dealIds = [...new Set(events.map(e => e._dealId))];
     const allDeals = await getPipedriveDeals(null, null);
     const dealById = {};
     (allDeals || []).forEach(d => { dealById[d.id] = d; });
     const allDealsInRange = (allDeals || []).filter(d => { const a = (d.addTime || '').slice(0, 10); return a >= since && a <= until; });
-    const taxa = allDealsInRange.length ? +(dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
-    const receitaPerdida = dealIds.reduce((s, id) => s + ((dealById[id] || {}).rawValue || 0), 0);
+    const taxa = allDealsInRange.length ? +(_dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
+    const receitaPerdida = _dealIds.reduce((s, id) => s + ((dealById[id] || {}).rawValue || 0), 0);
     const diaNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
     const porDiaCount = {};
     events.forEach(e => {
@@ -5016,10 +5016,10 @@ app.get('/api/dashboard/executive/faltas', async (req, res) => {
     const maxDia = Math.max(1, ...Object.values(porDiaCount));
     const porDia = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex'].map(dia => ({ dia, count: porDiaCount[dia] || 0, fator: (porDiaCount[dia] || 0) / maxDia, pct: (porDiaCount[dia] || 0) }));
     const ultimasFaltas = [...events].sort((a, b) => (b.enteredAt || '').localeCompare(a.enteredAt || '')).slice(0, 4).map(e => {
-      const d = dealById[e.dealId] || {};
+      const d = dealById[e._dealId] || {};
       return { paciente: d.personName || 'Paciente', data: (e.enteredAt || '').slice(0, 10), horario: '', valor: d.rawValue || 0, procedimento: '' };
     });
-    res.json({ success: true, range: { since, until }, total: dealIds.length, taxa, receitaPerdida, vsAnterior: 0, porDia, ultimasFaltas, _gap: 'faltas por SDR nao disponivel - sem mapeamento de dono/SDR no historico de eventos de pipeline' });
+    res.json({ success: true, range: { since, until }, total: _dealIds.length, taxa, receitaPerdida, vsAnterior: 0, porDia, ultimasFaltas, _gap: 'faltas por SDR nao disponivel - sem mapeamento de dono/SDR no historico de eventos de pipeline' });
   } catch (error) {
     console.error('Erro em faltas:', error.message);
     res.json({ success: false, error: error.message, total: 0, taxa: 0, receitaPerdida: 0, vsAnterior: 0, porDia: [], ultimasFaltas: [] });
@@ -5036,26 +5036,26 @@ app.get('/api/dashboard/executive/cancelamentos', async (req, res) => {
       const d = (e.enteredAt || '').slice(0, 10);
       return d >= since && d <= until;
     });
-    const dealIds = [...new Set(events.map(e => e.dealId))];
-    const remarcouDealIds = new Set(_pipelineEvents.filter(e => e.eventKey === 'remarcou').map(e => e.dealId));
+    const _dealIds = [...new Set(events.map(e => e._dealId))];
+    const remarcouDealIds = new Set(_pipelineEvents.filter(e => e.eventKey === 'remarcou').map(e => e._dealId));
     const allDeals = await getPipedriveDeals(null, null);
     const dealById = {};
     (allDeals || []).forEach(d => { dealById[d.id] = d; });
     const allDealsInRange = (allDeals || []).filter(d => { const a = (d.addTime || '').slice(0, 10); return a >= since && a <= until; });
-    const taxa = allDealsInRange.length ? +(dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
+    const taxa = allDealsInRange.length ? +(_dealIds.length / allDealsInRange.length * 100).toFixed(1) : 0;
     let receitaPerdida = 0, receitaRecuperada = 0, reagendadosCount = 0;
-    const detalhes = dealIds.map(id => {
+    const detalhes = _dealIds.map(id => {
       const d = dealById[id] || {};
       const reagendado = remarcouDealIds.has(id);
       if (reagendado) { reagendadosCount++; receitaRecuperada += (d.rawValue || 0); } else { receitaPerdida += (d.rawValue || 0); }
-      return { dealId: id, paciente: d.personName || 'Paciente', reagendado, valor: d.rawValue || 0 };
+      return { _dealId: id, paciente: d.personName || 'Paciente', reagendado, valor: d.rawValue || 0 };
     });
     const ultimosCancelamentos = detalhes.slice(-5).reverse();
-    const pctReagendado = dealIds.length ? +(reagendadosCount / dealIds.length * 100).toFixed(1) : 0;
+    const pctReagendado = _dealIds.length ? +(reagendadosCount / _dealIds.length * 100).toFixed(1) : 0;
     res.json({
       success: true,
       range: { since, until },
-      total: dealIds.length,
+      total: _dealIds.length,
       taxa,
       reagendados: reagendadosCount,
       pctReagendado,
