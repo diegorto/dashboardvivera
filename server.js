@@ -249,7 +249,7 @@ const FIELD_ORIGEM = 'fd9cfb07956d6227f9e50b9be8b20ab176d17ce7';
 // Campo 'Origem' no Pipedrive e do tipo enum (opcoes fixas), nao aceita texto livre.
 // Mapeia os valores de origem sugeridos pelo Tintim para o ID da opcao correspondente no Pipedrive.
 const ORIGEM_ENUM_MAP = {
-  'meta ads': 89,       // Facebook (Meta/Instagram Ads)
+  'meta ads': 88,       // Instagram (100% do trafego Meta da clinica roda no IG; override abaixo se houver tag [FB])
   'facebook ads': 89,
   'facebook': 89,
   'instagram': 88,
@@ -265,6 +265,14 @@ function mapOrigemToPipedriveOption(origem) {
   if (!origem) return null;
   const key = String(origem).trim().toLowerCase();
   return ORIGEM_ENUM_MAP[key] || null;
+}
+
+function detectPlacementFromCampaignTags(fields) {
+  if (!fields) return null;
+  const text = `${fields.conjunto || ''} ${fields.campanha || ''}`;
+  if (/\[ig\]/i.test(text)) return 88;
+  if (/\[fb\]/i.test(text)) return 89;
+  return null;
 }
 const ORIGEM_LABELS = {
   '86': 'Indicacao (dentro da clinica)',
@@ -4043,9 +4051,25 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
       until: req.query.until || defaults.until
     };
 
-    const [ads, deals] = await Promise.all([
+    const [ads, deals, crmAgg] = await Promise.all([
       getMetaAds(range.since, range.until),
-      getPipedriveDeals(range.since, range.until)
+      getPipedriveDeals(range.since, range.until),
+      (async () => {
+        const pool = getCrmRankingPool();
+        const [rows] = await pool.query(
+          `SELECT campanha, conjunto, criativo,
+             SUM(CASE WHEN status = 'lost' AND add_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS perdidos,
+             SUM(CASE WHEN status = 'open' AND stage_id IN (9,10,11,12,13) THEN 1 ELSE 0 END) AS working
+           FROM deals
+           GROUP BY campanha, conjunto, criativo`,
+          [range.since, range.until]
+        );
+        const map = new Map();
+        for (const r of rows) {
+          map.set(`${r.campanha}|${r.conjunto}|${r.criativo}`, { perdidos: Number(r.perdidos) || 0, working: Number(r.working) || 0 });
+        }
+        return map;
+      })()
     ]);
 
     const creatives = ads.map(ad => {
@@ -4056,6 +4080,8 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
       // CPL: usa leads do Meta quando reportados; senao usa leads do CRM
       // (campanhas de WhatsApp nao reportam action_type=lead no Meta)
       const effectiveLeads = ad.leads > 0 ? ad.leads : relatedDeals.length;
+      const crmKey = `${ad.campaignName}|${ad.adsetName}|${ad.adName}`;
+      const crmCounts = crmAgg.get(crmKey) || { perdidos: 0, working: 0 };
       return {
         id: ad.adId,
         name: ad.adName,
@@ -4066,6 +4092,8 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
         leads: ad.leads,
         cpl: effectiveLeads > 0 ? parseFloat((ad.spend / effectiveLeads).toFixed(2)) : 0,
         crmLeads: relatedDeals.length,
+        perdidos: crmCounts.perdidos,
+        working: crmCounts.working,
         sales: relatedDeals.filter(d => d.status === 'won').length,
         revenue,
         roas: ad.spend > 0 ? parseFloat((revenue / ad.spend).toFixed(2)) : 0,
@@ -4075,6 +4103,80 @@ app.get('/api/dashboard/marketing/creatives', async (req, res) => {
     }).sort((a, b) => b.spend - a.spend);
 
     res.json({ success: true, range, data: creatives });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/creative-lost-breakdown - Perdidos detalhado (drill-down)
+app.get('/api/dashboard/marketing/creative-lost-breakdown', async (req, res) => {
+  try {
+    const defaults = defaultDateRange();
+    const since = req.query.since || defaults.since;
+    const until = req.query.until || defaults.until;
+    const { campanha, conjunto, criativo } = req.query;
+    const pool = getCrmRankingPool();
+    const [rows] = await pool.query(
+      `SELECT id, title, loss_reason, objections, tags, lost_date
+       FROM deals
+       WHERE campanha = ? AND conjunto = ? AND criativo = ? AND status = 'lost' AND add_date BETWEEN ? AND ?
+       ORDER BY lost_date DESC`,
+      [campanha, conjunto, criativo, since, until]
+    );
+    const reasonCounts = {};
+    const objectionTags = {};
+    for (const r of rows) {
+      const reason = r.loss_reason || 'Sem motivo registrado';
+      reasonCounts[reason] = (reasonCounts[reason] || 0) + 1;
+      if (r.tags) {
+        String(r.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+          objectionTags[t] = (objectionTags[t] || 0) + 1;
+        });
+      }
+    }
+    res.json({
+      success: true,
+      total: rows.length,
+      byReason: Object.entries(reasonCounts).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count),
+      byTag: Object.entries(objectionTags).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count),
+      leads: rows.map(r => ({ id: r.id, title: r.title, lossReason: r.loss_reason, tags: r.tags, lostDate: r.lost_date }))
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/dashboard/marketing/creative-working-breakdown - Working detalhado (drill-down)
+app.get('/api/dashboard/marketing/creative-working-breakdown', async (req, res) => {
+  try {
+    const { campanha, conjunto, criativo } = req.query;
+    const pool = getCrmRankingPool();
+    const [rows] = await pool.query(
+      `SELECT d.id, d.title, s.label AS stage_label, d.objections, d.tags, d.stage_entered_at
+       FROM deals d
+       LEFT JOIN stages s ON s.id = d.stage_id
+       WHERE d.campanha = ? AND d.conjunto = ? AND d.criativo = ? AND d.status = 'open' AND d.stage_id IN (9,10,11,12,13)
+       ORDER BY d.stage_entered_at DESC`,
+      [campanha, conjunto, criativo]
+    );
+    const stageCounts = {};
+    const objectionTags = {};
+    for (const r of rows) {
+      const stage = r.stage_label || 'Etapa desconhecida';
+      stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+      if (r.tags) {
+        String(r.tags).split(',').map(t => t.trim()).filter(Boolean).forEach(t => {
+          objectionTags[t] = (objectionTags[t] || 0) + 1;
+        });
+      }
+    }
+    res.json({
+      success: true,
+      total: rows.length,
+      byStage: Object.entries(stageCounts).map(([stage, count]) => ({ stage, count })).sort((a, b) => b.count - a.count),
+      byTag: Object.entries(objectionTags).map(([tag, count]) => ({ tag, count })).sort((a, b) => b.count - a.count),
+      leads: rows.map(r => ({ id: r.id, title: r.title, stage: r.stage_label, tags: r.tags, stageEnteredAt: r.stage_entered_at }))
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -4451,7 +4553,9 @@ app.post('/api/tintim/audit/fix', async (req, res) => {
 
     const updatePayload = {};
     if (fields.origem) {
-      const origemOptionId = mapOrigemToPipedriveOption(fields.origem);
+      let origemOptionId = mapOrigemToPipedriveOption(fields.origem);
+      const placementOverride = detectPlacementFromCampaignTags(fields);
+      if (placementOverride) { origemOptionId = placementOverride; }
       if (origemOptionId) {
         updatePayload[FIELD_ORIGEM] = origemOptionId;
       } else {

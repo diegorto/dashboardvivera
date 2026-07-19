@@ -17,6 +17,7 @@ services:
       NODE_ENV: production
       PORT: 3001
       LOG_LEVEL: info
+      CRM_DB_HOST: 172.19.0.1
     volumes:
       - ./data:/app/data
     restart: unless-stopped

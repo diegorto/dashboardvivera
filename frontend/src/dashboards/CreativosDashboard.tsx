@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Layout } from '../components';
+import { useDrillDown } from '../hooks/useDrillDown';
+import ExecutiveDrillDownDrawer from '../components/ExecutiveDrillDownDrawer';
 import { useFilters } from '../contexts/FilterContext';
 import { getDateRange, fmtCurrency, fmtNumber, fmtMult, LoadingScreen, ErrorScreen, MiniKpi, CardBox, Th, Td, ExportButton } from '../utils/dashboardHelpers';
 
@@ -14,6 +16,8 @@ interface Creative {
   leads: number;
   cpl: number;
   crmLeads: number;
+  perdidos: number;
+  working: number;
   sales: number;
   revenue: number;
   roas: number;
@@ -22,6 +26,7 @@ interface Creative {
 
 const CreativosDashboard: React.FC = () => {
   const { filters } = useFilters();
+  const { drillDown, openDrillDown, closeDrillDown } = useDrillDown();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creatives, setCreatives] = useState<Creative[]>([]);
@@ -39,6 +44,25 @@ const CreativosDashboard: React.FC = () => {
   };
 
   useEffect(() => { load(); }, [filters.period, filters.dateRange]);
+
+  const handlePerdidosClick = async (c: Creative) => {
+    try {
+      const { since, until } = getDateRange(filters.period, filters.dateRange);
+      const r = await axios.get('/api/dashboard/marketing/creative-lost-breakdown', { params: { campanha: c.campaign, conjunto: c.adset, criativo: c.name, since, until } });
+      openDrillDown('creative-lost', undefined, r.data, `Perdidos - ${c.name}`);
+    } catch (e) {
+      console.error('Erro ao carregar perdidos:', e);
+    }
+  };
+
+  const handleWorkingClick = async (c: Creative) => {
+    try {
+      const r = await axios.get('/api/dashboard/marketing/creative-working-breakdown', { params: { campanha: c.campaign, conjunto: c.adset, criativo: c.name } });
+      openDrillDown('creative-working', undefined, r.data, `Working - ${c.name}`);
+    } catch (e) {
+      console.error('Erro ao carregar working:', e);
+    }
+  };
 
   if (error) return <ErrorScreen title="Criativos" error={error} onRetry={load} />;
   if (loading) return <LoadingScreen title="Criativos" />;
@@ -64,6 +88,8 @@ const CreativosDashboard: React.FC = () => {
                 <Th right onClick={() => setSortBy('spend')} active={sortBy === 'spend'}>Investimento</Th>
                 <Th right onClick={() => setSortBy('leads')} active={sortBy === 'leads'}>Leads Meta</Th>
                 <Th right onClick={() => setSortBy('crmLeads')} active={sortBy === 'crmLeads'}>Leads CRM</Th>
+                <Th right onClick={() => setSortBy('perdidos')} active={sortBy === 'perdidos'}><span title="Leads que entraram no período filtrado e que estão dados como perdidos.">Perdidos</span></Th>
+                <Th right onClick={() => setSortBy('working')} active={sortBy === 'working'}><span title="Leads sendo trabalhados no período filtrado, independente da data que entraram no funil.">Working</span></Th>
                 <Th right onClick={() => setSortBy('cpl')} active={sortBy === 'cpl'}>CPL</Th>
                 <Th right onClick={() => setSortBy('sales')} active={sortBy === 'sales'}>Vendas</Th>
                 <Th right onClick={() => setSortBy('roas')} active={sortBy === 'roas'}>ROAS</Th>
@@ -78,6 +104,12 @@ const CreativosDashboard: React.FC = () => {
                   <Td right mono>{fmtCurrency(c.spend)}</Td>
                   <Td right mono>{fmtNumber(c.leads)}</Td>
                   <Td right mono>{fmtNumber(c.crmLeads)}</Td>
+                  <Td right mono>
+                    <span className="cursor-pointer underline decoration-dotted text-[#b91c1c]" onClick={() => handlePerdidosClick(c)}>{fmtNumber(c.perdidos)}</span>
+                  </Td>
+                  <Td right mono>
+                    <span className="cursor-pointer underline decoration-dotted text-[#1d4ed8]" onClick={() => handleWorkingClick(c)}>{fmtNumber(c.working)}</span>
+                  </Td>
                   <Td right mono>{fmtCurrency(c.cpl)}</Td>
                   <Td right mono>{fmtNumber(c.sales)}</Td>
                   <Td right mono>{fmtMult(c.roas)}</Td>
@@ -100,6 +132,7 @@ const CreativosDashboard: React.FC = () => {
         </div>
         {creatives.length === 0 && <div className="text-center py-8 text-gray-500">Sem dados do Meta Ads no período (verifique o token em Configurações)</div>}
       </CardBox>
+    <ExecutiveDrillDownDrawer drillDown={drillDown} onClose={closeDrillDown} />
     </Layout>
   );
 };

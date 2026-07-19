@@ -18,9 +18,10 @@ const AuditDashboard: React.FC = () => {
     setLoading(false);
   };
 
-  const handleFixLead = async (leadId: string) => {
+  const handleFixLead = async (lead: TintimLead) => {
+    const leadId = String(lead._dealId);
     setFixing(prev => new Set([...prev, leadId]));
-    const success = await tintimAuditService.fixLead(leadId);
+    const success = await tintimAuditService.fixLead(leadId, lead.suggested);
     if (success) {
       await loadAudit();
     }
@@ -32,9 +33,9 @@ const AuditDashboard: React.FC = () => {
   };
 
   const handleFixAll = async () => {
-    setFixing(new Set(data?.leads.map(l => String(l.dealId)) || []));
+    setFixing(new Set(data?.leads.map(l => String(l._dealId)) || []));
     for (const lead of data?.leads || []) {
-      await tintimAuditService.fixLead(String(lead.dealId));
+      await tintimAuditService.fixLead(String(lead._dealId), lead.suggested);
     }
     await loadAudit();
     setFixing(new Set());
@@ -119,7 +120,7 @@ const AuditDashboard: React.FC = () => {
             </thead>
             <tbody className="divide-y">
               {data.leads.map((lead: TintimLead) => (
-                <tr key={lead.dealId} className="hover:bg-gray-50">
+                <tr key={lead._dealId} className="hover:bg-gray-50">
                   <td className="px-6 py-4 text-sm text-gray-900">{lead.personName || lead.dealTitle}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{lead.phone}</td>
                   <td className="px-6 py-4 text-sm">
@@ -135,11 +136,11 @@ const AuditDashboard: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 text-center">
                     <button
-                      onClick={() => handleFixLead(String(lead.dealId))}
-                      disabled={fixing.has(String(lead.dealId))}
+                      onClick={() => handleFixLead(lead)}
+                      disabled={fixing.has(String(lead._dealId))}
                       className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 disabled:bg-gray-400"
                     >
-                      {fixing.has(String(lead.dealId)) ? 'Corrigindo...' : 'Corrigir'}
+                      {fixing.has(String(lead._dealId)) ? 'Corrigindo...' : 'Corrigir'}
                     </button>
                   </td>
                 </tr>

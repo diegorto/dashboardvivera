@@ -138,6 +138,58 @@ const ExecutiveDrillDownDrawer: React.FC<DrillDownDrawerProps> = ({ drillDown, o
           </div>
         )}
 
+      {drillDown.type === 'creative-lost' && (
+        <div className="space-y-3">
+          <div className="text-sm text-[#64748b]">Total de leads perdidos no periodo: <span className="font-semibold text-[#0f172a]">{drillDown.data?.total ?? 0}</span></div>
+          <div className="text-xs font-semibold uppercase text-[#94a3b8] mt-2">Por motivo de perda</div>
+          {(!drillDown.data?.byReason || drillDown.data.byReason.length === 0) && (
+            <p className="text-sm text-[#94a3b8] py-2">Nenhuma perda registrada no periodo.</p>
+          )}
+          {drillDown.data?.byReason?.map((r: any, idx2: number) => (
+            <div key={idx2} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg px-3 py-2">
+              <span className="text-sm text-[#0f172a]">{r.reason}</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#fee2e2] text-[#b91c1c]">{r.count}</span>
+            </div>
+          ))}
+          <div className="text-xs font-semibold uppercase text-[#94a3b8] mt-4">Objecoes / tags</div>
+          {(!drillDown.data?.byTag || drillDown.data.byTag.length === 0) && (
+            <p className="text-sm text-[#94a3b8] py-2">Nenhuma objecao/tag registrada.</p>
+          )}
+          {drillDown.data?.byTag?.map((t: any, idx2: number) => (
+            <div key={idx2} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg px-3 py-2">
+              <span className="text-sm text-[#0f172a]">{t.tag}</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{t.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {drillDown.type === 'creative-working' && (
+        <div className="space-y-3">
+          <div className="text-sm text-[#64748b]">Total de leads em trabalho hoje: <span className="font-semibold text-[#0f172a]">{drillDown.data?.total ?? 0}</span></div>
+          <div className="text-xs font-semibold uppercase text-[#94a3b8] mt-2">Por etapa do funil</div>
+          {(!drillDown.data?.byStage || drillDown.data.byStage.length === 0) && (
+            <p className="text-sm text-[#94a3b8] py-2">Nenhum lead em trabalho no momento.</p>
+          )}
+          {drillDown.data?.byStage?.map((s: any, idx2: number) => (
+            <div key={idx2} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg px-3 py-2">
+              <span className="text-sm text-[#0f172a]">{s.stage}</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#dbeafe] text-[#1d4ed8]">{s.count}</span>
+            </div>
+          ))}
+          <div className="text-xs font-semibold uppercase text-[#94a3b8] mt-4">Objecoes / tags</div>
+          {(!drillDown.data?.byTag || drillDown.data.byTag.length === 0) && (
+            <p className="text-sm text-[#94a3b8] py-2">Nenhuma objecao/tag registrada.</p>
+          )}
+          {drillDown.data?.byTag?.map((t: any, idx2: number) => (
+            <div key={idx2} className="flex items-center justify-between border border-[#e2e8f0] rounded-lg px-3 py-2">
+              <span className="text-sm text-[#0f172a]">{t.tag}</span>
+              <span className="text-xs font-semibold px-2 py-0.5 rounded bg-[#f1f5f9] text-[#64748b]">{t.count}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
         {drillDown.type === 'sales-by-funnel' && (
             <div className="space-y-4">
               {drillDown.data?.map((funnel: any, idx: number) => (

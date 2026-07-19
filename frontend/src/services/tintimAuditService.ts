@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 export interface TintimLead {
-  dealId: number;
+  _dealId: number;
   dealTitle: string;
   personName: string;
   addDate?: string;
@@ -36,9 +36,9 @@ const tintimAuditService = {
     }
   },
 
-  async fixLead(leadId: string): Promise<boolean> {
+  async fixLead(leadId: string, fields?: { origem?: string; campanha?: string; conjunto?: string; palavraChave?: string; plataforma?: string }): Promise<boolean> {
     try {
-      await axios.post('/api/tintim/audit/fix', { leadId });
+      await axios.post('/api/tintim/audit/fix', { leadId, fields });
       return true;
     } catch (error) {
       console.error('Erro ao corrigir lead:', error);

@@ -14,6 +14,8 @@ export type DrillDownType =
   | 'revenue-by-source'
   | 'origin-leads'
   | 'campaign-leads'
+  | 'creative-lost'
+  | 'creative-working'
   | null;
 
 export interface DrillDownState {

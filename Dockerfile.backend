@@ -19,6 +19,7 @@ COPY googleAdsDirectService.js ./
 COPY googleAdsCacheService.js ./
 COPY pipeboardMetaAdsService.js ./
 COPY pipedriveLocalDB.js ./
+COPY vivera-crm-mirror.js ./
 
 # Create data directory for any local storage
 RUN mkdir -p /app/data

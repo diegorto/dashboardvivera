@@ -67,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title, breadcrumb, right }) =
             textAlign: 'center',
           }}
         >
-          Vivera Command Center | Dados atualizados em tempo real
+          Vivera Command Center | Dados sincronizados automaticamente
         </footer>
       </div>
     </div>
