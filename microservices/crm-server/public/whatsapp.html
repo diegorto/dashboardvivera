@@ -1,0 +1,1344 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>WhatsApp - Vivera CRM</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="app.css">
+<style>
+  .wa-wrap { display:flex; min-height:100vh; }
+  .wa-main { flex:1; padding:24px; max-width:1100px; }
+  .wa-tabs { display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid #333; }
+  .wa-tab { padding:10px 16px; cursor:pointer; border-bottom:2px solid transparent; opacity:.7; }
+  .wa-tab.active { border-color:#25D366; opacity:1; font-weight:600; }
+@media (max-width:768px){
+  .wa-tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .wa-tab{flex:0 0 auto;white-space:nowrap;padding:10px 12px;}
+}
+  .wa-panel { display:none; }
+  .wa-panel.active { display:block; }
+  .wa-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(15,23,42,.04); }
+  .wa-status-badge { display:inline-block; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+  .st-connected { background:#dcfce7; color:#15803d; }
+  .st-qr_pending { background:#fef3c7; color:#b45309; }
+  .st-disconnected { background:#fee2e2; color:#dc2626; }
+  .wa-qr-box { text-align:center; padding:20px; }
+  .wa-qr-box img { max-width:280px; border-radius:8px; border:6px solid #fff; }
+  .wa-conv-list { list-style:none; padding:0; margin:0; }
+  .wa-conv-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid #e2e8f0; }
+ .wa-conv-item:hover { background:#f8fafc; cursor:pointer; }
+ .wa-field { margin-bottom:14px; }
+  .wa-field label { display:block; margin-bottom:6px; font-size:13px; opacity:.8; }
+  .wa-field input[type=text], .wa-field textarea { width:100%; background:#fff; border:1px solid #e2e8f0; color:var(--ink-900); border-radius:6px; padding:8px 10px; font-family:inherit; }
+  .wa-field textarea { min-height:110px; }
+  .wa-toggle { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .wa-btn { background:#25D366; color:#08260f; border:none; border-radius:6px; padding:9px 16px; font-weight:600; cursor:pointer; }
+  .wa-btn.secondary { background:#f1f5f9; color:var(--ink-900); border:1px solid #e2e8f0; }
+.wa-btn.primary-blue{background:#2563eb;color:#fff;}
+.wa-btn-icon{background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:6px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;line-height:1;padding:0;}
+.wa-btn-icon:hover{background:#e2e8f0;}
+  .flow-canvas { position:relative; height:500px; background:#f8fafc repeating-linear-gradient(0deg,#e2e8f0 0 1px,transparent 1px 24px),repeating-linear-gradient(90deg,#e2e8f0 0 1px,transparent 1px 24px); border:1px solid #e2e8f0; border-radius:8px; overflow:auto; }
+  .flow-node { position:absolute; width:160px; background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; cursor:move; font-size:12px;  color:var(--ink-900); box-shadow:0 1px 3px rgba(15,23,42,.08); }
+ .flow-node.trigger { border-color:#7C4DFF; }
+  .flow-node.message { border-color:#25D366; }
+  .flow-node.question { border-color:#4DA6FF; }
+  .flow-node.condition { border-color:#FFB84D; }
+  .flow-node.wait { border-color:#888; }
+  .flow-node.reminder { border-color:#FF6E6E; }
+  .flow-node.end { border-color:#666; }
+  .flow-node .nt { font-size:10px; text-transform:uppercase; opacity:.6; }
+  .flow-palette { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .flow-palette button { font-size:12px; padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; background:#fff; color:var(--ink-900); cursor:pointer; }
+.big-switch { position:relative; display:inline-block; width:56px; height:30px; flex-shrink:0; }
+.big-switch input { opacity:0; width:0; height:0; }
+.big-switch-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:#d1362f; transition:.2s; border-radius:30px; }
+.big-switch-slider:before { position:absolute; content:""; height:24px; width:24px; left:3px; bottom:3px; background-color:#fff; transition:.2s; border-radius:50%; }
+.big-switch input:checked + .big-switch-slider { background-color:#25D366; }
+.big-switch input:checked + .big-switch-slider:before { transform:translateX(26px); }
+
+    .wa-metric-card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:#fff;}
+    .wa-metric-lbl{font-size:11px;text-transform:uppercase;color:#9ca3af;letter-spacing:.04em;margin-bottom:6px;}
+    .wa-metric-val{font-size:26px;font-weight:700;color:#111827;}
+    .wa-metric-sub{font-size:12px;color:#6b7280;margin-top:4px;}
+</style>
+</head>
+<body>
+<div class="wa-wrap">
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script src="app.js"></script>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+  <div class="wa-main">
+    <h2>WhatsApp - Vive (assistente IA)</h2>
+    <p id="waStatusLine">Status: <span id="waStatusBadge" class="wa-status-badge">carregando...</span></p>
+
+    <div class="wa-tabs">
+      <div class="wa-tab active" data-tab="conversas">Conversas</div>
+      <div class="wa-tab" data-tab="metricas">Dashboard</div>
+      
+      <div class="wa-tab" data-tab="fluxos">Fluxos</div>
+        <div class="wa-tab" data-tab="cadencia">Cadência</div>
+        <div class="wa-tab" data-tab="orientacao">Configuração da IA</div>
+      <div class="wa-tab" data-tab="conexao">Conexão</div>
+      <div class="wa-tab" data-tab="comando">Comando Central</div>
+    </div>
+
+    <div class="wa-panel" id="panel-conexao">
+      <div class="wa-card">
+        <div class="wa-qr-box" id="qrBox">
+          <p>Carregando status da conexao...</p>
+        </div>
+      </div>
+    <div class="wa-card" style="margin-top:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:700;">Numeros adicionais (ate 4)</div>
+        <button class="wa-btn" id="btnConnectNewNumber" onclick="connectNewNumber()">+ Conectar numero</button>
+      </div>
+      <div id="extraConnList"><p style="opacity:.6;">Carregando...</p></div>
+    </div>
+    </div>
+
+    <div class="wa-panel active" id="panel-conversas">
+<div class="wa-chat-layout">
+<div class="wa-chat-sidebar">
+<div class="wa-chat-sidebar-header">
+        <style>
+.conv-filter-pill{padding:5px 12px;border-radius:14px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer;}
+.conv-filter-pill.active{background:#25D366;border-color:#25D366;color:#fff;font-weight:600;}
+.wa-chat-layout{display:flex;height:calc(100vh - 230px);min-height:420px;max-height:78vh;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.wa-chat-sidebar{width:340px;min-width:260px;max-width:40%;display:flex;flex-direction:column;border-right:1px solid #e2e8f0;overflow:hidden;}
+.wa-chat-sidebar-header{padding:14px 14px 8px 14px;border-bottom:1px solid #e2e8f0;}
+.wa-chat-sidebar .wa-conv-list{flex:1;overflow-y:auto;}
+.wa-chat-main{flex:1;min-width:0;display:flex;flex-direction:column;background:#e9edf1;}
+.wa-chat-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:14px;text-align:center;padding:20px;}
+#convThreadBox{display:none;flex-direction:column;height:100%;}
+.wa-chat-header{display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:#fff;border-bottom:1px solid #e2e8f0;}
+.wa-chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px;}
+.wa-chat-inputbar{display:flex;gap:8px;padding:10px 14px;background:#fff;border-top:1px solid #e2e8f0;}
+.wa-conv-item{cursor:pointer;align-items:flex-start;gap:10px;padding:10px 14px;}
+.wa-conv-item:hover{background:#f5f7f9;}
+.wa-conv-item.active{background:#e7f9ee;}
+.wa-conv-avatar{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:#25D366;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;}
+.wa-conv-info{flex:1;min-width:0;}
+.wa-conv-row1{display:flex;justify-content:space-between;align-items:baseline;gap:6px;}
+.wa-conv-name{font-weight:600;font-size:14px;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wa-conv-phone{font-weight:400;font-size:12px;color:#6b7280;white-space:nowrap;margin-left:6px;}
+.wa-conv-time{font-size:11px;color:#64748b;flex:0 0 auto;}
+.wa-conv-row2{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:2px;}
+.wa-conv-preview{font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0;}
+.wa-conv-badge{font-size:10px;color:#fff;padding:2px 7px;border-radius:9px;white-space:nowrap;flex:0 0 auto;}
+.wa-status-dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 auto;margin-left:6px;}
+.wa-conv-row3{display:flex;gap:10px;margin-top:4px;font-size:11px;color:#64748b;}
+.wa-conv-row3 label{display:flex;align-items:center;gap:3px;cursor:pointer;}
+@media (max-width:768px){
+  .wa-main{padding:8px;width:100%;min-width:0;box-sizing:border-box;}
+  .wa-chat-layout{height:calc(100vh - 170px);border-radius:0;min-width:0;}
+  .wa-chat-sidebar{width:100%;min-width:0;max-width:100%;border-right:none;}
+  .wa-chat-main{display:none;}
+  .wa-chat-layout.mobile-conv-open .wa-chat-sidebar{display:none;}
+  .wa-chat-layout.mobile-conv-open .wa-chat-main{display:flex;}
+  .wa-conv-name{font-size:15px;}
+  .wa-chat-header{padding:10px 12px;}
+}
+</style>
+<div id="convFiltersBar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
+  <select id="convFilterOwner" onchange="applyConvFilters()" style="padding:4px 8px;border-radius:6px;">
+    <option value="">Todas as SDRs</option>
+  </select>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <button type="button" class="conv-filter-pill active" data-filter="all" onclick="setConvFilter('all')">Todas</button>
+    <button type="button" class="conv-filter-pill" data-filter="sdr" onclick="setConvFilter('sdr')">SDR (humano)</button>
+    <button type="button" class="conv-filter-pill" data-filter="bot" onclick="setConvFilter('bot')">Robo</button>
+    <button type="button" class="conv-filter-pill" data-filter="lead" onclick="setConvFilter('lead')">Lead respondeu</button>
+    <button type="button" class="conv-filter-pill" data-filter="waiting" onclick="setConvFilter('waiting')">Aguardando resposta</button>
+  </div>
+</div>
+</div><!-- /wa-chat-sidebar-header -->
+<ul class="wa-conv-list" id="convList"><li>Carregando...</li></ul>
+ </div><!-- /wa-chat-sidebar -->
+<div class="wa-chat-main">
+<div class="wa-chat-empty" id="convThreadEmpty">Selecione uma conversa a esquerda para ver as mensagens</div>
+<div id="convThreadBox">
+ <div class="wa-chat-header">
+<span style="display:flex;align-items:center;gap:10px;"><a id="convThreadTitle" href="javascript:void(0)" style="color:inherit;text-decoration:none;font-weight:600;">Conversa</a><span id="convThreadBadge" class="wa-conv-badge" style="display:none"></span></span>
+ <span style="display:flex;align-items:center;gap:8px;"><button class="wa-btn primary-blue" onclick="resolveConversation(currentConvId)">Concluido</button><button class="wa-btn-icon" onclick="closeConvThread()" title="Fechar" aria-label="Fechar">&times;</button></span>
+ </div>
+ <div id="convThreadMsgs" class="wa-chat-messages"></div>
+<div class="wa-chat-inputbar"><input type="text" id="convManualInput" placeholder="Enviar mensagem manual (desliga a IA nesta conversa)..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendManualMessage();}"><button class="wa-btn" onclick="sendManualMessage()">Enviar</button></div>
+ </div><!-- /convThreadBox -->
+</div><!-- /wa-chat-main -->
+</div><!-- /wa-chat-layout -->
+</div><!-- /panel-conversas -->
+<div class="wa-panel" id="panel-comando">
+      <div class="wa-card" id="handoffAlertsCard" style="border:2px solid #c0392b;background:#fff5f5;margin-bottom:16px;display:none;">
+        <div style="font-size:16px;font-weight:700;color:#c0392b;margin-bottom:12px;">Transferencias pendentes (aguardando atendimento humano)</div>
+        <div id="handoffAlertsList" style="font-size:13px;"></div>
+      </div>
+
+    <div class="wa-card" style="border:2px solid #25D366; background:#f4fff8; margin-bottom:16px;">
+      <div style="font-size:16px; font-weight:700; color:var(--ink-900); margin-bottom:12px;">Interruptores gerais (todos os numeros)</div>
+      <div style="display:flex; gap:32px; flex-wrap:wrap;">
+        <div>
+          <label class="big-switch">
+            <input type="checkbox" id="cmdGlobalAiToggle" onchange="toggleGlobalAiCmd(this.checked)">
+            <span class="big-switch-slider"></span>
+          </label>
+          <div style="font-size:13px; margin-top:6px;">Robo de IA <span id="cmdGlobalAiStatus" style="opacity:.7;"></span></div>
+        </div>
+        <div>
+          <label class="big-switch">
+            <input type="checkbox" id="cmdGlobalChatbotToggle" onchange="toggleGlobalChatbotCmd(this.checked)">
+            <span class="big-switch-slider"></span>
+          </label>
+          <div style="font-size:13px; margin-top:6px;">Chatbot de Cadencias <span id="cmdGlobalChatbotStatus" style="opacity:.7;"></span></div>
+        </div>
+      </div>
+      <div style="font-size:12px; color:var(--ink-500); margin-top:10px;">O Robo de IA e o Chatbot de Cadencias sao independentes: desligar um nao afeta o outro.</div>
+    </div>
+
+    <div class="wa-card">
+      <div style="font-size:16px; font-weight:700; color:var(--ink-900); margin-bottom:12px;">Por numero de WhatsApp</div>
+      <div id="cmdNumbersTable">Carregando...</div>
+    </div>
+
+    <div class="wa-card" style="margin-top:16px;">
+      <div style="font-size:13px; color:var(--ink-500);">Para pausar a IA ou a cadencia de um lead especifico, use os checkboxes "IA ativa" e "Cadencia ativa" na lista de conversas (aba Conversas).</div>
+    </div>
+  </div>
+  <div class="wa-panel" id="panel-orientacao">
+      <div class="wa-card">
+        <h3 style="margin-top:0;">Configuração da IA (Vive)</h3>
+        <div class="wa-card" id="globalAiCard" style="border: 2px solid rgb(209, 54, 47); background: rgb(255, 244, 244); margin-bottom: 16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+          <div>
+            <div style="font-size:16px; font-weight:700; color:var(--ink-900);">IA ativa para todos os leads</div>
+            <div id="globalAiStatusText" style="font-size:13px; color:var(--ink-500); margin-top:2px;">DESLIGADA - a Vive NAO esta respondendo a NENHUM lead agora.</div>
+          </div>
+          <label class="big-switch">
+            <input type="checkbox" id="cfgGlobalAiToggle" onchange="toggleGlobalAi(this.checked)">
+            <span class="big-switch-slider"></span>
+          </label>
+        </div>
+        <div style="font-size:12px; color:var(--ink-500); margin-top:10px;">Quando desligado, a Vive para de responder automaticamente TODOS os leads, independente do estado individual de cada conversa. O toggle por conversa continua valendo assim que a IA geral for religada.</div>
+      </div>
+
+        <p style="opacity:.75;font-size:13px;margin:0;">Aqui está tudo que orienta o comportamento do robô no WhatsApp: o prompt completo enviado para a IA, as mensagens usadas quando a IA não consegue responder, e o FAQ. Edite o que quiser e clique em "Salvar orientação" - vale a partir da próxima mensagem recebida, sem precisar reiniciar nada.</p>
+      </div>
+      <div class="wa-card">
+        <div class="wa-field">
+          <label>Nome do assistente</label>
+          <input type="text" id="orAssistantName" placeholder="Vive">
+        </div>
+        <div class="wa-field">
+          <label>Prompt do sistema completo (tom de voz, o que o robô deve e não deve fazer/dizer). Use {{assistant_name}} para inserir o nome configurado acima.</label>
+          <textarea id="orSystemPrompt" style="min-height:360px;font-family:ui-monospace,Consolas,monospace;font-size:13px;line-height:1.5;"></textarea>
+        </div>
+      </div>
+      <div class="wa-card">
+        <div class="wa-toggle"><input type="checkbox" id="cfgHumanizer"> <label for="cfgHumanizer">Humanizador (quebra respostas em mensagens curtas)</label></div>
+        <div class="wa-toggle"><input type="checkbox" id="cfgQualifier"> <label for="cfgQualifier">Qualificador (transfere para SDR humano automaticamente)</label></div>
+      </div>
+      <div class="wa-card">
+        <h4 style="margin-top:0;">Mensagens de contingência (quando a IA não está configurada ou não responde)</h4>
+        <div class="wa-field">
+          <label>Mensagem de boas-vindas (primeiro contato do lead)</label>
+          <textarea id="orFallbackWelcome" style="min-height:70px;"></textarea>
+        </div>
+        <div class="wa-field">
+          <label>Mensagem para redirecionar o paciente (quando não entende o pedido)</label>
+          <textarea id="orFallbackRedirect" style="min-height:70px;"></textarea>
+        </div>
+        <div class="wa-field">
+          <label>Mensagem de transferência para atendimento humano</label>
+          <textarea id="orFallbackHandoff" style="min-height:70px;"></textarea>
+        </div>
+      </div>
+      <div class="wa-card">
+        <h4 style="margin-top:0;">FAQ / respostas rápidas (usado como referência e nas respostas automáticas)</h4>
+        <div class="wa-field">
+          <label>JSON: lista de {"q":"pergunta chave","a":"resposta"}</label>
+          <textarea id="orFaq" style="min-height:160px;font-family:ui-monospace,Consolas,monospace;font-size:13px;"></textarea>
+        </div>
+      </div>
+      <div class="wa-card" id="orPromptEditorCard">
+        <h4 style="margin-top:0;">Peça uma alteração à IA</h4>
+        <p style="color:#666;font-size:13px;margin-top:-8px;">Descreva em português o que quer mudar no comportamento do robô (ex: cole/descreva o que viu numa conversa que saiu errado, ou diga algo como "não quero que ele ofereça desconto sem eu autorizar"). A IA vai gerar uma revisão do prompt acima — nada é salvo até você conferir e confirmar.</p>
+        <div class="wa-field">
+          <textarea id="orInstruction" placeholder="Ex: não quero que o robô ofereça desconto sem eu autorizar" style="min-height:80px;"></textarea>
+        <div class="wa-field" style="margin-top:8px;">
+          <label style="font-size:12px;color:#666;">Anexar print da conversa (opcional)</label><br>
+          <input type="file" id="orInstructionImage" accept="image/*" onchange="handleOrInstructionImage(event)">
+          <div id="orInstructionImagePreview" style="margin-top:6px;"></div>
+       </div>
+        </div>
+        <button class="wa-btn" onclick="generatePromptRevision()">Gerar revisão</button>
+        <span id="orPromptEditorMsg" style="margin-left:10px;font-size:13px;"></span>
+
+        <div id="orPromptDiffWrap" style="display:none;margin-top:16px;">
+          <h4 style="margin-top:0;">O que vai mudar</h4>
+          <p id="orChangeSummary" style="color:#444;font-size:13px;"></p>
+          <div style="display:flex;gap:12px;">
+            <div style="flex:1;min-width:0;">
+              <label style="font-weight:600;font-size:12px;">Antes</label>
+              <div id="orDiffBefore" style="white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;border:1px solid #ddd;border-radius:6px;padding:10px;max-height:400px;overflow:auto;background:#fafafa;"></div>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <label style="font-weight:600;font-size:12px;">Depois</label>
+              <div id="orDiffAfter" style="white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;border:1px solid #ddd;border-radius:6px;padding:10px;max-height:400px;overflow:auto;background:#fafafa;"></div>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="wa-btn" onclick="confirmPromptRevision()" style="background:#1a7f37;">Confirmar e salvar</button>
+            <button class="wa-btn" onclick="discardPromptRevision()" style="background:#888;margin-left:8px;">Descartar</button>
+          </div>
+        </div>
+      </div>
+      <button class="wa-btn" onclick="saveOrientacao()">Salvar configuração</button>
+      <span id="orSaveMsgAfterCard" style="margin-left:10px;font-size:13px;"></span>
+
+
+    </div>
+
+    <div class="wa-panel" id="panel-fluxos">
+      <div class="wa-card">
+        <div id="flowListBox">
+          <button class="wa-btn" onclick="createFlow()">+ Novo fluxo</button>
+          <div id="flowList" style="margin-top:14px;"></div>
+        </div>
+      </div>
+      <div class="wa-card" id="flowEditorBox" style="display:none;">
+        <div class="flow-palette">
+          <button onclick="addNode('trigger')">+ Gatilho</button>
+          <button onclick="addNode('message')">+ Mensagem</button>
+          <button onclick="addNode('question')">+ Pergunta</button>
+          <button onclick="addNode('condition')">+ Condição</button>
+          <button onclick="addNode('wait')">+ Espera</button>
+          <button onclick="addNode('reminder')">+ Lembrete</button>
+          <button onclick="addNode('end')">+ Fim</button>
+          <button class="wa-btn" style="margin-left:auto;" onclick="saveFlowGraph()">Salvar fluxo</button>
+        </div>
+        <div class="flow-canvas" id="flowCanvas"></div>
+      </div>
+    </div>
+    <div class="wa-panel" id="panel-cadencia">
+      <div class="wa-card">
+        <h3 style="margin-top:0;">Cadência - Fluxo Mensal</h3>
+        <p style="color:#666; font-size:13px;">Mensagem enviada 1x por mes para leads parados no estagio D+5. Monte a mensagem empilhando blocos de texto, audio e video, na ordem que serao enviados.</p>
+        <p id="cadenciaMonthLabel" style="font-weight:600;"></p>
+        <div id="cadenciaBlockList" style="margin-top:10px;"></div>
+        <div style="margin-top:14px; display:flex; gap:8px;">
+          <button class="wa-btn secondary" onclick="addCadenciaBlock('text')">+ Texto</button>
+          <button class="wa-btn secondary" onclick="addCadenciaBlock('audio')">+ Audio</button>
+          <button class="wa-btn secondary" onclick="addCadenciaBlock('video')">+ Video</button>
+          <button class="wa-btn" style="margin-left:auto;" onclick="saveCadencia()">Salvar mensagem do mes</button>
+        </div>
+      </div>
+    </div>
+    <div class="wa-panel" id="panel-metricas">
+    <div class="wa-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+        <h3 style="margin:0;">Dashboard de mensagens e ligações</h3>
+        <span style="display:inline-flex;align-items:center;gap:8px;">
+          <select class="input" id="metricasRangeSel">
+            <option value="today">Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="week">Esta semana</option>
+            <option value="lastweek">Semana passada</option>
+            <option value="month" selected>Este mês</option>
+            <option value="lastmonth">Mês passado</option>
+            <option value="custom">Personalizado</option>
+          </select>
+          <select class="input" id="metricasOwnerSel" style="margin-left:6px;">
+            <option value="Todos">Todos</option>
+          </select>
+          <span id="metricasCustomWrap" style="display:none;align-items:center;gap:6px;">
+            <input type="date" id="metricasCustomFrom" class="input" style="padding:6px;font-size:13px;">
+            <span style="font-size:12px;color:#666;">até</span>
+            <input type="date" id="metricasCustomTo" class="input" style="padding:6px;font-size:13px;">
+            <button class="btn-primary" id="metricasApplyBtn" style="padding:6px 10px;font-size:13px;">Aplicar</button>
+          </span>
+        </span>
+      </div>
+      <div id="metricasGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;">
+        <p class="muted">Carregando...</p>
+      </div>
+      <p id="metricasNote" style="font-size:12px;color:#9ca3af;margin-top:14px;"></p>
+    </div>
+  </div>
+
+  </div>
+</div>
+
+<script>
+const API_BASE = '/whatsapp-api/api';
+const token = localStorage.getItem('crm_token');
+if (!token) { window.location.href = 'login.html'; }
+
+function authHeaders() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
+async function api(path, opts) {
+  const r = await fetch(API_BASE + path, Object.assign({ headers: authHeaders() }, opts || {}));
+  if (r.status === 401) { window.location.href = 'login.html'; throw new Error('unauthorized'); }
+  return r.json();
+}
+
+document.querySelectorAll('.wa-tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.wa-tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.wa-panel').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  document.getElementById('panel-' + t.dataset.tab).classList.add('active');
+}));
+
+async function refreshHandoffAlerts() {
+      try {
+        const data = await fetch('/api/crm/ui/handoff-alerts', { headers: authHeaders() }).then(r => r.json());
+        const card = document.getElementById('handoffAlertsCard');
+        const list = document.getElementById('handoffAlertsList');
+        if (!card || !list) return;
+        if (!data.success || !data.alerts || !data.alerts.length) {
+          card.style.display = 'none';
+          list.innerHTML = '';
+          return;
+        }
+        card.style.display = 'block';
+        list.innerHTML = data.alerts.map(a => {
+          const when = a.created_at ? new Date(a.created_at).toLocaleString('pt-BR') : '';
+          const owner = a.owner_name || 'sem owner definida no deal';
+          const name = a.lead_name || a.phone || ('conversa #' + a.conversation_id);
+          return '<div style="padding:8px 0;border-bottom:1px solid #f0d0d0;"><b>' + name + '</b>' + (a.phone ? ' (' + a.phone + ')' : '') + ' — aguardando <b>' + owner + '</b> desde ' + when + '</div>';
+        }).join('');
+      } catch (e) { console.error('refreshHandoffAlerts erro', e); }
+    }
+
+    async function refreshStatus() {
+  try {
+    const data = await api('/status');
+    const badge = document.getElementById('waStatusBadge');
+    badge.textContent = data.status;
+    badge.className = 'wa-status-badge st-' + data.status;
+    const box = document.getElementById('qrBox');
+    if (data.status === 'qr_pending' && data.qr) {
+      box.innerHTML = '<p>Escaneie o QR code abaixo no WhatsApp do numero de teste (Aparelhos conectados → Conectar aparelho):</p><img src="' + data.qr + '">';
+    } else if (data.status === 'connected') {
+      box.innerHTML = '<p>WhatsApp conectado e pronto para uso.</p>';
+    } else {
+      box.innerHTML = '<p>Aguardando geracao do QR code...</p>';
+    }
+  } catch (e) { console.error(e); }
+}
+(function(){
+  var __u2; try { __u2 = JSON.parse(localStorage.getItem('crm_user') || 'null'); } catch(e) { __u2 = null; }
+  if (!(__u2 && __u2.role === 'comercial_robo' && false)) {
+    refreshStatus();
+    setInterval(refreshStatus, 5000);
+      refreshHandoffAlerts();
+      setInterval(refreshHandoffAlerts, 15000);
+  }
+})();
+
+let __allConversations = [];
+let __convFilterCat = 'all';
+let __allConnections = [];
+
+function convBadgeInfo(c) {
+if (c.resolved_at) {
+var __lastT = new Date(String(c.last_msg_created_at || c.last_message_at || '').replace(' ', 'T')).getTime();
+var __resT = new Date(String(c.resolved_at).replace(' ', 'T')).getTime();
+if (!isNaN(__resT) && (isNaN(__lastT) || __resT >= __lastT)) return { label: 'Concluido', color: '#16a34a' };
+}
+  if (c.last_sent_by === 'ai') return { label: 'Gerenciado por: Robo', color: '#3182ce' };
+  if (c.last_sent_by === 'human') return { label: 'SDR ' + (c.deal_owner_name || 'responsavel'), color: '#38a169' };
+  if (c.last_sent_by === 'lead') return { label: 'Aguardando resposta', color: '#e53e3e' };
+  if (c.last_sent_by === 'system') return { label: 'Sistema', color: '#718096' };
+  return { label: 'Sem mensagens', color: '#718096' };
+}
+
+function fmtWaitTime(ms) {
+  if (ms == null || isNaN(ms)) return '';
+  var min = Math.floor(ms / 60000);
+  if (min < 1) return 'ha poucos segundos';
+  if (min < 60) return 'ha ' + min + ' min';
+  var h = Math.floor(min / 60);
+  if (h < 24) return 'ha ' + h + 'h';
+  var d = Math.floor(h / 24);
+  return 'ha ' + d + 'd';
+}
+
+function populateConvOwnerFilter(list) {
+  var sel = document.getElementById('convFilterOwner');
+  if (!sel) return;
+  var current = sel.value;
+  var names = Array.from(new Set(list.map(function(c){ return c.deal_owner_name; }).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">Todas as SDRs</option>' + names.map(function(n){
+    return '<option value="' + n.replace(/"/g,'&quot;') + '">' + n + '</option>';
+  }).join('');
+  if (names.indexOf(current) !== -1) sel.value = current;
+}
+
+function setConvFilter(cat) {
+  __convFilterCat = cat;
+  document.querySelectorAll('.conv-filter-pill').forEach(function(b){
+    b.classList.toggle('active', b.dataset.filter === cat);
+  });
+  applyConvFilters();
+}
+
+function applyConvFilters() {
+  var ownerSel = document.getElementById('convFilterOwner');
+  var ownerVal = ownerSel ? ownerSel.value : '';
+  var list = __allConversations.filter(function(c) {
+    if (ownerVal && c.deal_owner_name !== ownerVal) return false;
+    if (__convFilterCat === 'sdr') return c.last_sent_by === 'human';
+    if (__convFilterCat === 'bot') return c.last_sent_by === 'ai';
+    if (__convFilterCat === 'lead') return c.last_sent_by === 'lead';
+    if (__convFilterCat === 'waiting') return c.last_sent_by === 'lead';
+    return true;
+  });
+  if (__convFilterCat === 'waiting') {
+    list = list.slice().sort(function(a, b) {
+      var ta = new Date(String(a.last_msg_created_at || a.last_message_at || 0).replace(' ', 'T')).getTime();
+      var tb = new Date(String(b.last_msg_created_at || b.last_message_at || 0).replace(' ', 'T')).getTime();
+      return ta - tb;
+    });
+  }
+  renderConvList(list);
+}
+
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderConvList(list) {
+  const el = document.getElementById('convList');
+  el.innerHTML = '';
+  (list || []).forEach(c => {
+    const li = document.createElement('li');
+    li.className = 'wa-conv-item' + (String(c.id) === String(currentConvId) ? ' active' : '');
+    li.dataset.convId = c.id;
+    const badge = convBadgeInfo(c);
+    const isAnonJid = c.wa_jid && (c.wa_jid.endsWith('@lid') || c.wa_jid.endsWith('@g.us'));
+      const anonLabel = c.wa_jid && c.wa_jid.endsWith('@g.us') ? 'Grupo (nao e contato)' : 'Contato anonimo (WhatsApp)';
+      const name = c.contact_name || (isAnonJid ? anonLabel : c.phone);
+    const phoneDisp = isAnonJid ? '' : ((c.contact_name && c.phone && c.phone !== c.contact_name) ? c.phone : '');
+    const initials = (name || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase() || '?';
+    let waitHtml = '';
+    if (c.last_sent_by === 'lead') {
+      const t = new Date(String(c.last_msg_created_at || c.last_message_at || '').replace(' ', 'T')).getTime();
+      if (!isNaN(t)) waitHtml = ' (' + fmtWaitTime(Date.now() - t) + ')';
+    }
+    let preview = c.last_msg_type === 'audio' ? 'Audio' : (c.last_msg_content || '');
+    preview = String(preview).replace(/\s+/g, ' ').trim();
+    if (preview.length > 46) preview = preview.slice(0, 46) + '...';
+    const timeSrc = c.last_msg_created_at || c.last_message_at;
+    const timeLabel = timeSrc ? new Date(String(timeSrc).replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+    li.innerHTML =
+      '<div class="wa-conv-avatar">' + escHtml(initials) + '</div>' +
+      '<div class="wa-conv-info">' +
+        '<div class="wa-conv-row1"><span class="wa-conv-name">' + escHtml(name) + '</span>' + (phoneDisp ? '<span class="wa-conv-phone">' + escHtml(phoneDisp) + '</span>' : '') + '<span class="wa-conv-time">' + escHtml(timeLabel) + '</span></div>' +
+        '<div class="wa-conv-row2"><span class="wa-conv-preview">' + escHtml(preview || 'Sem mensagens') + '</span>' +
+          '<span class="wa-status-dot" style="background:' + badge.color + '" title="' + escHtml(badge.label + waitHtml) + '"></span></div>' +
+        '<div class="wa-conv-row3">' +
+          '<label><input type="checkbox" ' + (c.ai_enabled ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="toggleAi(' + c.id + ', this.checked)"> IA</label>' +
+          '<label><input type="checkbox" ' + (c.cadence_enabled != 0 ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="toggleCadence(' + c.id + ', this.checked)"> Cadencia</label>' +
+        '</div>' +
+      '</div>';
+    li.addEventListener('click', () => openConversation(c.id, name));
+    el.appendChild(li);
+  });
+  if (!el.children.length) el.innerHTML = '<li style="padding:16px;opacity:.6;">Nenhuma conversa encontrada.</li>';
+}
+
+async function loadConversations() {
+  const data = await api('/conversations');
+  __allConversations = data.conversations || [];
+  populateConvOwnerFilter(__allConversations);
+  applyConvFilters();
+}
+
+async function handleOpenFromQuery(){
+var params = new URLSearchParams(window.location.search);
+var qOpen = params.get('open');
+var qPhone = params.get('phone');
+if (qOpen) {
+var conv = (__allConversations||[]).find(function(c){ return String(c.id) === String(qOpen); });
+if (conv) { openConversation(conv.id, conv.contact_name || conv.phone); return; }
+}
+if (qPhone) {
+try {
+var resp = await fetch('/api/crm/ui/conversations/get-or-create', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ phone: qPhone }) });
+var data = await resp.json();
+if (data && data.success) {
+await loadConversations();
+var conv2 = (__allConversations||[]).find(function(c){ return String(c.id) === String(data.id); });
+openConversation(data.id, (conv2 && (conv2.contact_name || conv2.phone)) || qPhone);
+}
+} catch (e) { console.error('erro ao abrir conversa por telefone', e); }
+}
+}
+
+async function toggleAi(id, enabled) { await api('/conversations/' + id + '/toggle-ai', { method: 'POST', body: JSON.stringify({ ai_enabled: enabled }) }); }
+  async function toggleCadence(id, enabled) { await fetch('/api/crm/ui/conversations/' + id + '/toggle-cadence', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: enabled }) }); }
+let currentConvId = null;
+async function sendManualMessage() {
+const inp = document.getElementById('convManualInput');
+const text = (inp.value || '').trim();
+if (!text || !currentConvId) return;
+inp.disabled = true;
+try {
+await api('/conversations/' + currentConvId + '/send', { method: 'POST', body: JSON.stringify({ text }) });
+inp.value = '';
+const title = document.getElementById('convThreadTitle').textContent;
+await openConversation(currentConvId, title);
+await loadConversations();
+} catch (e) {
+alert('Erro ao enviar mensagem: ' + e.message);
+} finally {
+inp.disabled = false;
+inp.focus();
+}
+}
+async function openConversation(id, title) {
+currentConvId = id;
+  (function(){ var layoutEl = document.querySelector('.wa-chat-layout'); if (layoutEl) layoutEl.classList.add('mobile-conv-open'); })();
+const box = document.getElementById('convThreadBox');
+const msgsEl = document.getElementById('convThreadMsgs');
+const titleEl0 = document.getElementById('convThreadTitle');
+  titleEl0.textContent = title;
+  (function(){ var conv0 = (__allConversations||[]).find(function(c){ return String(c.id) === String(id); }); if (conv0 && conv0.deal_id) { titleEl0.href = 'detail.html?id=' + conv0.deal_id; titleEl0.target = '_blank'; titleEl0.style.textDecoration = 'underline'; titleEl0.style.cursor = 'pointer'; titleEl0.title = 'Abrir negocio no CRM'; } else { titleEl0.removeAttribute('href'); titleEl0.removeAttribute('target'); titleEl0.style.textDecoration = 'none'; titleEl0.style.cursor = 'default'; titleEl0.title = ''; } })();
+    (function(){ var b = document.getElementById('convThreadBadge'); if (b) { var conv = (__allConversations||[]).find(function(c){ return String(c.id) === String(id); }); if (conv) { var bd = convBadgeInfo(conv); var waitHtml = ''; if (conv.last_sent_by === 'lead') { var t = new Date(String(conv.last_msg_created_at || conv.last_message_at || '').replace(' ', 'T')).getTime(); if (!isNaN(t)) waitHtml = ' (' + fmtWaitTime(Date.now() - t) + ')'; } b.textContent = bd.label + waitHtml; b.style.background = bd.color; b.style.display = 'inline-block'; } else { b.style.display = 'none'; } } })();
+  const emptyEl = document.getElementById('convThreadEmpty');
+  if (emptyEl) emptyEl.style.display = 'none';
+  box.style.display = 'flex';
+  document.querySelectorAll('.wa-conv-item').forEach(function(li){ li.classList.toggle('active', String(li.dataset.convId) === String(id)); });
+msgsEl.innerHTML = '<p style="opacity:.6">Carregando mensagens...</p>';
+const data = await api('/conversations/' + id + '/messages');
+    loadConversationSidebar(id);
+
+
+function escapeHtmlLS(s) {
+  return String(s).replace(/[&<>"']/g, function(c){
+    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+  });
+}
+
+function ensureLeadSidebar() {
+  var sidebar = document.getElementById('leadSidebar');
+  if (sidebar) return sidebar;
+  var msgsEl = document.getElementById('convThreadMsgs');
+  if (!msgsEl) return null;
+  var panel = msgsEl;
+  var flexParent = null;
+  while (panel && panel.parentElement) {
+    var __cs = getComputedStyle(panel.parentElement);
+    if (__cs.display === 'flex' && __cs.flexDirection !== 'column' && __cs.flexDirection !== 'column-reverse') { flexParent = panel.parentElement; break; }
+    panel = panel.parentElement;
+  }
+  sidebar = document.createElement('div');
+  sidebar.id = 'leadSidebar';
+  sidebar.style.cssText = 'width:280px;min-width:280px;max-width:280px;border-left:1px solid #e5e5e5;padding:14px;overflow-y:auto;background:#fafafa;display:none;box-sizing:border-box;font-size:13px;';
+  sidebar.innerHTML = '<div style="color:#999;">Selecione uma conversa</div>';
+  if (flexParent) {
+    flexParent.appendChild(sidebar);
+  } else {
+    sidebar.style.position = 'fixed';
+    sidebar.style.top = '0';
+    sidebar.style.right = '0';
+    sidebar.style.height = '100vh';
+    sidebar.style.zIndex = '50';
+    document.body.appendChild(sidebar);
+  }
+  return sidebar;
+}
+
+function renderLeadSidebar(info) {
+  var sidebar = ensureLeadSidebar();
+  if (!sidebar) return;
+  sidebar.style.display = 'block';
+  if (!info || !info.success) {
+    sidebar.innerHTML = '<div style="color:#999;">Sem dados do lead para esta conversa.</div>';
+    return;
+  }
+  var scoreHtml = (info.leadScore === null || info.leadScore === undefined)
+    ? '<span style="color:#999;">sem score</span>'
+    : '<span style="font-weight:600;font-size:16px;">' + escapeHtmlLS(info.leadScore) + '</span>';
+  var tagsHtml = (info.tags && info.tags.length)
+    ? info.tags.map(function(t){ return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + '</span>'; }).join('')
+    : '<span style="color:#999;">sem tags</span>';
+  var resumoHtml = info.resumo ? escapeHtmlLS(info.resumo).replace(/\n/g,'<br>') : '<span style="color:#999;">sem resumo ainda</span>';
+  sidebar.innerHTML =
+    '<div style="font-weight:700;margin-bottom:10px;">' + (info.dealTitle ? escapeHtmlLS(info.dealTitle) : 'Lead') + '</div>' +
+    '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Lead score</div>' + scoreHtml + '</div>' +
+    '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
+    '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>';
+}
+
+async function loadConversationSidebar(id) {
+  var sidebar = ensureLeadSidebar();
+  if (sidebar) { sidebar.style.display = 'block'; sidebar.innerHTML = '<div style="color:#999;">Carregando...</div>'; }
+  try {
+    var sbData = await api('/conversations/' + id + '/sidebar');
+    renderLeadSidebar(sbData);
+  } catch (e) {
+    if (sidebar) sidebar.innerHTML = '<div style="color:#c00;">Erro ao carregar dados do lead.</div>';
+  }
+}
+
+msgsEl.innerHTML = '';
+(data.messages || []).forEach(m => {
+const div = document.createElement('div');
+const out = m.direction === 'out';
+div.style.cssText = 'max-width:75%;padding:8px 12px;border-radius:10px;font-size:13px;white-space:pre-wrap;' + (out ? 'align-self:flex-end;background:#dcf8c6;' : 'align-self:flex-start;background:#f1f5f9;');
+const assistantNameEl = document.getElementById('orAssistantName');
+const who = out ? (m.sent_by === 'ai' ? ((assistantNameEl && assistantNameEl.value) || 'Vive') + ' (IA)' : m.sent_by === 'human' ? 'Atendente' : 'Sistema') : title;
+const when = m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '';
+const safe = (m.content || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+div.innerHTML = '<div style="font-size:11px;opacity:.6;margin-bottom:3px;">' + who + ' - ' + when + '</div>' + safe;
+msgsEl.appendChild(div);
+});
+if (!msgsEl.children.length) msgsEl.innerHTML = '<p style="opacity:.6">Nenhuma mensagem ainda.</p>';
+msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+async function resolveConversation(id) {
+if (!id) return;
+try {
+await fetch('/api/crm/ui/conversations/' + id + '/resolve', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ resolved: true }) });
+var conv = (__allConversations || []).find(function(c){ return String(c.id) === String(id); });
+if (conv) conv.resolved_at = new Date().toISOString().slice(0, 19).replace('T', ' ');
+var b = document.getElementById('convThreadBadge');
+if (b && conv) { var bd = convBadgeInfo(conv); b.textContent = bd.label; b.style.background = bd.color; b.style.display = 'inline-block'; }
+applyConvFilters();
+} catch (e) {
+alert('Erro ao marcar como concluido: ' + e.message);
+}
+}
+function closeConvThread() {
+  document.getElementById('convThreadBox').style.display = 'none';
+  (function(){ var layoutEl = document.querySelector('.wa-chat-layout'); if (layoutEl) layoutEl.classList.remove('mobile-conv-open'); })();
+  const emptyEl = document.getElementById('convThreadEmpty');
+  if (emptyEl) emptyEl.style.display = 'flex';
+  currentConvId = null;
+  document.querySelectorAll('.wa-conv-item').forEach(function(li){ li.classList.remove('active'); });
+}
+
+
+function updateGlobalAiStatusText(enabled) {
+  const el = document.getElementById('globalAiStatusText');
+  const card = document.getElementById('globalAiCard');
+  if (enabled) {
+    el.textContent = 'Ligada - a Vive esta respondendo normalmente a todos os leads.';
+    card.style.borderColor = '#25D366';
+    card.style.background = '#f4fff8';
+  } else {
+    el.textContent = 'DESLIGADA - a Vive NAO esta respondendo a NENHUM lead agora.';
+    card.style.borderColor = '#d1362f';
+    card.style.background = '#fff4f4';
+  }
+}
+
+async function toggleGlobalAi(checked) {
+  document.getElementById('globalAiStatusText').textContent = 'Salvando...';
+  try {
+    const r = await api('/ai-config/toggle-global', { method: 'POST', body: JSON.stringify({ enabled: checked }) });
+    updateGlobalAiStatusText(r.ai_globally_enabled);
+  } catch (e) {
+    document.getElementById('globalAiStatusText').textContent = 'Erro ao salvar. Tente novamente.';
+  }
+}
+async function loadComandoCentral() {
+  try {
+    const g = await fetch('/api/crm/ui/global-toggles', { headers: authHeaders() }).then(r => r.json());
+    document.getElementById('cmdGlobalAiToggle').checked = !!g.ai_globally_enabled;
+    document.getElementById('cmdGlobalAiStatus').textContent = g.ai_globally_enabled ? '(ligado)' : '(desligado)';
+    document.getElementById('cmdGlobalChatbotToggle').checked = !!g.chatbot_globally_enabled;
+    document.getElementById('cmdGlobalChatbotStatus').textContent = g.chatbot_globally_enabled ? '(ligado)' : '(desligado)';
+  } catch (e) { console.error('erro global-toggles', e); }
+  try {
+    const n = await fetch('/api/crm/ui/whatsapp-numbers', { headers: authHeaders() }).then(r => r.json());
+    const box = document.getElementById('cmdNumbersTable');
+    if (!n.numbers || !n.numbers.length) { box.innerHTML = '<p style="opacity:.6">Nenhum numero cadastrado.</p>'; return; }
+    let out = '<table style="width:100%; border-collapse:collapse; font-size:13px;">' +
+      '<tr style="text-align:left; border-bottom:1px solid #e5e7eb;"><th style="padding:6px;">Numero</th><th>Status</th><th>Robo de IA</th><th>Chatbot Cadencias</th></tr>';
+    n.numbers.forEach(function(num){
+      const name = num.label || num.session_name || ('Numero ' + num.id);
+      out += '<tr style="border-bottom:1px solid #f0f0f0;">' +
+        '<td style="padding:6px;">' + name + (num.phone_number ? ' <small style="opacity:.6">(' + num.phone_number + ')</small>' : '') + '</td>' +
+        '<td>' + (num.status || '-') + '</td>' +
+        '<td><input type="checkbox" ' + (num.ai_enabled ? 'checked' : '') + ' onchange="toggleNumberAi(' + num.id + ', this.checked)"></td>' +
+        '<td><input type="checkbox" ' + (num.chatbot_enabled ? 'checked' : '') + ' onchange="toggleNumberChatbot(' + num.id + ', this.checked)"></td>' +
+        '</tr>';
+    });
+    out += '</table>';
+    box.innerHTML = out;
+  } catch (e) { console.error('erro whatsapp-numbers', e); }
+}
+async function toggleGlobalAiCmd(checked) {
+  await fetch('/api/crm/ui/global-toggles/ai', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: checked }) });
+  document.getElementById('cmdGlobalAiStatus').textContent = checked ? '(ligado)' : '(desligado)';
+}
+async function toggleGlobalChatbotCmd(checked) {
+  await fetch('/api/crm/ui/global-toggles/chatbot', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: checked }) });
+  document.getElementById('cmdGlobalChatbotStatus').textContent = checked ? '(ligado)' : '(desligado)';
+}
+async function toggleNumberAi(id, checked) {
+  await fetch('/api/crm/ui/whatsapp-numbers/' + id + '/toggle-ai', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: checked }) });
+}
+async function toggleNumberChatbot(id, checked) {
+  await fetch('/api/crm/ui/whatsapp-numbers/' + id + '/toggle-chatbot', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: checked }) });
+}
+let currentFlowId = null;
+let flowNodes = [];
+let flowEdges = [];
+let nodeSeq = 1;
+
+async function loadOrientacao() {
+  const data = await api('/ai-config');
+  const c = data.config;
+  document.getElementById('orAssistantName').value = c.assistant_name || 'Vive';
+  document.getElementById('orSystemPrompt').value = c.system_prompt || '';
+  document.getElementById('cfgHumanizer').checked = c.humanizer_enabled === 'true';
+  document.getElementById('cfgQualifier').checked = c.qualifier_enabled === 'true';
+  document.getElementById('orFallbackWelcome').value = c.fallback_welcome_message || '';
+  document.getElementById('orFallbackRedirect').value = c.fallback_redirect_message || '';
+  document.getElementById('orFallbackHandoff').value = c.fallback_handoff_message || '';
+  document.getElementById('orFaq').value = c.faq_items || '[]';
+  const globalEnabled = c.ai_globally_enabled !== 'false';
+  document.getElementById('cfgGlobalAiToggle').checked = globalEnabled;
+  updateGlobalAiStatusText(globalEnabled);
+}
+async function saveOrientacao() {
+  const body = {
+    assistant_name: document.getElementById('orAssistantName').value || 'Vive',
+    system_prompt: document.getElementById('orSystemPrompt').value,
+    humanizer_enabled: document.getElementById('cfgHumanizer').checked ? 'true' : 'false',
+    qualifier_enabled: document.getElementById('cfgQualifier').checked ? 'true' : 'false',
+    fallback_welcome_message: document.getElementById('orFallbackWelcome').value,
+    fallback_redirect_message: document.getElementById('orFallbackRedirect').value,
+    fallback_handoff_message: document.getElementById('orFallbackHandoff').value,
+    faq_items: document.getElementById('orFaq').value
+  };
+  await api('/ai-config', { method: 'POST', body: JSON.stringify(body) });
+  document.getElementById('orSaveMsg').textContent = 'Salvo!';
+  setTimeout(() => document.getElementById('orSaveMsg').textContent = '', 2000);
+  loadOrientacao();
+}
+
+let orPendingRevisionId = null;
+
+function orEscapeHtml(s) {
+  return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Diff simples por linhas (LCS) so para destacar visualmente o antes/depois.
+function orDiffLines(beforeText, afterText) {
+  const a = (beforeText || '').split('\n');
+  const b = (afterText || '').split('\n');
+  const n = a.length, m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const beforeOut = [], afterOut = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { beforeOut.push({ t: a[i], k: 'same' }); afterOut.push({ t: b[j], k: 'same' }); i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) { beforeOut.push({ t: a[i], k: 'removed' }); i++; }
+    else { afterOut.push({ t: b[j], k: 'added' }); j++; }
+  }
+  while (i < n) { beforeOut.push({ t: a[i], k: 'removed' }); i++; }
+  while (j < m) { afterOut.push({ t: b[j], k: 'added' }); j++; }
+  return { beforeOut, afterOut };
+}
+
+function orRenderDiffColumn(lines) {
+  return lines.map(l => {
+    const bg = l.k === 'removed' ? 'background:#ffecec;color:#8a1f1f;' : (l.k === 'added' ? 'background:#e8f7ec;color:#1a5c2e;' : '');
+    return '<div style="' + bg + 'padding:1px 4px;">' + (orEscapeHtml(l.t) || '&nbsp;') + '</div>';
+  }).join('');
+}
+
+let orInstructionImageDataUrl = null;
+    function handleOrInstructionImage(event) {
+      const file = event.target.files && event.target.files[0];
+      const preview = document.getElementById('orInstructionImagePreview');
+      if (!file) { orInstructionImageDataUrl = null; if (preview) preview.innerHTML = ''; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            const scale = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * scale); h = Math.round(h * scale);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          orInstructionImageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          if (preview) preview.innerHTML = '<img src="' + orInstructionImageDataUrl + '" style="max-width:220px;max-height:160px;border:1px solid #ccc;border-radius:6px;"> <button class="wa-btn" style="margin-left:8px;padding:2px 8px;" onclick="clearOrInstructionImage()">Remover</button>';
+         };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    }
+    function clearOrInstructionImage() {
+      orInstructionImageDataUrl = null;
+      const el = document.getElementById('orInstructionImage'); if (el) el.value = '';
+      const preview = document.getElementById('orInstructionImagePreview'); if (preview) preview.innerHTML = '';
+    }
+
+    async function generatePromptRevision() {
+  const instruction = document.getElementById('orInstruction').value.trim();
+  const msgEl = document.getElementById('orPromptEditorMsg');
+  if (!instruction && !orInstructionImageDataUrl) { msgEl.textContent = 'Escreva a instrução primeiro.'; return; }
+  msgEl.textContent = 'Gerando revisão...';
+  document.getElementById('orPromptDiffWrap').style.display = 'none';
+  try {
+    const data = await api('/chatbot/prompt-editor', { method: 'POST', body: JSON.stringify({ instruction, imageDataUrl: orInstructionImageDataUrl }) });
+    if (!data.success) { msgEl.textContent = 'Erro: ' + (data.error || 'falha desconhecida'); return; }
+    orPendingRevisionId = data.revisionId;
+    const diff = orDiffLines(data.before, data.after);
+    document.getElementById('orDiffBefore').innerHTML = orRenderDiffColumn(diff.beforeOut);
+    document.getElementById('orDiffAfter').innerHTML = orRenderDiffColumn(diff.afterOut);
+    document.getElementById('orChangeSummary').textContent = data.changeSummary || '';
+    document.getElementById('orPromptDiffWrap').style.display = 'block';
+    msgEl.textContent = data.applied === false ? 'A IA sinalizou um conflito — leia o resumo antes de confirmar.' : 'Revisão gerada. Confira o antes/depois antes de salvar.';
+  } catch (e) {
+    msgEl.textContent = 'Erro ao gerar revisão: ' + e.message;
+  }
+}
+
+async function confirmPromptRevision() {
+  const msgEl = document.getElementById('orPromptEditorMsg');
+  if (!orPendingRevisionId) { msgEl.textContent = 'Nenhuma revisão pendente.'; return; }
+  msgEl.textContent = 'Salvando...';
+  try {
+    const data = await api('/chatbot/prompt-editor/confirm', { method: 'POST', body: JSON.stringify({ revisionId: orPendingRevisionId }) });
+    if (!data.success) { msgEl.textContent = 'Erro ao salvar: ' + (data.error || ''); return; }
+    document.getElementById('orPromptDiffWrap').style.display = 'none';
+    document.getElementById('orInstruction').value = '';
+      clearOrInstructionImage();
+    orPendingRevisionId = null;
+    await loadOrientacao();
+    msgEl.textContent = 'Prompt atualizado com sucesso.';
+  } catch (e) {
+    msgEl.textContent = 'Erro ao salvar: ' + e.message;
+  }
+}
+
+function discardPromptRevision() {
+  orPendingRevisionId = null;
+  document.getElementById('orPromptDiffWrap').style.display = 'none';
+  document.getElementById('orPromptEditorMsg').textContent = 'Revisão descartada.';
+}
+
+async function loadFlows() {
+  if (typeof loadExtraConnections === 'function') { await loadExtraConnections().catch(function(){}); }
+  const data = await api('/flows');
+  const el = document.getElementById('flowList');
+  el.innerHTML = '';
+  (data.flows || []).forEach(f => {
+    const div = document.createElement('div');
+    div.style = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;';
+    div.innerHTML = '<span>' + f.name + ' ' + (f.is_active ? '<small style="color:#7CFC9A">(ativo)</small>' : '') + '</span>';
+      const connSel = document.createElement('select');
+      connSel.className = 'wa-btn secondary';
+      connSel.style.marginLeft = '6px';
+      connSel.title = 'Numero que executa este fluxo';
+      const optPrimary = document.createElement('option');
+      optPrimary.value = '';
+      optPrimary.textContent = 'Numero Principal';
+      connSel.appendChild(optPrimary);
+      (__allConnections || []).filter(function(c){ return !c.is_primary; }).forEach(function(c){
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.label || ('Numero ' + c.id);
+        if (f.connection_id && parseInt(f.connection_id) === c.id) opt.selected = true;
+        connSel.appendChild(opt);
+      });
+      connSel.onchange = function(){ updateFlowConnection(f.id, connSel.value); };
+    const btn = document.createElement('button');
+    btn.className = 'wa-btn secondary'; btn.textContent = 'Editar';
+    btn.onclick = () => openFlow(f.id);
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'wa-btn secondary'; toggleBtn.style.marginLeft = '6px';
+      toggleBtn.textContent = f.is_active ? 'Desativar' : 'Ativar';
+      toggleBtn.onclick = () => toggleFlowActive(f);
+    div.appendChild(btn);
+      div.appendChild(toggleBtn);
+      div.appendChild(connSel);
+    el.appendChild(div);
+  });
+}
+async function toggleFlowActive(f) {
+  await api('/flows/' + f.id, { method: 'PUT', body: JSON.stringify({ name: f.name, description: f.description, trigger_keyword: f.trigger_keyword, is_active: f.is_active ? 0 : 1 }) });
+  loadFlows();
+}
+let cadenciaBlocks = [];
+let cadenciaMonthKey = '';
+
+function cadenciaMonthLabel(monthKey) {
+  const meses = ['Janeiro','Fevereiro','Marco','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const parts = (monthKey || '').split('-');
+  const idx = parseInt(parts[1], 10) - 1;
+  const nomeMes = meses[idx] || parts[1];
+  return 'Mensagem de ' + nomeMes + '/' + parts[0];
+}
+
+async function loadCadencia() {
+  const data = await api('/monthly-message');
+  cadenciaMonthKey = data.month_key;
+  cadenciaBlocks = (data.blocks || []).map(b => ({ block_type: b.block_type, text_content: b.text_content || '', media_path: b.media_path || null }));
+  document.getElementById('cadenciaMonthLabel').textContent = cadenciaMonthLabel(cadenciaMonthKey);
+  renderCadenciaBlocks();
+}
+
+function renderCadenciaBlocks() {
+  const el = document.getElementById('cadenciaBlockList');
+  el.innerHTML = '';
+  if (!cadenciaBlocks.length) {
+    el.innerHTML = '<p style="color:#999;">Nenhum bloco configurado ainda para este mes. Adicione um bloco abaixo.</p>';
+    return;
+  }
+  cadenciaBlocks.forEach((b, idx) => {
+    const card = document.createElement('div');
+    card.className = 'wa-card';
+    card.style.marginBottom = '10px';
+    const label = b.block_type === 'text' ? 'Texto' : (b.block_type === 'audio' ? 'Audio' : 'Video');
+    let bodyHtml = '';
+    if (b.block_type === 'text') {
+      bodyHtml = '<textarea style="width:100%; min-height:70px;" data-idx="' + idx + '" onchange="updateCadenciaText(' + idx + ', this.value)">' + (b.text_content || '').replace(/</g, '&lt;') + '</textarea>';
+    } else {
+      const accept = b.block_type === 'audio' ? 'audio/*' : 'video/*';
+      const preview = b.media_path ? '<p style="font-size:12px; color:#666;">Arquivo atual: ' + b.media_path.split('/').pop() + '</p>' : '<p style="font-size:12px; color:#999;">Nenhum arquivo enviado ainda</p>';
+      bodyHtml = preview + '<input type="file" accept="' + accept + '" onchange="uploadCadenciaMedia(' + idx + ', this.files[0])">';
+    }
+    card.innerHTML =
+      '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">' +
+        '<strong>' + (idx + 1) + '. ' + label + '</strong>' +
+        '<div style="margin-left:auto; display:flex; gap:6px;">' +
+          '<button class="wa-btn secondary" onclick="moveCadenciaBlock(' + idx + ', -1)">Subir</button>' +
+          '<button class="wa-btn secondary" onclick="moveCadenciaBlock(' + idx + ', 1)">Descer</button>' +
+          '<button class="wa-btn secondary" onclick="removeCadenciaBlock(' + idx + ')">Remover</button>' +
+        '</div>' +
+      '</div>' +
+      bodyHtml;
+    el.appendChild(card);
+  });
+}
+
+function addCadenciaBlock(type) {
+  cadenciaBlocks.push({ block_type: type, text_content: '', media_path: null });
+  renderCadenciaBlocks();
+}
+
+function removeCadenciaBlock(idx) {
+  cadenciaBlocks.splice(idx, 1);
+  renderCadenciaBlocks();
+}
+
+function moveCadenciaBlock(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= cadenciaBlocks.length) return;
+  const tmp = cadenciaBlocks[idx];
+  cadenciaBlocks[idx] = cadenciaBlocks[newIdx];
+  cadenciaBlocks[newIdx] = tmp;
+  renderCadenciaBlocks();
+}
+
+function updateCadenciaText(idx, value) {
+  cadenciaBlocks[idx].text_content = value;
+}
+
+async function uploadCadenciaMedia(idx, file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch(API_BASE + '/monthly-message/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+  const data = await r.json();
+  if (data.success) {
+    cadenciaBlocks[idx].media_path = data.media_path;
+    renderCadenciaBlocks();
+  } else {
+    alert('Erro ao enviar arquivo: ' + (data.error || 'desconhecido'));
+  }
+}
+
+async function saveCadencia() {
+  const blocks = cadenciaBlocks.map(b => ({ block_type: b.block_type, text_content: b.text_content || null, media_path: b.media_path || null }));
+  const res = await api('/monthly-message', { method: 'PUT', body: JSON.stringify({ month_key: cadenciaMonthKey, blocks }) });
+  if (res.success) {
+    alert('Mensagem do mes salva.');
+  } else {
+    alert('Erro ao salvar: ' + (res.error || 'desconhecido'));
+  }
+}
+
+async function createFlow() {
+  const name = prompt('Nome do fluxo:');
+  if (!name) return;
+  const r = await api('/flows', { method: 'POST', body: JSON.stringify({ name }) });
+  await loadFlows();
+  openFlow(r.id);
+}
+async function openFlow(id) {
+  currentFlowId = id;
+  const data = await api('/flows/' + id);
+  flowNodes = (data.nodes || []).map(n => ({ client_id: 'n' + n.id, id: n.id, node_type: n.node_type, label: n.label, position_x: n.position_x, position_y: n.position_y, config: typeof n.config === 'string' ? JSON.parse(n.config || '{}') : (n.config || {}) }));
+  flowEdges = (data.edges || []).map(e => ({ source: 'n' + e.source_node_id, target: 'n' + e.target_node_id, source_handle: e.source_handle }));
+  document.getElementById('flowEditorBox').style.display = 'block';
+  renderFlow();
+}
+function addNode(type) {
+  const id = 'new' + (nodeSeq++);
+  flowNodes.push({ client_id: id, node_type: type, label: type, position_x: 40 + Math.random()*300, position_y: 40 + Math.random()*300, config: { text: '' } });
+  renderFlow();
+}
+function renderFlow() {
+  const canvas = document.getElementById('flowCanvas');
+  canvas.innerHTML = '';
+  flowNodes.forEach(n => {
+    const div = document.createElement('div');
+    div.className = 'flow-node ' + n.node_type;
+    div.style.left = n.position_x + 'px';
+    div.style.top = n.position_y + 'px';
+    div.innerHTML = '<div class="nt">' + n.node_type + '</div><div contenteditable="true" class="ntxt" style="outline:none;">' + (n.config.text || n.label || '') + '</div>';
+    div.querySelector('.ntxt').addEventListener('input', (e) => { n.config.text = e.target.textContent; });
+    let dragging = false, offX = 0, offY = 0;
+    div.addEventListener('mousedown', (e) => { if (e.target.classList.contains('ntxt')) return; dragging = true; offX = e.offsetX; offY = e.offsetY; });
+    document.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const rect = canvas.getBoundingClientRect();
+      n.position_x = e.clientX - rect.left - offX + canvas.scrollLeft;
+      n.position_y = e.clientY - rect.top - offY + canvas.scrollTop;
+      div.style.left = n.position_x + 'px'; div.style.top = n.position_y + 'px';
+    });
+    document.addEventListener('mouseup', () => dragging = false);
+    canvas.appendChild(div);
+  });
+}
+async function saveFlowGraph() {
+  if (!currentFlowId) return;
+  const payload = { nodes: flowNodes, edges: flowEdges };
+  await api('/flows/' + currentFlowId + '/graph', { method: 'PUT', body: JSON.stringify(payload) });
+  alert('Fluxo salvo!');
+  openFlow(currentFlowId);
+}
+
+(function(){
+  var __u; try { __u = JSON.parse(localStorage.getItem('crm_user') || 'null'); } catch(e) { __u = null; }
+  var __isRobo = __u && __u.role === 'comercial_robo' && false;
+  if (!__isRobo) {
+ loadConversations().then(function(){ try { handleOpenFromQuery(); } catch(e) { console.error('handleOpenFromQuery erro', e); } });
+    loadFlows();
+    loadCadencia();
+    loadComandoCentral();
+  }
+  loadOrientacao();
+  if (__isRobo) {
+    document.querySelectorAll('.wa-tab').forEach(function(t){
+      if (t.dataset.tab !== 'orientacao') { t.style.display = 'none'; t.classList.remove('active'); }
+      else { t.classList.add('active'); }
+    });
+    document.querySelectorAll('.wa-panel').forEach(function(p){
+      if (p.id !== 'panel-orientacao') { p.classList.remove('active'); }
+      else { p.classList.add('active'); }
+    });
+    var __sb = document.getElementById('crmSidebar'); if (__sb) __sb.style.display = 'none';
+  }
+})();
+</script>
+<script>
+function metricasRangeDates(sel){
+  function iso(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+day; }
+  var now = new Date(); var from, to;
+  if (sel === 'today') { from = new Date(now.getFullYear(), now.getMonth(), now.getDate()); to = from; }
+  else if (sel === 'yesterday') { var y = new Date(now.getTime() - 86400000); from = new Date(y.getFullYear(), y.getMonth(), y.getDate()); to = from; }
+  else if (sel === 'week') { var day = now.getDay() || 7; var mon = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + 1); from = mon; to = now; }
+  else if (sel === 'lastweek') { var day2 = now.getDay() || 7; var mon2 = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day2 + 1); from = new Date(mon2.getFullYear(), mon2.getMonth(), mon2.getDate() - 7); to = new Date(mon2.getFullYear(), mon2.getMonth(), mon2.getDate() - 1); }
+  else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if (sel === 'custom') { var cf = document.getElementById('metricasCustomFrom'); var ct = document.getElementById('metricasCustomTo'); if (cf && cf.value && ct && ct.value) return { from: cf.value, to: ct.value }; from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  else { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  return { from: iso(from), to: iso(to) };
+}
+
+function fmtDur(sec){
+  if (sec === null || sec === undefined) return '—';
+  sec = Math.round(sec);
+  if (sec < 60) return sec + 's';
+  var m = Math.floor(sec/60), s = sec % 60;
+  if (m < 60) return m + 'm ' + s + 's';
+  var h = Math.floor(m/60), mm = m % 60;
+  return h + 'h ' + mm + 'm';
+}
+
+function fmtOwnerBreakdown(byOwner){
+  if (!byOwner || !Object.keys(byOwner).length) return '';
+  var parts = Object.keys(byOwner).sort().map(function(k){ return k + ': ' + byOwner[k]; });
+  return '<div class="wa-metric-sub">' + parts.join(' | ') + '</div>';
+}
+
+function collectMetricsOwners(d){
+  var set = {};
+  ['callsMadeByOwner','callsAnsweredByOwner','messagesSentByOwner','messagesReceivedByOwner','avgResponseByOwner'].forEach(function(k){
+    var obj = (d && d[k]) || {};
+    Object.keys(obj).forEach(function(name){ set[name] = true; });
+  });
+  return Object.keys(set).sort();
+}
+
+function metricsForOwner(d, owner){
+  if (!owner || owner === 'Todos') {
+    return {
+      messagesSent: d.messagesSent,
+      messagesReceived: d.messagesReceived,
+      callsMade: d.callsMade,
+      callsAnswered: d.callsAnswered,
+      avgResponseSeconds: d.avgResponseSeconds,
+      avgResponseSamples: d.avgResponseSamples
+    };
+  }
+  var avgObj = (d.avgResponseByOwner && d.avgResponseByOwner[owner]) || null;
+  return {
+    messagesSent: (d.messagesSentByOwner && d.messagesSentByOwner[owner]) || 0,
+    messagesReceived: (d.messagesReceivedByOwner && d.messagesReceivedByOwner[owner]) || 0,
+    callsMade: (d.callsMadeByOwner && d.callsMadeByOwner[owner]) || 0,
+    callsAnswered: (d.callsAnsweredByOwner && d.callsAnsweredByOwner[owner]) || 0,
+    avgResponseSeconds: avgObj ? avgObj.avgResponseSeconds : null,
+    avgResponseSamples: avgObj ? avgObj.avgResponseSamples : 0
+  };
+}
+
+async function loadMetricas(){
+  var grid = document.getElementById('metricasGrid');
+  var note = document.getElementById('metricasNote');
+  var selEl = document.getElementById('metricasRangeSel');
+  if (!grid || !selEl) return;
+  var range = metricasRangeDates(selEl.value);
+  grid.innerHTML = '<p class="muted">Carregando...</p>';
+  try {
+    var d = await api('/dashboard/metrics?from=' + range.from + '&to=' + range.to);
+    if (!d || !d.success) { grid.innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+    var ownerSel = document.getElementById('metricasOwnerSel');
+    if (ownerSel) {
+      var owners = collectMetricsOwners(d);
+      var prevVal = ownerSel.value || 'Todos';
+      ownerSel.innerHTML = '<option value="Todos">Todos</option>' + owners.map(function(o){ return '<option value="' + o + '">' + o + '</option>'; }).join('');
+      ownerSel.value = (owners.indexOf(prevVal) !== -1 || prevVal === 'Todos') ? prevVal : 'Todos';
+    }
+    var selectedOwner = ownerSel ? ownerSel.value : 'Todos';
+    var m = metricsForOwner(d, selectedOwner);
+    grid.innerHTML =
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Mensagens enviadas</div><div class="wa-metric-val">' + m.messagesSent + '</div></div>' +
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Mensagens recebidas</div><div class="wa-metric-val">' + m.messagesReceived + '</div></div>' +
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Ligações efetuadas</div><div class="wa-metric-val">' + m.callsMade + '</div></div>' +
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Ligações atendidas</div><div class="wa-metric-val">' + m.callsAnswered + '</div></div>' +
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Ligações recebidas</div><div class="wa-metric-val">—</div><div class="wa-metric-sub">Sem integração de telefonia</div></div>' +
+      '<div class="wa-metric-card"><div class="wa-metric-lbl">Tempo médio de resposta</div><div class="wa-metric-val">' + fmtDur(m.avgResponseSeconds) + '</div><div class="wa-metric-sub">' + (m.avgResponseSamples||0) + ' amostras</div></div>';
+    var noteTxt = 'Período: ' + d.period.from + ' a ' + d.period.to + '.';
+    if (selectedOwner && selectedOwner !== 'Todos') noteTxt += ' Filtrado por: ' + selectedOwner + '.';
+    if (d.callsReceivedNote) noteTxt += ' ' + d.callsReceivedNote;
+    note.textContent = noteTxt;
+  } catch (e) {
+    grid.innerHTML = '<p class="muted">Erro ao carregar métricas.</p>';
+  }
+}
+
+(function(){
+  var sel = document.getElementById('metricasRangeSel');
+  var customWrap = document.getElementById('metricasCustomWrap');
+  var applyBtn = document.getElementById('metricasApplyBtn');
+  if (sel) sel.addEventListener('change', function(){
+    if (customWrap) customWrap.style.display = this.value === 'custom' ? 'inline-flex' : 'none';
+    if (this.value !== 'custom') loadMetricas();
+  });
+  if (applyBtn) applyBtn.addEventListener('click', loadMetricas);
+  var ownerSelEl = document.getElementById('metricasOwnerSel');
+  if (ownerSelEl) ownerSelEl.addEventListener('change', loadMetricas);
+  document.querySelectorAll('.wa-tab').forEach(function(t){
+    t.addEventListener('click', function(){
+      if (t.dataset.tab === 'metricas') loadMetricas();
+    });
+  });
+})();
+
+async function loadExtraConnections() {
+  try {
+    const data = await api('/connections');
+    __allConnections = data.connections || [];
+    const list = document.getElementById('extraConnList');
+    if (list) {
+      const extras = __allConnections.filter(function(c){ return !c.is_primary; });
+      if (!extras.length) {
+        list.innerHTML = '<p style="opacity:.6;">Nenhum numero adicional conectado ainda.</p>';
+      } else {
+        list.innerHTML = extras.map(function(c){
+          var body = '';
+          if (c.status === 'qr_pending' && c.qr_code) {
+            body = '<p style="font-size:13px;">Escaneie o QR code abaixo:</p><img src="' + c.qr_code + '" style="max-width:220px;">';
+          } else if (c.status === 'connected') {
+            body = '<p style="font-size:13px;color:#3182ce;">Conectado' + (c.phone_number ? (' - ' + c.phone_number) : '') + '</p>';
+          } else {
+            body = '<p style="font-size:13px;opacity:.7;">Aguardando geracao do QR code...</p>';
+          }
+          return '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:10px;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<strong>' + (c.label || ('Numero ' + c.id)) + '</strong>' +
+            '<button class="wa-btn secondary" onclick="disconnectExtraConnection(' + c.id + ')">Desconectar</button>' +
+            '</div>' + body + '</div>';
+        }).join('');
+      }
+      var btnc = document.getElementById('btnConnectNewNumber');
+      if (btnc) btnc.disabled = extras.length >= 4;
+    }
+  } catch (e) { console.error('loadExtraConnections erro', e); }
+}
+async function connectNewNumber() {
+  const label = prompt('Nome/identificacao para o novo numero (ex: Recepcao, Vendas):');
+  if (label === null) return;
+  try {
+    await api('/connections', { method: 'POST', body: JSON.stringify({ label: label || null }) });
+    loadExtraConnections();
+  } catch (e) { alert('Erro ao criar conexao: ' + e.message); }
+}
+async function disconnectExtraConnection(id) {
+  if (!confirm('Desconectar este numero? Sera necessario escanear o QR code novamente para reconectar.')) return;
+  try {
+    await api('/connections/' + id, { method: 'DELETE' });
+    loadExtraConnections();
+  } catch (e) { alert('Erro ao desconectar: ' + e.message); }
+}
+async function updateFlowConnection(flowId, connectionId) {
+  try {
+    await api('/flows/' + flowId + '/connection', { method: 'PATCH', body: JSON.stringify({ connection_id: connectionId || null }) });
+  } catch (e) { alert('Erro ao salvar numero do fluxo: ' + e.message); }
+}
+loadExtraConnections();
+setInterval(loadExtraConnections, 5000);
+</script>
+</body>
+</html>
