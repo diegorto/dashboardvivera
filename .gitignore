@@ -3,3 +3,11 @@ node_modules/
 config/settings.json
 data/
 dist/
+
+# whatsapp-bot: sessoes/credenciais Baileys e mídia recebida - nunca versionar
+microservices/whatsapp-bot/auth_session*
+microservices/whatsapp-bot/assets/incoming_*
+**/.env.*
+*.env.bak*
+*.bak*
+*.db
