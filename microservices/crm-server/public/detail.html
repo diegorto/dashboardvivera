@@ -2099,6 +2099,23 @@ document.addEventListener("DOMContentLoaded",async()=>{await loadProfessionals()
   mcadOverlay.addEventListener('click', function(e){ if (e.target === mcadOverlay) mcadOverlay.classList.remove('open'); });
 
   function mcadEsc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+    function mcadFriendlyError(msg){
+      var map = {
+        'lead_fora_do_piloto': 'Este lead esta fora do piloto (allowlist) no momento. So e possivel disparar mensagens manuais para os numeros de teste liberados.',
+        'deal_nao_encontrado': 'Negocio (deal) nao encontrado.',
+        'Deal nao encontrado': 'Negocio (deal) nao encontrado.',
+        'sem_telefone': 'Este lead nao tem telefone cadastrado.',
+        'fluxo_inicial_desativado': 'O Fluxo Inicial esta desativado nas configuracoes do bot.',
+        'Token invalido ou expirado': 'Sua sessao expirou. Atualize a pagina e faca login novamente.',
+        'Sem token': 'Sua sessao expirou. Atualize a pagina e faca login novamente.',
+        'Erro interno ao disparar mensagem': 'Erro interno no servidor ao tentar enviar. Tente novamente em instantes.'
+      };
+      if (msg && map[msg]) return map[msg];
+      if (msg && /load failed|failed to fetch|networkerror|network request failed/i.test(msg)) {
+        return 'Falha de conexao ao enviar (rede instavel ou conexao caiu). Verifique sua internet e tente novamente.';
+      }
+      return msg || 'Erro inesperado.';
+    }
 
   async function mcadLoad(){
     var dealId = mcadDealId();
@@ -2107,7 +2124,7 @@ document.addEventListener("DOMContentLoaded",async()=>{await loadProfessionals()
       var data = await api('/whatsapp-api/api/cadence/steps?dealId=' + encodeURIComponent(dealId));
       mcadRenderSteps(data);
     } catch (e) {
-      mcadBodyEl.innerHTML = '<div class="mcad-msg err">Erro ao carregar etapas: ' + mcadEsc(e.message) + '</div>';
+      mcadBodyEl.innerHTML = '<div class="mcad-msg err">Erro ao carregar etapas: ' + mcadEsc(mcadFriendlyError(e.message)) + '</div>';
     }
   }
 
@@ -2151,7 +2168,7 @@ document.addEventListener("DOMContentLoaded",async()=>{await loadProfessionals()
       msgEl.innerHTML = '<div class="mcad-msg ok">Mensagem da etapa ' + mcadEsc(label) + ' enviada com sucesso.</div>';
       setTimeout(mcadLoad, 1200);
     } catch (e) {
-      msgEl.innerHTML = '<div class="mcad-msg err">' + mcadEsc(e.message) + '</div>';
+      msgEl.innerHTML = '<div class="mcad-msg err">' + mcadEsc(mcadFriendlyError(e.message)) + '</div>';
       mcadBodyEl.querySelectorAll('.mcad-send-btn').forEach(function(b){ b.disabled = false; });
       btn.textContent = 'Disparar agora';
     }
