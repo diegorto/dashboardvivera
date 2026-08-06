@@ -184,7 +184,7 @@ router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single(
 router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag
+      `SELECT c.deal_id AS dealId, d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag
        FROM whatsapp_conversations c
        LEFT JOIN deals d ON d.id = c.deal_id
        WHERE c.id = ?`,
@@ -196,6 +196,7 @@ router.get('/conversations/:id/sidebar', auth, async (req, res) => {
     try { tags = row.tags ? JSON.parse(row.tags) : [] } catch (e) { tags = [] }
     res.json({
       success: true,
+      dealId: row.dealId || null,
       dealTitle: row.title || null,
       tags,
       leadScore: row.lead_score,

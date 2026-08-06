@@ -777,6 +777,7 @@ inp.focus();
 }
 async function openConversation(id, title) {
 currentConvId = id;
+window.__currentConvTitle = title || '';
   (function(){ var layoutEl = document.querySelector('.wa-chat-layout'); if (layoutEl) layoutEl.classList.add('mobile-conv-open'); })();
 const box = document.getElementById('convThreadBox');
 const msgsEl = document.getElementById('convThreadMsgs');
@@ -836,6 +837,7 @@ function openLeadSidebarManually(){
 }
 window.openLeadSidebarManually = openLeadSidebarManually;
 function renderLeadSidebar(info) {
+  window.__lastSidebarInfo = info;
   var sidebar = ensureLeadSidebar();
   if (!sidebar) return;
   if (window.innerWidth > 860) { sidebar.style.display = 'block'; document.body.classList.add('lead-sidebar-open'); }
@@ -855,6 +857,18 @@ function renderLeadSidebar(info) {
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Lead score</div>' + scoreHtml + '</div>' +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>';
+  sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
+}
+
+window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
+  if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
+  var info = window.__lastSidebarInfo || {};
+  var params = new URLSearchParams();
+  params.set('autoOpen', '1');
+  if (info.dealId) params.set('dealId', String(info.dealId));
+  var patientName = info.dealTitle || window.__currentConvTitle || '';
+  if (patientName) params.set('patientName', patientName);
+  window.open('/agenda-visual.html?' + params.toString(), '_blank');
 }
 
 async function loadConversationSidebar(id) {
