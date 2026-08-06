@@ -209,6 +209,44 @@ router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   }
 })
 
+router.patch('/conversations/:id/deal-meta', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT c.deal_id AS dealId FROM whatsapp_conversations c WHERE c.id = ?`,
+      [req.params.id]
+    )
+    if (!rows.length) return res.status(404).json({ success: false, error: 'conversa nao encontrada' })
+    const dealId = rows[0].dealId
+    if (!dealId) return res.status(400).json({ success: false, error: 'esta conversa nao esta vinculada a um negocio' })
+
+    const updates = []
+    const params = []
+    if (req.body.tags !== undefined) {
+      if (!Array.isArray(req.body.tags) || !req.body.tags.every(t => typeof t === 'string')) {
+        return res.status(400).json({ success: false, error: 'tags deve ser uma lista de textos' })
+      }
+      updates.push('tags = ?')
+      params.push(JSON.stringify(req.body.tags))
+    }
+    if (req.body.leadScore !== undefined) {
+      const score = req.body.leadScore
+      if (score !== null && (!Number.isInteger(score) || score < 1 || score > 5)) {
+        return res.status(400).json({ success: false, error: 'leadScore deve ser um numero inteiro de 1 a 5 (ou null)' })
+      }
+      updates.push('lead_score = ?')
+      params.push(score)
+    }
+    if (!updates.length) return res.status(400).json({ success: false, error: 'nada para atualizar' })
+
+    params.push(dealId)
+    await pool.query('UPDATE deals SET ' + updates.join(', ') + ' WHERE id = ?', params)
+    res.json({ success: true })
+  } catch (e) {
+    console.error('[api] erro ao atualizar deal-meta:', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 // ---- Configuracao do agente de IA (Vive) ----
 router.get('/ai-config', auth, async (req, res) => {
   const cfg = await ai.getConfig()
