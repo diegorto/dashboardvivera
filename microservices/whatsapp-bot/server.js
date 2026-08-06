@@ -28,6 +28,7 @@ app.listen(PORT, '172.17.0.1', () => console.log(`[whatsapp-bot] rodando na port
   scheduler.start()
   monthlyFlow.start()
 cadenceEngine.start()
+try { require('./services/connectionWatchdog').startConnectionWatchdog() } catch (e) { console.error('[server] erro ao iniciar watchdog de conexao:', e.message) }
   wa.startSocket().catch(e => console.error('[whatsapp-bot] erro ao iniciar socket WhatsApp:', e.message))
   require('./services/sessionManager').startAll().catch(e => console.error('[whatsapp-bot] erro ao iniciar sessionManager:', e.message))
 }
