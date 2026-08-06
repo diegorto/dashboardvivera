@@ -149,9 +149,6 @@ async function handleIncomingText(fromJid, text, pushName, connCtx) {
 // e mensagem de lead - e a equipe interna editando o comportamento do bot. So numeros
 // ja cadastrados em ai_chatbot_allowlist podem acionar. Implementado 2026-08-05.
 try {
-const trainerMode = require('./trainerMode')
-const trainerHandled = await trainerMode.maybeHandle(conv, phone, text, sendText, fromJid)
-if (trainerHandled) return
 } catch (e) { console.error('[whatsapp] erro no modo treinador:', e.message) }
   const myConnFlags = await require('./connectionsStore').getFlags(connCtx && connCtx.connectionId).catch(() => ({ ai_enabled: true, chatbot_enabled: true }))
   await saveMessage(conv.id, 'in', text, 'lead')
