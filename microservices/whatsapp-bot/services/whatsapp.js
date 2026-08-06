@@ -530,6 +530,11 @@ async function checkOnWhatsApp(number, sockOverride) {
   return results
 }
 
+async function sendDocument(jid, filePath, fileName, mimetype, sockOverride) {
+  const fsx = require('fs')
+  await (sockOverride || sock).sendMessage(jid, { document: { url: filePath }, fileName: fileName || 'arquivo', mimetype: mimetype || 'application/octet-stream' })
+}
+
 async function sendAudioWithAck(jid, filePath, timeoutMs) {
   const fsx = require('fs')
   const sent = await sock.sendMessage(jid, { audio: fsx.readFileSync(filePath), mimetype: 'audio/ogg; codecs=opus', ptt: true })
@@ -553,6 +558,34 @@ async function sendAudioWithAck(jid, filePath, timeoutMs) {
       }
     }, timeoutMs || 15000)
   })
+}
+
+async function sendManualMedia(conversationId, filePath, mediaType, opts) {
+  opts = opts || {}
+  const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
+  if (!conv) throw new Error('conversa nao encontrada')
+  const jid = conv.wa_jid || (String(conv.phone || '').replace('+', '')) + '@s.whatsapp.net'
+  const sockOverride = getSocketForConnection(conv.connection_id)
+  if (mediaType === 'image') await sendImage(jid, filePath, opts.caption || '', sockOverride)
+  else if (mediaType === 'video') await sendVideo(jid, filePath, { caption: opts.caption || '' }, sockOverride)
+  else if (mediaType === 'audio') await sendAudio(jid, filePath, sockOverride)
+  else await sendDocument(jid, filePath, opts.fileName || 'arquivo', opts.mimetype || 'application/octet-stream', sockOverride)
+  const relMediaUrl = String(filePath).replace(/^.*[\\\/]assets[\\\/]/, 'assets/').replace(/\\/g, '/')
+  try {
+    await pool.query(
+      "INSERT INTO whatsapp_messages (conversation_id, direction, message_type, media_url, sent_by, content) VALUES (?, 'out', ?, ?, 'human', ?)",
+      [conversationId, mediaType, relMediaUrl, opts.caption || ('\uD83D\uDCCE ' + (opts.fileName || 'anexo'))]
+    )
+  } catch (e) {
+    console.error('[whatsapp] erro ao salvar mensagem de anexo manual:', e.message)
+  }
+  await pool.query('UPDATE whatsapp_conversations SET ai_enabled = 0 WHERE id = ?', [conversationId])
+  try {
+    await pool.query('UPDATE handoff_alerts SET resolved_at = NOW() WHERE conversation_id = ? AND resolved_at IS NULL', [conversationId])
+  } catch (e) {
+    console.error('[whatsapp] erro ao resolver alerta de handoff:', e.message)
+  }
+  return true
 }
 
 async function sendManualMessage(conversationId, text) {
@@ -691,4 +724,4 @@ async function forceReconnectConnection(connectionId) {
   try { return await _sessionManager.forceReconnect(connectionId) } catch (e) { console.error('[whatsapp] erro ao forcar reconexao da conexao ' + connectionId + ':', e.message); return false }
 }
 
-module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, ensureConversation, saveMessage, sendManualMessage, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }

@@ -187,7 +187,7 @@
  <span style="display:flex;align-items:center;gap:8px;"><button class="wa-btn primary-blue" onclick="resolveConversation(currentConvId)">Concluido</button><button class="wa-btn-icon" onclick="closeConvThread()" title="Fechar" aria-label="Fechar">&times;</button></span>
  </div>
  <div id="convThreadMsgs" class="wa-chat-messages"></div>
-<div class="wa-chat-inputbar"><input type="text" id="convManualInput" placeholder="Enviar mensagem manual (desliga a IA nesta conversa)..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendManualMessage();}"><button class="wa-btn" onclick="sendManualMessage()">Enviar</button></div>
+<div class="wa-chat-inputbar"><input type="text" id="convManualInput" placeholder="Enviar mensagem manual (desliga a IA nesta conversa)..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendManualMessage();}"><button class="wa-btn-icon" id="convAttachBtn" onclick="document.getElementById('convAttachInput').click()" title="Anexar arquivo" aria-label="Anexar arquivo">📎</button><input type="file" id="convAttachInput" style="display:none" onchange="handleAttachmentSelected(this)"><button class="wa-btn" onclick="sendManualMessage()">Enviar</button></div><div id="convAttachStatus" style="padding:0 14px 8px;font-size:12px;color:#666;"></div>
  </div><!-- /convThreadBox -->
 </div><!-- /wa-chat-main -->
 </div><!-- /wa-chat-layout -->
@@ -601,6 +601,45 @@ openConversation(data.id, (conv2 && (conv2.contact_name || conv2.phone)) || qPho
 async function toggleAi(id, enabled) { await api('/conversations/' + id + '/toggle-ai', { method: 'POST', body: JSON.stringify({ ai_enabled: enabled }) }); }
   async function toggleCadence(id, enabled) { await fetch('/api/crm/ui/conversations/' + id + '/toggle-cadence', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: enabled }) }); }
 let currentConvId = null;
+async function handleAttachmentSelected(inputEl) {
+  var file = inputEl.files && inputEl.files[0];
+  inputEl.value = '';
+  if (!file) return;
+  await sendAttachment(file);
+}
+
+async function sendAttachment(file) {
+  if (!currentConvId) { alert('Selecione uma conversa antes de anexar.'); return; }
+  var statusEl = document.getElementById('convAttachStatus');
+  var attachBtn = document.getElementById('convAttachBtn');
+  if (statusEl) statusEl.textContent = 'Enviando anexo: ' + file.name + '...';
+  if (attachBtn) attachBtn.disabled = true;
+  try {
+    var fd = new FormData();
+    fd.append('file', file);
+    var captionInput = document.getElementById('convManualInput');
+    var caption = (captionInput && captionInput.value ? captionInput.value.trim() : '');
+    if (caption) fd.append('caption', caption);
+    var r = await fetch(API_BASE + '/conversations/' + currentConvId + '/send-attachment', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: fd
+    });
+    var data = await r.json();
+    if (!data.success) throw new Error(data.error || 'falha ao enviar anexo');
+    if (captionInput) captionInput.value = '';
+    if (statusEl) statusEl.textContent = '';
+    var title = document.getElementById('convThreadTitle').textContent;
+    await openConversation(currentConvId, title);
+    await loadConversations();
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '';
+    alert('Erro ao enviar anexo: ' + e.message);
+  } finally {
+    if (attachBtn) attachBtn.disabled = false;
+  }
+}
+
 async function sendManualMessage() {
 const inp = document.getElementById('convManualInput');
 const text = (inp.value || '').trim();

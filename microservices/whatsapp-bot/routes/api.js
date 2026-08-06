@@ -87,6 +87,45 @@ router.post('/conversations/:id/send', auth, async (req, res) => {
   }
 })
 
+const attachmentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const fsx = require('fs')
+    const dir = require('path').join(__dirname, '..', 'assets', 'manual_attachments')
+    try { fsx.mkdirSync(dir, { recursive: true }) } catch (e) {}
+    cb(null, dir)
+  },
+  filename: function (req, file, cb) {
+    const ext = require('path').extname(file.originalname || '') || ''
+    cb(null, 'att_' + Date.now() + '_' + Math.round(Math.random() * 1e9) + ext)
+  }
+})
+const attachmentUpload = multer({ storage: attachmentStorage, limits: { fileSize: 64 * 1024 * 1024 } })
+
+function mediaTypeFromMimetype(mimetype) {
+  if (!mimetype) return 'document'
+  if (mimetype.startsWith('image/')) return 'image'
+  if (mimetype.startsWith('video/')) return 'video'
+  if (mimetype.startsWith('audio/')) return 'audio'
+  return 'document'
+}
+
+// Envio manual de anexo (documento/foto/video) pela equipe; reusa sendImage/sendVideo/sendDocument/sendAudio.
+router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'arquivo obrigatorio' })
+    const mediaType = mediaTypeFromMimetype(req.file.mimetype)
+    await wa.sendManualMedia(req.params.id, req.file.path, mediaType, {
+      caption: req.body.caption || '',
+      fileName: req.file.originalname,
+      mimetype: req.file.mimetype
+    })
+    res.json({ success: true, mediaType })
+  } catch (e) {
+    console.error('[api] erro ao enviar anexo manual:', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
