@@ -416,6 +416,16 @@
 <script>
 const API_BASE = '/whatsapp-api/api';
 const token = localStorage.getItem('crm_token');
+async function loadAudioSrc(elId, relPath) {
+  try {
+    var resp = await fetch('/api/media?path=' + encodeURIComponent(relPath), { headers: { Authorization: 'Bearer ' + token } });
+    if (!resp.ok) return;
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var el = document.getElementById(elId);
+    if (el) el.src = url;
+  } catch (e) { console.error('[whatsapp] erro ao carregar audio:', e); }
+}
 if (!token) { window.location.href = 'login.html'; }
 
 function authHeaders() { return { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }; }
@@ -867,8 +877,16 @@ const assistantNameEl = document.getElementById('orAssistantName');
 const who = out ? (m.sent_by === 'ai' ? ((assistantNameEl && assistantNameEl.value) || 'Vive') + ' (IA)' : m.sent_by === 'human' ? 'Atendente' : 'Sistema') : title;
 const when = m.created_at ? new Date(m.created_at).toLocaleString('pt-BR') : '';
 const safe = (m.content || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (m.message_type === 'audio' && m.media_url) {
+    var audioElId = 'aud_' + m.id;
+    var transcriptHtml = (safe && safe.trim()) ? safe : '<span style="opacity:.6;font-style:italic;">(transcricao indisponivel)</span>';
+    div.innerHTML = '<div style="font-size:11px;opacity:.6;margin-bottom:3px;">' + who + ' - ' + when + '</div>' + '<audio id="' + audioElId + '" controls style="max-width:260px;display:block;margin-bottom:4px;"></audio>' + '<div style="font-size:13px;">' + transcriptHtml + '</div>';
+    msgsEl.appendChild(div);
+    loadAudioSrc(audioElId, m.media_url);
+  } else {
 div.innerHTML = '<div style="font-size:11px;opacity:.6;margin-bottom:3px;">' + who + ' - ' + when + '</div>' + safe;
 msgsEl.appendChild(div);
+  }
 });
 if (!msgsEl.children.length) msgsEl.innerHTML = '<p style="opacity:.6">Nenhuma mensagem ainda.</p>';
 msgsEl.scrollTop = msgsEl.scrollHeight;

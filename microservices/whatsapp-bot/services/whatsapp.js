@@ -85,10 +85,10 @@ async function ensureConversation(phone, name, jid, connectionId) {
   }
 }
 
-async function saveMessage(conversationId, direction, content, sentBy, waMessageId, messageType) {
+async function saveMessage(conversationId, direction, content, sentBy, waMessageId, messageType, mediaUrl) {
   await pool.query(
-    'INSERT INTO whatsapp_messages (conversation_id, direction, content, sent_by, wa_message_id, message_type) VALUES (?, ?, ?, ?, ?, ?)',
-    [conversationId, direction, content, sentBy || 'lead', waMessageId || null, messageType || 'text']
+    'INSERT INTO whatsapp_messages (conversation_id, direction, content, sent_by, wa_message_id, message_type, media_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [conversationId, direction, content, sentBy || 'lead', waMessageId || null, messageType || 'text', mediaUrl || null]
   )
   await pool.query('UPDATE whatsapp_conversations SET last_message_at = NOW() WHERE id = ?', [conversationId])
 }
@@ -126,7 +126,29 @@ async function handleOutgoingFromDevice(fromJid, m, connCtx) {
     [conv.id, content]
   )
   if (recentRows.length) return
-  await saveMessage(conv.id, 'out', content, 'human', waMessageId, messageType)
+  let mediaUrl = null
+  if (messageType === 'audio') {
+    try {
+      const fsx = require('fs')
+      const { downloadMediaMessage } = require('@whiskeysockets/baileys')
+      const buffer = await downloadMediaMessage(m, 'buffer', {})
+      const dir = path.join(__dirname, '..', 'assets', 'outgoing_device_audio')
+      fsx.mkdirSync(dir, { recursive: true })
+      const filename = 'outdev_' + Date.now() + '_' + phone + '.ogg'
+      fsx.writeFileSync(path.join(dir, filename), buffer)
+      mediaUrl = 'assets/outgoing_device_audio/' + filename
+      try {
+        const transcript = await ai.transcribeAudio(buffer)
+        content = (transcript && transcript.trim()) ? transcript : 'Transcricao indisponivel'
+      } catch (e) {
+        console.error('[whatsapp] erro ao transcrever audio enviado do dispositivo:', e.message)
+        content = 'Transcricao indisponivel'
+      }
+    } catch (e) {
+      console.error('[whatsapp] erro ao baixar audio enviado do dispositivo:', e.message)
+    }
+  }
+  await saveMessage(conv.id, 'out', content, 'human', waMessageId, messageType, mediaUrl)
 }
 
 async function handleIncomingText(fromJid, text, pushName, connCtx) {
