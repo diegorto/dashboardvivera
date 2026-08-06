@@ -388,6 +388,10 @@ replyText = faqHit.a
 await setFallbackStreak(conversationId, 0, ttl)
 if (needsHandoff) replyText = trimForHandoff(replyText) + '\n\n' + await buildHandoffNotice(conversationId)
 } else if (isFirstContact) {
+// NOTA (2026-08-06, pedido do Diego): fallback_welcome_message e os textos de cadencia D1-D15
+// sao mensagens FIXAS/roteirizadas, nao geradas ao vivo pela IA. A regra de proibicao de
+// diminutivos do system_prompt vale so para texto que a IA gera durante a conversa -
+// NAO se aplica a esses templates fixos. Nao remover diminutivos deles sem confirmar com o Diego.
 // Primeira mensagem desta conversa: mensagem de boas-vindas (enviada apenas uma vez).
 replyText = (cfg.fallback_welcome_message || 'Oi! Aqui e a {{assistant_name}}, da Vivera Orofacial. Recebi sua mensagem e ja vou te ajudar. Pode me contar rapidinho o que voce precisa?').replaceAll('{{assistant_name}}', cfg.assistant_name || 'Vive')
 await setFallbackStreak(conversationId, 1, ttl)
