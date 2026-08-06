@@ -64,6 +64,9 @@
 </head>
 <body>
 <div class="wa-wrap">
+<button id="crmSidebarToggle" class="crm-hamburger-btn" type="button" aria-label="Abrir menu" onclick="document.getElementById('crmSidebar').classList.toggle('open');document.getElementById('crmSidebarBackdrop').classList.toggle('show');">Menu</button>
+<div id="crmSidebarBackdrop" class="crm-sidebar-backdrop" onclick="document.getElementById('crmSidebar').classList.remove('open');this.classList.remove('show');"></div>
+<button id="leadSidebarCloseBtn" type="button" aria-label="Fechar detalhes do lead" style="display:none;position:fixed;top:10px;right:10px;z-index:900;width:36px;height:36px;border:none;border-radius:8px;background:#111827;color:#fff;font-size:16px;" onclick="document.getElementById('leadSidebar').style.display='none';document.body.classList.remove('lead-sidebar-open');">&times;</button>
 <div class="crm-sidebar" id="crmSidebar">
  <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
  <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
@@ -154,7 +157,7 @@
 .wa-conv-row3{display:flex;gap:10px;margin-top:4px;font-size:11px;color:#64748b;}
 .wa-conv-row3 label{display:flex;align-items:center;gap:3px;cursor:pointer;}
 @media (max-width:768px){
-  .wa-main{padding:8px;width:100%;min-width:0;box-sizing:border-box;}
+  .wa-main{padding:54px 8px 8px 8px;width:100%;min-width:0;box-sizing:border-box;}
   .wa-chat-layout{height:calc(100vh - 170px);border-radius:0;min-width:0;}
   .wa-chat-sidebar{width:100%;min-width:0;max-width:100%;border-right:none;}
   .wa-chat-main{display:none;}
@@ -800,7 +803,7 @@ function ensureLeadSidebar() {
 function renderLeadSidebar(info) {
   var sidebar = ensureLeadSidebar();
   if (!sidebar) return;
-  sidebar.style.display = 'block';
+  sidebar.style.display = 'block'; document.body.classList.add('lead-sidebar-open');
   if (!info || !info.success) {
     sidebar.innerHTML = '<div style="color:#999;">Sem dados do lead para esta conversa.</div>';
     return;
@@ -821,7 +824,7 @@ function renderLeadSidebar(info) {
 
 async function loadConversationSidebar(id) {
   var sidebar = ensureLeadSidebar();
-  if (sidebar) { sidebar.style.display = 'block'; sidebar.innerHTML = '<div style="color:#999;">Carregando...</div>'; }
+  if (sidebar) { sidebar.style.display = 'block'; document.body.classList.add('lead-sidebar-open'); sidebar.innerHTML = '<div style="color:#999;">Carregando...</div>'; }
   try {
     var sbData = await api('/conversations/' + id + '/sidebar');
     renderLeadSidebar(sbData);

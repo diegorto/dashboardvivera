@@ -31,6 +31,8 @@
 </style>
 </head>
 <body>
+<button id="crmSidebarToggle" class="crm-hamburger-btn" type="button" aria-label="Abrir menu" onclick="document.getElementById('crmSidebar').classList.toggle('open');document.getElementById('crmSidebarBackdrop').classList.toggle('show');">Menu</button>
+<div id="crmSidebarBackdrop" class="crm-sidebar-backdrop" onclick="document.getElementById('crmSidebar').classList.remove('open');this.classList.remove('show');"></div>
 <div class="crm-sidebar" id="crmSidebar">
  <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
  <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
