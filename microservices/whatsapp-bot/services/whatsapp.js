@@ -223,12 +223,8 @@ try {
 
   const [[freshConv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conv.id])
   const aiCfg = await ai.getConfig()
-  if (aiCfg.ai_globally_enabled === 'false') return; if (myConnFlags && myConnFlags.ai_enabled === false) return // IA desligada GLOBALMENTE (todos os leads) via Configuracao IA
-  if (!freshConv.ai_enabled) {
-    // atendimento humano assumiu, bot fica em silencio - a mensagem ja foi salva na
-    // memoria de forma incondicional logo no inicio da funcao (ver bloco apos saveMessage).
-    return
-  }
+  const aiConversationDisabled = (aiCfg.ai_globally_enabled === 'false') || (myConnFlags && myConnFlags.ai_enabled === false) || !freshConv.ai_enabled
+  // NOTA (2026-08-06, pedido do Diego): fluxo de boas-vindas desacoplado deste gate - dispara mesmo com IA conversacional desativada (testes). Resto da IA (nome, respostas, handoff) fica muda quando aiConversationDisabled = true.
 
   if (aiBlockedByAllowlist) {
     console.log('[whatsapp] allowlist ativo: lead fora do piloto (bloqueando fluxos automaticos e enviando cortesia unica) - ' + phone)
@@ -246,7 +242,8 @@ try {
     return
   }
 
-    // ---- Confirmacao de nome via pushName do WhatsApp (2026-08-01) ----
+      if (!aiConversationDisabled) {
+  // ---- Confirmacao de nome via pushName do WhatsApp (2026-08-01) ----
     // Pergunta UMA vez, logo no inicio, se ainda nao confirmado. Depois disso a IA
     // so recebe o nome ja resolvido - nunca pergunta "qual seu nome" por conta propria.
     try {
@@ -321,6 +318,8 @@ try {
       console.error('[whatsapp] erro no fluxo de confirmacao de nome:', e.message)
     }
 
+    }
+
   let treatmentTriggered = false
   let genericInterestTriggered = false
   try {
@@ -376,6 +375,7 @@ try {
     console.error('[whatsapp] erro na deteccao de tratamento:', e.message)
   }
   if (treatmentTriggered || genericInterestTriggered) return // mensagem ja salva na memoria incondicionalmente no inicio da funcao
+  if (aiConversationDisabled) return // IA conversacional desativada - fluxo de boas-vindas ja tratado acima, resto fica em silencio
   const { chunks, needsHandoff, qualification, summary, crmSummary } = await ai.generateReply(conv.id, text, (patient && patient.name) ? patient.name : pushName)
 
   // Deteccao simples de interesse em procedimento corporal (fora do escopo atual,
