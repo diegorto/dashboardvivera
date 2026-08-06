@@ -411,7 +411,7 @@ async function handleIncomingAudio(m) {
   const filename = 'in_' + Date.now() + '_' + phone + '.ogg'
   fsx.writeFileSync(path.join(dir, filename), buffer)
   const conv = await ensureConversation(phone, pushName, fromJid)
-  await pool.query("INSERT INTO whatsapp_messages (conversation_id, direction, message_type, media_url, sent_by) VALUES (?, 'in', 'audio', ?, 'lead')", [conv.id, 'assets/incoming_audio/' + filename])
+  const [audioInsertResult] = await pool.query("INSERT INTO whatsapp_messages (conversation_id, direction, message_type, media_url, sent_by) VALUES (?, 'in', 'audio', ?, 'lead')", [conv.id, 'assets/incoming_audio/' + filename])
   console.log('[whatsapp] audio recebido salvo em assets/incoming_audio/' + filename)
   try {
     await withConversationLock(fromJid, async () => {
@@ -419,8 +419,10 @@ async function handleIncomingAudio(m) {
       if (transcript) {
         console.log('[whatsapp] audio transcrito: ' + transcript)
         await handleIncomingText(fromJid, transcript, pushName)
+        try { await pool.query('UPDATE whatsapp_messages SET content = ? WHERE id = ?', [transcript, audioInsertResult.insertId]) } catch (e) { console.error('[whatsapp] erro ao salvar transcricao no audio:', e.message) }
       } else {
         console.log('[whatsapp] audio nao pode ser transcrito (sem texto reconhecido)')
+        try { await pool.query('UPDATE whatsapp_messages SET content = ? WHERE id = ?', ['Transcricao indisponivel', audioInsertResult.insertId]) } catch (e) { console.error('[whatsapp] erro ao salvar fallback de transcricao:', e.message) }
       }
     })
   } catch (e) {
@@ -516,8 +518,35 @@ async function sendText(jid, text, sockOverride) {
 }
 
 async function sendAudio(jid, filePath, sockOverride) {
-  const fsx = require('fs')
-  await (sockOverride || sock).sendMessage(jid, { audio: fsx.readFileSync(filePath), mimetype: 'audio/ogg; codecs=opus', ptt: true })
+  const activeSock = sockOverride || sock
+  const sent = await activeSock.sendMessage(jid, { audio: { url: filePath }, mimetype: 'audio/ogg; codecs=opus', ptt: true })
+  const targetId = sent && sent.key && sent.key.id
+  if (!targetId) return null
+  const ackTimeoutMs = 20000
+  const acked = await new Promise((resolve) => {
+    let done = false
+    const handler = (updates) => {
+      for (const u of updates) {
+        if (u.key && u.key.id === targetId) {
+          done = true
+          activeSock.ev.off('messages.update', handler)
+          resolve(true)
+        }
+      }
+    }
+    activeSock.ev.on('messages.update', handler)
+    setTimeout(() => {
+      if (!done) {
+        activeSock.ev.off('messages.update', handler)
+        resolve(false)
+      }
+    }, ackTimeoutMs)
+  })
+  if (!acked) {
+    console.error('[whatsapp] audio enviado sem confirmacao de entrega (possivel falha silenciosa) - id ' + targetId)
+    throw new Error('Audio enviado mas sem confirmacao de entrega do WhatsApp (a conexao pode ter caido durante o envio). Tente novamente.')
+  }
+  return targetId
 }
 async function sendImage(jid, filePath, caption, sockOverride) {
   const fsx = require('fs')
@@ -574,9 +603,13 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
   if (!conv) throw new Error('conversa nao encontrada')
   const jid = conv.wa_jid || (String(conv.phone || '').replace('+', '')) + '@s.whatsapp.net'
   const sockOverride = getSocketForConnection(conv.connection_id)
+  if (conv.connection_id && !sockOverride) {
+    throw new Error('Conexao WhatsApp (conexao ' + conv.connection_id + ') indisponivel no momento (reconectando). Tente novamente em alguns segundos.')
+  }
+  let sentAudioMsgId = null
   if (mediaType === 'image') await sendImage(jid, filePath, opts.caption || '', sockOverride)
   else if (mediaType === 'video') await sendVideo(jid, filePath, { caption: opts.caption || '' }, sockOverride)
-  else if (mediaType === 'audio') await sendAudio(jid, filePath, sockOverride)
+  else if (mediaType === 'audio') sentAudioMsgId = await sendAudio(jid, filePath, sockOverride)
   else await sendDocument(jid, filePath, opts.fileName || 'arquivo', opts.mimetype || 'application/octet-stream', sockOverride)
   let audioTranscript = null
   if (mediaType === 'audio') {
@@ -597,6 +630,13 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
     )
   } catch (e) {
     console.error('[whatsapp] erro ao salvar mensagem de anexo manual:', e.message)
+  }
+  if (mediaType === 'audio' && sentAudioMsgId) {
+    try {
+      await pool.query('UPDATE whatsapp_messages SET wa_message_id = ? WHERE conversation_id = ? AND direction = ? ORDER BY id DESC LIMIT 1', [sentAudioMsgId, conversationId, 'out'])
+    } catch (e) {
+      console.error('[whatsapp] erro ao salvar wa_message_id do audio:', e.message)
+    }
   }
   await pool.query('UPDATE whatsapp_conversations SET ai_enabled = 0 WHERE id = ?', [conversationId])
   try {

@@ -144,6 +144,27 @@ router.post('/conversations/:id/send-recorded-audio', auth, recordingUpload.sing
   }
 })
 
+router.get('/media', auth, (req, res) => {
+  try {
+    var rel = String(req.query.path || '')
+    if (!rel || rel.indexOf('..') !== -1 || !/^assets\//.test(rel)) {
+      return res.status(400).json({ success: false, error: 'path invalido' })
+    }
+    var assetsRoot = path.resolve(path.join(__dirname, '..', 'assets'))
+    var fullPath = path.resolve(path.join(__dirname, '..', rel))
+    if (fullPath.indexOf(assetsRoot + path.sep) !== 0) {
+      return res.status(400).json({ success: false, error: 'path invalido' })
+    }
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ success: false, error: 'arquivo nao encontrado' })
+    }
+    res.sendFile(fullPath)
+  } catch (e) {
+    console.error('[api] erro ao servir media:', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'arquivo obrigatorio' })
