@@ -432,7 +432,10 @@ const recentAiMessages = memory.filter(m => m && m.role === 'assistant').slice(-
             : 'Ja te respondi isso agora ha pouco - se ficou alguma duvida especifica, me conta que te ajudo.'
       }
     }
-    await pushMemory(conversationId, 'user', userText, ttl)
+    // pushMemory('user', ...) removido daqui (2026-08-06): agora e responsabilidade exclusiva
+  // do chamador (handleIncomingText em whatsapp.js), que grava a mensagem incondicionalmente
+  // ANTES de decidir se chama generateReply ou nao. Isso evita que branches de negocio (quiz,
+  // handoff humano, etc) 'esquecam' de gravar a mensagem no contexto, e evita duplicacao.
 await pushMemory(conversationId, 'assistant', replyText, ttl)
   replyText = sanitizeLocationHallucination(replyText)
   try {

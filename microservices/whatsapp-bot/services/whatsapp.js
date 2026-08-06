@@ -152,6 +152,17 @@ try {
 } catch (e) { console.error('[whatsapp] erro no modo treinador:', e.message) }
   const myConnFlags = await require('./connectionsStore').getFlags(connCtx && connCtx.connectionId).catch(() => ({ ai_enabled: true, chatbot_enabled: true }))
   await saveMessage(conv.id, 'in', text, 'lead')
+  // ARQUITETURA (2026-08-06): a partir daqui, QUALQUER mensagem recebida (texto digitado ou
+  // transcricao de audio) ja esta gravada incondicionalmente na memoria/contexto da IA,
+  // ANTES de qualquer verificacao de negocio (allowlist, handoff humano, quiz/deteccao de
+  // intencao, etc). Nenhum branch abaixo pode mais 'esquecer' de salvar a mensagem no
+  // contexto, porque isso ja aconteceu aqui, no unico ponto de entrada. Ver tambem: o
+  // pushMemory('user', ...) que existia dentro de ai.generateReply foi removido para nao
+  // duplicar esta gravacao.
+  try {
+    const cfgMemEntry = await ai.getConfig().catch(() => null)
+    if (cfgMemEntry) await ai.pushMemory(conv.id, 'user', text, parseInt(cfgMemEntry.redis_ttl_seconds || '86400')).catch(() => {})
+  } catch (e) { console.error('[whatsapp] erro ao salvar mensagem incondicionalmente na memoria:', e.message) }
   if (pendingAudioTimers.has(conv.id)) { clearTimeout(pendingAudioTimers.get(conv.id)); pendingAudioTimers.delete(conv.id) }
   try { await require('./scheduler').cancelPending(conv.id) } catch (e) { console.error('[scheduler] erro ao cancelar sequencia:', e.message) }
 
@@ -192,10 +203,8 @@ try {
   const aiCfg = await ai.getConfig()
   if (aiCfg.ai_globally_enabled === 'false') return; if (myConnFlags && myConnFlags.ai_enabled === false) return // IA desligada GLOBALMENTE (todos os leads) via Configuracao IA
   if (!freshConv.ai_enabled) {
-    // atendimento humano assumiu, bot fica em silencio - guarda a mensagem na memoria
-    // para o contexto nao se perder quando a IA for reativada (corrige perda de contexto).
-    const cfgMem = await ai.getConfig().catch(() => null)
-    if (cfgMem) await ai.pushMemory(conv.id, 'user', text, parseInt(cfgMem.redis_ttl_seconds || '86400')).catch(() => {})
+    // atendimento humano assumiu, bot fica em silencio - a mensagem ja foi salva na
+    // memoria de forma incondicional logo no inicio da funcao (ver bloco apos saveMessage).
     return
   }
 
@@ -344,13 +353,7 @@ try {
   } catch (e) {
     console.error('[whatsapp] erro na deteccao de tratamento:', e.message)
   }
-  if (treatmentTriggered || genericInterestTriggered) {
-    try {
-      const cfgMem2 = await ai.getConfig().catch(() => null)
-      if (cfgMem2) await ai.pushMemory(conv.id, 'user', text, parseInt(cfgMem2.redis_ttl_seconds || '86400')).catch(() => {})
-    } catch (e) { console.error('[whatsapp] erro ao salvar mensagem na memoria (quiz/interesse):', e.message) }
-    return
-  }
+  if (treatmentTriggered || genericInterestTriggered) return // mensagem ja salva na memoria incondicionalmente no inicio da funcao
   const { chunks, needsHandoff, qualification, summary, crmSummary } = await ai.generateReply(conv.id, text, (patient && patient.name) ? patient.name : pushName)
 
   // Deteccao simples de interesse em procedimento corporal (fora do escopo atual,
