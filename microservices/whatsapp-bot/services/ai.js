@@ -4,6 +4,11 @@
 const pool = require('../db')
 const redis = require('../lib/redis')
 
+function llmTemp(desired) {
+  var m = String(process.env.OPENAI_MODEL || '');
+  return m.indexOf('gpt-5.6') === 0 ? 1 : desired;
+}
+
 // ---- Fase 0.3: guarda anti-repeticao / anti-loop ----
 // Compara a resposta candidata com as ultimas mensagens da IA na mesma
 // conversa (memoria curta, role 'assistant'). Se for muito parecida
@@ -211,7 +216,7 @@ async function callLLM(systemPrompt, memory, userText) {
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: 0.6 })
+    body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.6) })
   })
   const data = await resp.json()
   return data?.choices?.[0]?.message?.content || null
@@ -507,7 +512,7 @@ async function reviseSystemPrompt(currentPrompt, instruction, imageDataUrl) {
     body: JSON.stringify({
       model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
       messages: messages,
-      temperature: 0,
+      temperature: llmTemp(0),
       response_format: { type: 'json_object' }
     })
   })
@@ -557,7 +562,7 @@ async function callStructuredLLM(systemPrompt, memory, userText) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: 0, response_format: { type: 'json_object' } })
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0), response_format: { type: 'json_object' } })
     })
     const data = await resp.json()
     const raw = data?.choices?.[0]?.message?.content
@@ -583,7 +588,7 @@ async function classifyOpeningIntent(userText) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: 0, response_format: { type: 'json_object' } })
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0), response_format: { type: 'json_object' } })
     })
     const data = await resp.json()
     const raw = data?.choices?.[0]?.message?.content
@@ -611,7 +616,7 @@ async function callSummaryLLM(systemPrompt, memory, userText) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: 0.3 })
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.3) })
     })
     const data = await resp.json()
     return data?.choices?.[0]?.message?.content || null
@@ -658,7 +663,7 @@ async function humanizeLLM(text, cfg) {
     const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: 0.2 })
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.2) })
     })
     const data = await resp.json()
     const raw = data?.choices?.[0]?.message?.content
@@ -756,7 +761,7 @@ headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiK
 body: JSON.stringify({
 model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
 messages: [{ role: 'system', content: metaPrompt }],
-temperature: 0,
+temperature: llmTemp(0),
 response_format: { type: 'json_object' }
 })
 })
