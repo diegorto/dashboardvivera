@@ -89,3 +89,69 @@ Fix: `.crm-sidebar` ganhou `z-index:500` dentro do bloco mobile (fica acima
 do backdrop 450, abaixo do botao Menu 600). Testado com clique real: abrir
 menu -> clicar em "Pessoas" (navega) -> abrir menu de novo -> clicar em
 "Duplicidades" (navega). Sem overlay cinza, sem erros no console.
+
+## Update 4 (2026-08-06) - Conversas WhatsApp: abrir chat direto + acesso ao painel do lead em mobile
+
+Dois pedidos do Diego apos confirmar que menu mobile e responsividade geral estavam OK:
+
+### 1) Selecionar uma conversa deveria abrir o chat direto, sem passo extra
+
+Comportamento confirmado ANTES da mudanca (testado com clique real em iframe 390x780px simulando mobile):
+ao tocar no nome de um lead na lista de conversas (ex: "Elis Mezzari"), o chat carregava
+corretamente, mas ao mesmo tempo a funcao `loadConversationSidebar()` (chamada automaticamente
+no fim de `openConversation()`) forcava `document.body.classList.add('lead-sidebar-open')`,
+o que via CSS mobile (`body.lead-sidebar-open #leadSidebar{display:block !important;}`) fazia o
+painel de detalhes do lead cobrir a tela inteira por cima do chat. Ou seja, o chat abria, mas
+ficava escondido atras do painel de detalhes - obrigando o usuario a fechar o painel (botao X)
+para ver a conversa. Esse era o "passo extra" relatado.
+
+Correcao: as duas chamadas que forcavam `sidebar.style.display='block'` +
+`classList.add('lead-sidebar-open')` (uma dentro de `renderLeadSidebar()`, outra dentro de
+`loadConversationSidebar()`) passaram a ser condicionais: `if (window.innerWidth > 860) { ... }`.
+Esse e o mesmo breakpoint usado no CSS (`app.css`) para transformar o `#leadSidebar` em overlay
+de tela cheia. Resultado: em desktop (>860px) o painel continua abrindo automaticamente do lado
+do chat, como sempre; em mobile (<=860px) os dados do lead continuam sendo buscados e renderizados
+em segundo plano (fica pronto pra quando o usuario quiser ver), mas o painel fica oculto e o chat
+aparece direto ao tocar na conversa.
+
+### 2) Acesso ao painel de detalhes do lead em mobile
+
+Como o auto-open foi desativado em mobile, era necessario um jeito manual de abrir o painel.
+Foi adicionado um botao verde "Detalhes do lead" no cabecalho do chat (`.wa-chat-header`), ao
+lado dos botoes existentes "Concluido" e "Fechar". O botao usa a classe `.lead-info-mobile-btn`,
+oculta por padrao (`display:none`) e visivel apenas em telas <=860px via media query em `app.css`
+- em desktop ele nao aparece, porque o painel ja fica visivel automaticamente.
+
+O botao chama `openLeadSidebarManually()`, que apenas exibe o `#leadSidebar` (ja carregado em
+segundo plano) sem precisar refazer a requisicao. O fechamento usa o botao X (`#leadSidebarCloseBtn`)
+ja existente desde a correcao anterior.
+
+### Bug encontrado durante a implementacao (e corrigido antes de reportar)
+
+A primeira versao do botao "Detalhes do lead" nao funcionava ao testar com clique real: o clique
+registrava (coordenadas corretas, elemento certo), mas nada acontecia. Investigacao mostrou que
+`ensureLeadSidebar`, `renderLeadSidebar`, `loadConversationSidebar` (e a nova `openLeadSidebarManually`)
+estao declaradas *dentro* do corpo de `async function openConversation(...)` (uma peculiaridade ja
+existente no codigo original - a funcao openConversation nao fecha logo depois de chamar
+`loadConversationSidebar(id)`, ela continua ate o final e engloba essas funcoes auxiliares como
+funcoes aninhadas). Isso faz com que `openConversation` fique global (acessivel via `window`), mas
+tudo que esta aninhado dentro dela - inclusive minha nova funcao - fica preso no escopo local,
+inacessivel para o atributo `onclick="openLeadSidebarManually()"` do botao (que precisa resolver o
+nome no escopo global). Corrigido adicionando `window.openLeadSidebarManually = openLeadSidebarManually;`
+logo apos a definicao da funcao, expondo-a globalmente. Como o botao so aparece depois que uma
+conversa ja foi aberta (e portanto `openConversation` ja rodou ao menos uma vez), a funcao sempre
+esta disponivel no momento em que o usuario poderia clicar nela.
+
+### Teste realizado
+
+Testado com clique real (`computer.left_click` em coordenadas de tela, nao `.click()` via JS) em
+iframe 390x780px simulando mobile, apos restart do pm2:
+- Clique em conversa "Daniel": chat abriu direto, sem overlay do painel de lead cobrindo a tela.
+- Clique no botao "Detalhes do lead": painel abriu em tela cheia mostrando nome, lead score, tags
+  e resumo da conversa, com botao X visivel.
+- Clique no X: painel fechou, voltando pro chat.
+- Verificado tambem em largura desktop (>860px): painel continua abrindo automaticamente como antes,
+  e o botao "Detalhes do lead" fica oculto (nao aparece, pois e desnecessario nesse caso).
+
+Arquivos alterados: `public/whatsapp.html` (botao no header, gating das 2 chamadas de auto-open,
+nova funcao `openLeadSidebarManually` exposta globalmente), `public/app.css` (regra `.lead-info-mobile-btn`).
