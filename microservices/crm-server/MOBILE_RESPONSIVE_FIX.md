@@ -45,3 +45,32 @@ lead), Dashboard (incluindo aba Publico). Sem erros no console. Desktop
 (>860px) permanece identico ao layout anterior.
 
 Commit: ver historico do git ("fix: responsividade mobile do CRM").
+
+## Update 1 (mesmo dia): onclick inline -> addEventListener
+
+Diego reportou que o botao Menu nao abria no celular real (funcionava em
+simulacao de clique). Trocado onclick inline por addEventListener em
+<script> (mais resistente a bloqueadores de conteudo/navegadores restritos).
+Nao resolveu sozinho.
+
+## Update 2: causa provavel identificada (Chrome iOS / WebKit)
+
+Diego confirmou uso de Chrome no iPhone (motor WebKit). Hipotese: o botao
+fica nos primeiros ~48px do topo da tela, zona onde o iOS reconhece o gesto
+nativo de pull-to-refresh. Um toque real (com pequeno deslocamento vertical
+do dedo) pode ser capturado por esse gesto antes de virar um "click" na
+pagina - por isso nunca reproduzi o bug com clique de mouse simulado.
+
+Correcoes aplicadas em public/app.css:
+- `overscroll-behavior-y: contain` em html/body (desativa pull-to-refresh
+  nativo; suportado desde Safari/WebKit 16, portanto Chrome iOS tambem).
+- `touch-action: manipulation` + `-webkit-tap-highlight-color` no botao
+  Menu (remove ambiguidade/atraso de gesto no WebKit).
+- Botao aumentado para 44x44px (touch target minimo recomendado pela Apple).
+- `pointer-events: none` na sidebar/backdrop quando fechados, como
+  blindagem extra contra qualquer sobreposicao de hit-test.
+
+Nao foi possivel validar em iPhone fisico (sem acesso a hardware real) -
+aguardando novo teste do Diego. Se persistir, proximo passo e pedir uma
+gravacao de tela do toque, ou tentar Safari no lugar do Chrome para isolar
+se e algo do Chrome iOS especificamente ou do WebKit em geral.
