@@ -570,11 +570,22 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
   else if (mediaType === 'video') await sendVideo(jid, filePath, { caption: opts.caption || '' }, sockOverride)
   else if (mediaType === 'audio') await sendAudio(jid, filePath, sockOverride)
   else await sendDocument(jid, filePath, opts.fileName || 'arquivo', opts.mimetype || 'application/octet-stream', sockOverride)
+  let audioTranscript = null
+  if (mediaType === 'audio') {
+    try {
+      const fsx = require('fs')
+      const buffer = fsx.readFileSync(filePath)
+      audioTranscript = await ai.transcribeAudio(buffer)
+      if (audioTranscript) console.log('[whatsapp] audio manual transcrito: ' + audioTranscript)
+    } catch (e) {
+      console.error('[whatsapp] erro ao transcrever audio manual:', e.message)
+    }
+  }
   const relMediaUrl = String(filePath).replace(/^.*[\\\/]assets[\\\/]/, 'assets/').replace(/\\/g, '/')
   try {
     await pool.query(
       "INSERT INTO whatsapp_messages (conversation_id, direction, message_type, media_url, sent_by, content) VALUES (?, 'out', ?, ?, 'human', ?)",
-      [conversationId, mediaType, relMediaUrl, opts.caption || ('\uD83D\uDCCE ' + (opts.fileName || 'anexo'))]
+      [conversationId, mediaType, relMediaUrl, opts.caption || audioTranscript || ('\uD83D\uDCCE ' + (opts.fileName || 'anexo'))]
     )
   } catch (e) {
     console.error('[whatsapp] erro ao salvar mensagem de anexo manual:', e.message)
