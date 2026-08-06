@@ -541,34 +541,47 @@ async function sendText(jid, text, sockOverride) {
 
 async function sendAudio(jid, filePath, sockOverride) {
   const activeSock = sockOverride || sock
-  const sent = await activeSock.sendMessage(jid, { audio: { url: filePath }, mimetype: 'audio/ogg; codecs=opus', ptt: true })
-  const targetId = sent && sent.key && sent.key.id
-  if (!targetId) return null
+  const fsx = require('fs')
+  const maxAttempts = 2
   const ackTimeoutMs = 20000
-  const acked = await new Promise((resolve) => {
-    let done = false
-    const handler = (updates) => {
-      for (const u of updates) {
-        if (u.key && u.key.id === targetId) {
-          done = true
-          activeSock.ev.off('messages.update', handler)
-          resolve(true)
-        }
+  let lastErr = null
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let targetId = null
+    try {
+      const buffer = fsx.readFileSync(filePath)
+      const sent = await activeSock.sendMessage(jid, { audio: buffer, mimetype: 'audio/ogg; codecs=opus', ptt: true })
+      targetId = sent && sent.key && sent.key.id
+      if (!targetId) {
+        lastErr = new Error('Envio nao retornou ID de mensagem (tentativa ' + attempt + ')')
+        console.error('[whatsapp] ' + lastErr.message)
+      } else {
+        const acked = await new Promise((resolve) => {
+          let done = false
+          const handler = (updates) => {
+            for (const u of updates) {
+              if (u.key && u.key.id === targetId) {
+                done = true
+                activeSock.ev.off('messages.update', handler)
+                resolve(true)
+              }
+            }
+          }
+          activeSock.ev.on('messages.update', handler)
+          setTimeout(() => {
+            if (!done) { activeSock.ev.off('messages.update', handler); resolve(false) }
+          }, ackTimeoutMs)
+        })
+        if (acked) return targetId
+        lastErr = new Error('Audio enviado mas sem confirmacao de entrega do WhatsApp (tentativa ' + attempt + ')')
+        console.error('[whatsapp] audio sem ACK na tentativa ' + attempt + ' - id ' + targetId + (attempt < maxAttempts ? ' - tentando novamente' : ''))
       }
+    } catch (e) {
+      lastErr = e
+      console.error('[whatsapp] tentativa ' + attempt + ' de envio de audio falhou: ' + e.message)
     }
-    activeSock.ev.on('messages.update', handler)
-    setTimeout(() => {
-      if (!done) {
-        activeSock.ev.off('messages.update', handler)
-        resolve(false)
-      }
-    }, ackTimeoutMs)
-  })
-  if (!acked) {
-    console.error('[whatsapp] audio enviado sem confirmacao de entrega (possivel falha silenciosa) - id ' + targetId)
-    throw new Error('Audio enviado mas sem confirmacao de entrega do WhatsApp (a conexao pode ter caido durante o envio). Tente novamente.')
+    if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 2000))
   }
-  return targetId
+  throw lastErr || new Error('Falha ao enviar audio apos ' + maxAttempts + ' tentativas (sem confirmacao de entrega do WhatsApp). Tente novamente.')
 }
 async function sendImage(jid, filePath, caption, sockOverride) {
   const fsx = require('fs')
