@@ -30,8 +30,17 @@
 </style>
 </head>
 <body>
-<button id="crmSidebarToggle" class="crm-hamburger-btn" type="button" aria-label="Abrir menu" onclick="document.getElementById('crmSidebar').classList.toggle('open');document.getElementById('crmSidebarBackdrop').classList.toggle('show');">Menu</button>
-<div id="crmSidebarBackdrop" class="crm-sidebar-backdrop" onclick="document.getElementById('crmSidebar').classList.remove('open');this.classList.remove('show');"></div>
+<button id="crmSidebarToggle" class="crm-hamburger-btn" type="button" aria-label="Abrir menu">Menu</button>
+<div id="crmSidebarBackdrop" class="crm-sidebar-backdrop"></div>
+<script>(function(){
+  var btn = document.getElementById('crmSidebarToggle');
+  var bd = document.getElementById('crmSidebarBackdrop');
+  function openMenu(){ var sb = document.getElementById('crmSidebar'); if (sb) sb.classList.add('open'); if (bd) bd.classList.add('show'); }
+  function closeMenu(){ var sb = document.getElementById('crmSidebar'); if (sb) sb.classList.remove('open'); if (bd) bd.classList.remove('show'); }
+  function toggleMenu(ev){ if (ev) ev.preventDefault(); var sb = document.getElementById('crmSidebar'); if (!sb) return; if (sb.classList.contains('open')) closeMenu(); else openMenu(); }
+  if (btn) { btn.addEventListener('click', toggleMenu); }
+  if (bd) { bd.addEventListener('click', function(ev){ if (ev) ev.preventDefault(); closeMenu(); }); }
+})();</script>
 <div class="crm-sidebar" id="crmSidebar">
  <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
  <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
