@@ -628,6 +628,11 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
   if (conv.connection_id && !sockOverride) {
     throw new Error('Conexao WhatsApp (conexao ' + conv.connection_id + ') indisponivel no momento (reconectando). Tente novamente em alguns segundos.')
   }
+  const connAgeMs = getConnectionAgeMs(conv.connection_id)
+  const MIN_STABLE_MS = 20000
+  if (conv.connection_id && connAgeMs !== null && connAgeMs < MIN_STABLE_MS) {
+    throw new Error('Conexao WhatsApp (conexao ' + conv.connection_id + ') reconectou ha pouco (' + Math.round(connAgeMs/1000) + 's). Aguarde alguns segundos e tente novamente para evitar midia corrompida.')
+  }
   let sentAudioMsgId = null
   if (mediaType === 'image') await sendImage(jid, filePath, opts.caption || '', sockOverride)
   else if (mediaType === 'video') await sendVideo(jid, filePath, { caption: opts.caption || '' }, sockOverride)
@@ -799,6 +804,7 @@ function getStatus() { return { status: connectionStatus, qr: latestQrDataUrl } 
 let _sessionManager = null
 function registerSessionManager(sm) { _sessionManager = sm }
 function getSocketForConnection(connectionId) { if (!connectionId) return undefined; return _sessionManager ? _sessionManager.getSocket(connectionId) : undefined }
+function getConnectionAgeMs(connectionId) { if (!connectionId) return null; return _sessionManager ? _sessionManager.getConnectionAgeMs(connectionId) : null }
 
 async function forceReconnectConnection(connectionId) {
   if (!connectionId || !_sessionManager || !_sessionManager.forceReconnect) return false

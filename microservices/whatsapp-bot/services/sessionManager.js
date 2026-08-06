@@ -6,6 +6,7 @@ const store = require('./connectionsStore')
 const wa = require('./whatsapp')
 
 const sockets = new Map()
+const connectionOpenedAt = new Map()
 const qrCache = new Map()
 
 function baseDir() { return path.join(__dirname, '..') }
@@ -29,12 +30,14 @@ async function startSocket(connectionId, authDirRel) {
     }
     if (connection === 'open') {
       qrCache.delete(connectionId)
+      connectionOpenedAt.set(connectionId, Date.now())
       const phoneNumber = (sock.user && sock.user.id) ? sock.user.id.split(':')[0] : null
       await store.setStatus(connectionId, 'connected', null, phoneNumber).catch(() => {})
       console.log('[sessionManager] conexao ' + connectionId + ' conectada, numero:', phoneNumber)
     }
     if (connection === 'close') {
       await store.setStatus(connectionId, 'disconnected').catch(() => {})
+      connectionOpenedAt.delete(connectionId)
       const code = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode
       const loggedOut = code === (DisconnectReason ? DisconnectReason.loggedOut : 401)
       if (!loggedOut) {
@@ -128,6 +131,10 @@ async function connectNew(label) {
   return conn
 }
 
+function getConnectionAgeMs(connectionId) {
+  const t = connectionOpenedAt.get(connectionId)
+  return t ? (Date.now() - t) : null
+}
 function getSocket(connectionId) {
   return sockets.get(connectionId)
 }
@@ -172,4 +179,4 @@ async function forceReconnect(connectionId) {
   }
 }
 
-module.exports = { startAll, connectNew, getSocket, getQr, disconnect, startSocket, forceReconnect }
+module.exports = { startAll, connectNew, getSocket, getQr, disconnect, startSocket, forceReconnect, getConnectionAgeMs }
