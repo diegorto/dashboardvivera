@@ -418,12 +418,12 @@ const API_BASE = '/whatsapp-api/api';
 const token = localStorage.getItem('crm_token');
 async function loadAudioSrc(elId, relPath) {
   try {
-    var resp = await fetch('/api/media?path=' + encodeURIComponent(relPath), { headers: { Authorization: 'Bearer ' + token } });
+    var resp = await fetch(API_BASE + '/media?path=' + encodeURIComponent(relPath), { headers: { Authorization: 'Bearer ' + token } });
     if (!resp.ok) return;
     var blob = await resp.blob();
     var url = URL.createObjectURL(blob);
     var el = document.getElementById(elId);
-    if (el) el.src = url;
+    if (el) { el.src = url; el.load(); }
   } catch (e) { console.error('[whatsapp] erro ao carregar audio:', e); }
 }
 if (!token) { window.location.href = 'login.html'; }
