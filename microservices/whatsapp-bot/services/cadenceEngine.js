@@ -466,6 +466,49 @@ async function getStepContentPreview(step) {
   return await getCfg(key)
 }
 
+// ---- Disparo manual do Fluxo Inicial (boas-vindas/quiz) pelo mesmo botao "Disparar agora" ----
+// Reaproveita getDealAndPatient (acima) e triggerWelcomeFlow (services/whatsapp.js), aplicando
+// a mesma restricao de allowlist/piloto que ja vale para o fluxo automatico.
+async function manualTriggerWelcomeFlow(dealId, actorName) {
+  const deal = await getDealAndPatient(dealId)
+  if (!deal) return { ok: false, error: 'deal_nao_encontrado' }
+  if (!deal.patient_phone) return { ok: false, error: 'sem_telefone' }
+  const allowlist = require('./allowlist')
+  if (await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) {
+    return { ok: false, error: 'lead_fora_do_piloto' }
+  }
+  const [[flowRow]] = await pool.query(
+    "SELECT connection_id FROM chatbot_flows WHERE trigger_keyword = 'fluxo_inicial_quiz' AND is_active = 1 LIMIT 1"
+  )
+  if (!flowRow) return { ok: false, error: 'fluxo_inicial_desativado' }
+  const phone = deal.patient_phone.replace(/\D/g, '')
+  const fromJid = phone + '@s.whatsapp.net'
+  const conv = await wa.ensureConversation(phone, deal.patient_name, fromJid, flowRow.connection_id)
+  const sockOverride = wa.getSocketForConnection(flowRow.connection_id)
+  let chatbotEnabled = true
+  try {
+    const connFlags = await require('./connectionsStore').getFlags(flowRow.connection_id)
+    chatbotEnabled = !connFlags || connFlags.chatbot_enabled !== false
+  } catch (e) {}
+  await wa.triggerWelcomeFlow({
+    fromJid,
+    convId: conv.id,
+    dealId,
+    pushName: deal.patient_name,
+    connCtx: { sock: sockOverride, connectionId: flowRow.connection_id },
+    chatbotEnabled
+  })
+  try {
+    const [[dealRow]] = await pool.query('SELECT patient_id FROM deals WHERE id=?', [dealId])
+    const patientId = dealRow ? dealRow.patient_id : null
+    await require('./crm').logActivity(
+      dealId, patientId,
+      'Disparo manual do Fluxo Inicial (quiz + audio Dr. Diego) via WhatsApp (via CRM, por ' + (actorName || 'usuario desconhecido') + ')',
+      'cadence_manual'
+    )
+  } catch (e) {}
+  return { ok: true, step: 'fluxo_inicial', dealId }
+}
 async function listCadenceStepsForDeal(dealId) {
   const deal = await getDealAndPatient(dealId)
   const [[enrollment]] = await pool.query(
@@ -473,6 +516,7 @@ async function listCadenceStepsForDeal(dealId) {
     [dealId]
   )
   const steps = []
+  steps.push({ step: 'fluxo_inicial', label: 'Fluxo Inicial (Quiz + Audio Dr. Diego)', preview: 'Envia o audio de pre-qualificacao do Dr. Diego e inicia a sequencia de resgate.' })
   for (const step of STEP_ORDER) {
     if (step === 'handoff_done') continue
     const content = await getStepContentPreview(step)
@@ -482,6 +526,7 @@ async function listCadenceStepsForDeal(dealId) {
 }
 
 async function manualSendStep(dealId, step, actorName) {
+  if (step === 'fluxo_inicial') return await manualTriggerWelcomeFlow(dealId, actorName)
   if (!STEP_ORDER.includes(step) || step === 'handoff_done') {
     return { ok: false, error: 'step_invalido', detail: 'Etapa invalida.' }
   }
@@ -559,3 +604,4 @@ async function manualSendStep(dealId, step, actorName) {
 module.exports.manualSendStep = manualSendStep
 module.exports.listCadenceStepsForDeal = listCadenceStepsForDeal
 module.exports.getDealAndPatient = getDealAndPatient
+module.exports.manualTriggerWelcomeFlow = manualTriggerWelcomeFlow

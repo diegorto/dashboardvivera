@@ -151,6 +151,37 @@ async function handleOutgoingFromDevice(fromJid, m, connCtx) {
   await saveMessage(conv.id, 'out', content, 'human', waMessageId, messageType, mediaUrl)
 }
 
+// ---- Fluxo de boas-vindas (audio de pre-qualificacao + inicio da sequencia de resgate) ----
+// Extraido do gatilho automatico (classifyOpeningIntent === treatment) para ser reutilizavel
+// tambem pelo disparo manual via CRM (cadenceEngine.manualTriggerWelcomeFlow). NAO altera
+// o comportamento do gatilho automatico - mesma logica, so parametrizada.
+async function triggerWelcomeFlow({ fromJid, convId, dealId, pushName, connCtx, chatbotEnabled }) {
+  try {
+    const seqCfg = await ai.getConfig()
+    const audioPath = seqCfg.seq_trigger_audio_path
+    if (audioPath) {
+      try {
+        await sendAudio(fromJid, require('path').join(__dirname, '..', audioPath), connCtx && connCtx.sock)
+        await saveMessage(convId, 'out', '[audio pre-qualificacao Dr. Diego]', 'ai')
+        if (dealId) {
+          try {
+            await pool.query('UPDATE deals SET stage_id = ? WHERE id = ? AND pipeline_id = (SELECT pipeline_id FROM stages WHERE id = ?)', [8, dealId, 8])
+            console.log('[whatsapp] deal ' + dealId + ' movido para Contato Realizado (stage 8) apos envio do audio 1')
+          } catch (e) {
+            console.error('[whatsapp] erro ao mover deal para Contato Realizado:', e.message)
+          }
+        }
+      } catch (e) {
+        console.error('[whatsapp] erro ao enviar audio de pre-qualificacao:', e.message)
+      }
+    } else {
+      console.warn('[whatsapp] seq_trigger_audio_path nao configurado, pulando audio inicial')
+    }
+    if (chatbotEnabled) await require('./scheduler').scheduleSequence(convId, pushName)
+  } catch (e) {
+    console.error('[whatsapp] erro ao disparar sequencia apos delay:', e.message)
+  }
+}
 async function handleIncomingText(fromJid, text, pushName, connCtx) {
   const phone = fromJid.split('@')[0]
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
@@ -341,34 +372,19 @@ try {
       if (quizEnabled) {
         const intent = await ai.classifyOpeningIntent(text)
         if (intent && intent.category === 'treatment') {
-          const timer = setTimeout(async () => {
-            pendingAudioTimers.delete(conv.id)
-            try {
-              const seqCfg = await ai.getConfig()
-              const audioPath = seqCfg.seq_trigger_audio_path
-              if (audioPath) {
-                try {
-                  await sendAudio(fromJid, require('path').join(__dirname, '..', audioPath), connCtx && connCtx.sock)
-                  await saveMessage(conv.id, 'out', '[audio pre-qualificacao Dr. Diego]', 'ai')
-                try {
-                  await pool.query('UPDATE deals SET stage_id = ? WHERE id = ? AND pipeline_id = (SELECT pipeline_id FROM stages WHERE id = ?)', [8, deal.id, 8])
-                  console.log('[whatsapp] deal ' + deal.id + ' movido para Contato Realizado (stage 8) apos envio do audio 1')
-                } catch (e) {
-                  console.error('[whatsapp] erro ao mover deal para Contato Realizado:', e.message)
-                }
-                } catch (e) {
-                  console.error('[whatsapp] erro ao enviar audio de pre-qualificacao:', e.message)
-                }
-              } else {
-                console.warn('[whatsapp] seq_trigger_audio_path nao configurado, pulando audio inicial')
-              }
-              if (!myConnFlags || myConnFlags.chatbot_enabled !== false) await require('./scheduler').scheduleSequence(conv.id, pushName)
-            } catch (e) {
-              console.error('[whatsapp] erro ao disparar sequencia apos delay:', e.message)
-            }
-          }, 5000)
-          pendingAudioTimers.set(conv.id, timer)
-          treatmentTriggered = true
+          const timer = setTimeout(() => {
+      pendingAudioTimers.delete(conv.id)
+      triggerWelcomeFlow({
+        fromJid,
+        convId: conv.id,
+        dealId: (typeof deal !== 'undefined' && deal) ? deal.id : null,
+        pushName,
+        connCtx,
+        chatbotEnabled: !myConnFlags || myConnFlags.chatbot_enabled !== false
+      })
+    }, 5000)
+    pendingAudioTimers.set(conv.id, timer)
+    treatmentTriggered = true
         } else if (intent && intent.category === 'generic_interest') {
           try {
             const reply = 'Ola, eu sou a assistente e vou te encaminhar para a atendente especializada no seu interesse. Poderia me mandar por escrito ou por audio a sua duvida? Assim ja vou adiantando o assunto para ser mais rapida pra voce 😊'
@@ -834,4 +850,4 @@ async function forceReconnectConnection(connectionId) {
   try { return await _sessionManager.forceReconnect(connectionId) } catch (e) { console.error('[whatsapp] erro ao forcar reconexao da conexao ' + connectionId + ':', e.message); return false }
 }
 
-module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
