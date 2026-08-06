@@ -845,19 +845,69 @@ function renderLeadSidebar(info) {
     sidebar.innerHTML = '<div style="color:#999;">Sem dados do lead para esta conversa.</div>';
     return;
   }
-  var scoreHtml = (info.leadScore === null || info.leadScore === undefined)
-    ? '<span style="color:#999;">sem score</span>'
-    : '<span style="font-weight:600;font-size:16px;">' + escapeHtmlLS(info.leadScore) + '</span>';
-  var tagsHtml = (info.tags && info.tags.length)
-    ? info.tags.map(function(t){ return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + '</span>'; }).join('')
-    : '<span style="color:#999;">sem tags</span>';
+  var scoreHtml;
+  if (info.dealId) {
+    var scoreBtns = '';
+    for (var si = 1; si <= 5; si++) {
+      var active = (info.leadScore && si <= info.leadScore);
+      scoreBtns += '<button type="button" onclick="setLeadScoreForCurrentLead(' + si + ')" style="width:26px;height:26px;border-radius:50%;border:1px solid ' + (active ? '#6c5ce7' : '#ccc') + ';background:' + (active ? '#6c5ce7' : '#fff') + ';color:' + (active ? '#fff' : '#999') + ';cursor:pointer;font-size:12px;font-weight:600;margin-right:4px;">' + si + '</button>';
+    }
+    scoreBtns += '<button type="button" onclick="setLeadScoreForCurrentLead(null)" title="Limpar score" style="border:none;background:none;color:#999;cursor:pointer;font-size:11px;margin-left:6px;">limpar</button>';
+    scoreHtml = scoreBtns;
+  } else {
+    scoreHtml = (info.leadScore === null || info.leadScore === undefined)
+      ? '<span style="color:#999;">sem score</span>'
+      : '<span style="font-weight:600;font-size:16px;">' + escapeHtmlLS(info.leadScore) + '</span>';
+  }
+  var tagsHtml;
+  if (info.dealId) {
+    var tagChips = (info.tags || []).map(function(t, ti){
+      return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 6px 2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + ' <span onclick="removeTagForCurrentLead(' + ti + ')" style="cursor:pointer;font-weight:700;margin-left:3px;">&times;</span></span>';
+    }).join('');
+    tagsHtml = tagChips + '<input type="text" id="newTagInputLS" placeholder="+ tag" style="border:1px solid #ddd;border-radius:12px;padding:2px 8px;font-size:12px;width:80px;margin-top:2px;" onkeydown="if(event.key===&apos;Enter&apos;){addTagForCurrentLead(this.value);this.value=&apos;&apos;;}">';
+  } else {
+    tagsHtml = (info.tags && info.tags.length)
+      ? info.tags.map(function(t){ return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + '</span>'; }).join('')
+      : '<span style="color:#999;">sem tags</span>';
+  }
   var resumoHtml = info.resumo ? escapeHtmlLS(info.resumo).replace(/\n/g,'<br>') : '<span style="color:#999;">sem resumo ainda</span>';
+  var linkNoteHtml = info.dealId ? '' : '<div style="margin-bottom:14px;font-size:11px;color:#c0392b;">Esta conversa nao esta vinculada a um negocio. Vincule para editar tags e score.</div>';
   sidebar.innerHTML =
     '<div style="font-weight:700;margin-bottom:10px;">' + (info.dealTitle ? escapeHtmlLS(info.dealTitle) : 'Lead') + '</div>' +
+    linkNoteHtml +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Lead score</div>' + scoreHtml + '</div>' +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>';
   sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
+}
+
+window.saveDealMeta = function saveDealMeta(partial) {
+  if (!currentConvId) return;
+  api('/conversations/' + currentConvId + '/deal-meta', { method: 'PATCH', body: JSON.stringify(partial) }).then(function(r){
+    if (!r || !r.success) { alert('Erro ao salvar: ' + ((r && r.error) || 'desconhecido')); return; }
+    if (window.__lastSidebarInfo) {
+      if (partial.tags !== undefined) window.__lastSidebarInfo.tags = partial.tags;
+      if (partial.leadScore !== undefined) window.__lastSidebarInfo.leadScore = partial.leadScore;
+      renderLeadSidebar(window.__lastSidebarInfo);
+    }
+  }).catch(function(e){ alert('Erro ao salvar: ' + e.message); });
+}
+window.setLeadScoreForCurrentLead = function setLeadScoreForCurrentLead(n) {
+  saveDealMeta({ leadScore: n });
+}
+window.addTagForCurrentLead = function addTagForCurrentLead(val) {
+  val = (val || '').trim();
+  if (!val) return;
+  var info = window.__lastSidebarInfo || {};
+  var tags = (info.tags || []).slice();
+  if (tags.indexOf(val) === -1) tags.push(val);
+  saveDealMeta({ tags: tags });
+}
+window.removeTagForCurrentLead = function removeTagForCurrentLead(idx) {
+  var info = window.__lastSidebarInfo || {};
+  var tags = (info.tags || []).slice();
+  tags.splice(idx, 1);
+  saveDealMeta({ tags: tags });
 }
 
 window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
