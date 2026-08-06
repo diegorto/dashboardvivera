@@ -173,6 +173,16 @@ async function handleIncomingText(fromJid, text, pushName, connCtx) {
 try {
 } catch (e) { console.error('[whatsapp] erro no modo treinador:', e.message) }
   const myConnFlags = await require('./connectionsStore').getFlags(connCtx && connCtx.connectionId).catch(() => ({ ai_enabled: true, chatbot_enabled: true }))
+  try {
+    const [dupAudioCheck] = await pool.query(
+      "SELECT id FROM whatsapp_messages WHERE conversation_id = ? AND direction = 'in' AND message_type = 'audio' AND created_at >= (NOW() - INTERVAL 8 SECOND) ORDER BY id DESC LIMIT 1",
+      [conv.id]
+    )
+    if (dupAudioCheck && dupAudioCheck.length) {
+      console.log('[whatsapp] texto ignorado (provavel transcricao nativa do WhatsApp duplicando audio recem-recebido) - conversa ' + conv.id)
+      return
+    }
+  } catch (e) { console.error('[whatsapp] erro ao checar duplicidade audio/texto:', e.message) }
   await saveMessage(conv.id, 'in', text, 'lead')
   // ARQUITETURA (2026-08-06): a partir daqui, QUALQUER mensagem recebida (texto digitado ou
   // transcricao de audio) ja esta gravada incondicionalmente na memoria/contexto da IA,
