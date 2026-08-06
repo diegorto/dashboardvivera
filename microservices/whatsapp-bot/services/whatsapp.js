@@ -405,13 +405,15 @@ async function handleIncomingAudio(m) {
   await pool.query("INSERT INTO whatsapp_messages (conversation_id, direction, message_type, media_url, sent_by) VALUES (?, 'in', 'audio', ?, 'lead')", [conv.id, 'assets/incoming_audio/' + filename])
   console.log('[whatsapp] audio recebido salvo em assets/incoming_audio/' + filename)
   try {
-    const transcript = await ai.transcribeAudio(buffer)
-    if (transcript) {
-      console.log('[whatsapp] audio transcrito: ' + transcript)
-      await withConversationLock(fromJid, () => handleIncomingText(fromJid, transcript, pushName))
-    } else {
-      console.log('[whatsapp] audio nao pode ser transcrito (sem texto reconhecido)')
-    }
+    await withConversationLock(fromJid, async () => {
+      const transcript = await ai.transcribeAudio(buffer)
+      if (transcript) {
+        console.log('[whatsapp] audio transcrito: ' + transcript)
+        await handleIncomingText(fromJid, transcript, pushName)
+      } else {
+        console.log('[whatsapp] audio nao pode ser transcrito (sem texto reconhecido)')
+      }
+    })
   } catch (e) {
     console.error('[whatsapp] erro ao transcrever/processar audio:', e.message)
   }
