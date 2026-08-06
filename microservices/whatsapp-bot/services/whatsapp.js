@@ -344,7 +344,13 @@ try {
   } catch (e) {
     console.error('[whatsapp] erro na deteccao de tratamento:', e.message)
   }
-  if (treatmentTriggered || genericInterestTriggered) return
+  if (treatmentTriggered || genericInterestTriggered) {
+    try {
+      const cfgMem2 = await ai.getConfig().catch(() => null)
+      if (cfgMem2) await ai.pushMemory(conv.id, 'user', text, parseInt(cfgMem2.redis_ttl_seconds || '86400')).catch(() => {})
+    } catch (e) { console.error('[whatsapp] erro ao salvar mensagem na memoria (quiz/interesse):', e.message) }
+    return
+  }
   const { chunks, needsHandoff, qualification, summary, crmSummary } = await ai.generateReply(conv.id, text, (patient && patient.name) ? patient.name : pushName)
 
   // Deteccao simples de interesse em procedimento corporal (fora do escopo atual,
