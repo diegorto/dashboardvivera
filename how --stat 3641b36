@@ -1,0 +1,8 @@
+[33m3641b36[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mbackup-wip-vps-20260717-1606[m[33m)[m checkpoint: known-good baseline do whatsapp-bot antes de novas mudancas de risco (ensureConversation com recovery de ER_DUP_ENTRY, patch Exojet no system_prompt, reconexao estavel da conexao 5). Adiciona .gitignore para auth_session*, midia recebida, .env.* e arquivos .bak - nunca versionar credenciais/sessao Baileys.
+[33mfcccc55[m checkpoint: sidebar do lead (tags, lead_score, resumo_crm) na aba Conversas - testado ao vivo
+[33mb014b93[m Remove Ja e paciente do card Leads por Fonte (nao e fonte de lead)
+[33mffe39ea[m Auditoria de deals duplicados por telefone (Receita) + alerta no dashboard
+[33md941594[m fix: Qualificados combina historico de transicoes + posicao atual (fallback sem backfill completo)
+[33m83a0b1e[m fix: Receita por Procedimento com dados reais (vivera_crm), corrige bug eixo R$0K
+[33m5ba46c1[m feat: colunas Perdidos/Working em Criativos com drill-down (loss reasons + funil), zero API Pipedrive
+[33m3632201[m feat: drill-down na tabela Todas as Campanhas (nome, criativo, conjunto, tempo ate compra por lead)

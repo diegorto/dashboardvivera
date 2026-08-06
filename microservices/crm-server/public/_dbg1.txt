@@ -1,0 +1,51 @@
+    api("/api/crm/deals/" + dealId, { method COLON  "PATCH", body COLON  JSON.stringify({ professional_id COLON  null }) });
+}
+
+async function _ensureUsersLoaded() {
+  if (window._usersCache) return window._usersCache;
+  try { const d  EQ  await api('/api/crm/ui/users'); window._usersCache  EQ  d.users || []; } catch (e) { window._usersCache  EQ  []; }
+  return window._usersCache;
+}
+document.getElementById('openScheduleActivityBtn')?.addEventListener('click', async ()  EQ > {
+  const sel  EQ  document.getElementById('schedUser');
+  sel.innerHTML  EQ  '';
+  const users  EQ  await _ensureUsersLoaded();
+  users.forEach(u  EQ > { const o  EQ  document.createElement('option'); o.value  EQ  u.id; o.textContent  EQ  u.name; sel.appendChild(o); });
+  document.getElementById('schedType').value  EQ  'Ligacao';
+  document.getElementById('schedSubject').value  EQ  '';
+  document.getElementById('schedDueAt').value  EQ  '';
+  document.getElementById('scheduleActivityModal').style.display  EQ  'flex';
+});
+const _schedCancelBtn  EQ  document.getElementById('schedCancelBtn');
+if (_schedCancelBtn) {
+  _schedCancelBtn.addEventListener('click', ()  EQ > {
+    document.getElementById('scheduleActivityModal').style.display  EQ  'none';
+  });
+}
+document.getElementById('schedSaveBtn')?.addEventListener('click', async ()  EQ > {
+  const type  EQ  document.getElementById('schedType').value;
+  const subject  EQ  document.getElementById('schedSubject').value.trim();
+  const dueAtLocal  EQ  document.getElementById('schedDueAt').value;
+  const userId  EQ  parseInt(document.getElementById('schedUser').value, 10) || null;
+  if (!subject) { showToast('Informe o assunto', 'error'); return; }
+  if (!dueAtLocal) { showToast('Informe data e hora', 'error'); return; }
+  try {
+    await api('/api/crm/activities', { method COLON  'POST', body COLON  JSON.stringify({
+      dealId COLON  parseInt(dealId, 10), type COLON  type, subject COLON  subject, content COLON  subject,
+      dueAt COLON  dueAtLocal.replace('T', ' ') + ' COLON 00', assignedUserId COLON  userId
+    }) });
+    showToast('Atividade agendada.', 'success');
+    document.getElementById('scheduleActivityModal').style.display  EQ  'none';
+    await loadDeal();
+  } catch (err) { showToast(err.message, 'error'); }
+});
+const _buscarTintimBtnEl  EQ  document.getElementById('buscarTintimBtn');
+if (_buscarTintimBtnEl) {
+  _buscarTintimBtnEl.addEventListener('click', async ()  EQ > {
+    const btn  EQ  _buscarTintimBtnEl;
+    btn.disabled  EQ  true; const _origTxt  EQ  btn.textContent; btn.textContent  EQ  'Buscando...';
+    try {
+      const resp  EQ  await api('/api/crm/deals/' + dealId + '/lookup-tintim', { method COLON  'POST' });
+      if (resp && resp.found) {
+        showToast('Dados encontrados no Tintim e preenchidos.', 'success');
+        await loadDeal();

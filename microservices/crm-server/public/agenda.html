@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Agenda</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.agenda-group{margin-bottom:24px;}
+.agenda-group h3{font-size:13px;text-transform:uppercase;color:#888;letter-spacing:.05em;margin:0 0 8px;}
+.agenda-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e5e5e5;border-radius:8px;margin-bottom:8px;background:#fff;}
+.agenda-item.overdue{border-color:#e0a0a0;background:#fff7f7;}
+.overdue-badge{display:inline-block;margin-left:8px;font-size:11px;font-weight:600;color:#fff;background:#e33;padding:2px 8px;border-radius:10px;vertical-align:middle;}
+.agenda-item .chk{width:18px;height:18px;flex-shrink:0;cursor:pointer;}
+.agenda-item .info{flex:1;min-width:0;}
+.agenda-item .subj{font-weight:600;font-size:14px;}
+.agenda-item .meta{font-size:12px;color:#888;margin-top:2px;}
+.agenda-item .time{font-size:13px;color:#555;white-space:nowrap;}
+.agenda-item .type-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#3949ab;white-space:nowrap;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:10px;padding:24px;width:440px;max-width:90vw;max-height:85vh;overflow-y:auto;}
+.modal-box h2{margin-top:0;font-size:18px;}
+.modal-field{margin-bottom:14px;}
+.modal-field label{display:block;font-size:12px;color:#666;margin-bottom:4px;}
+.modal-field input,.modal-field select,.modal-field textarea{width:100%;box-sizing:border-box;}
+.deal-suggestions{border:1px solid #ddd;border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;display:none;}
+.deal-suggestions.open{display:block;}
+.deal-suggestions div{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;}
+.deal-suggestions div:hover{background:#f5f5f5;}
+</style>
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+      <a class="nav-link" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link active" href="agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class="topbar-right" id="topbarRight"></div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Agenda</h1><div id="overdueSummaryCard" style="display:none;background:#fdecec;border:1px solid #f3b4b4;border-radius:10px;padding:12px 16px;margin-bottom:16px;"><div style="font-weight:600;color:#a33;margin-bottom:8px;">Atividades em atraso</div><div id="overdueSummaryList" style="display:flex;flex-wrap:wrap;gap:16px;"></div></div><div class="modal-overlay" id="overdueModal"><div class="modal-box"><h2 id="overdueModalTitle">Atividades em atraso</h2><div id="overdueModalList" style="max-height:60vh;overflow-y:auto;"></div><div style="display:flex;justify-content:flex-end;margin-top:16px;"><button class="btn" onclick="document.getElementById('overdueModal').classList.remove('open')">Fechar</button></div></div></div>
+  <p class="page-sub" id="totalLabel">Carregando...</p>
+
+  <div class="card">
+    <div class="toolbar">
+      <select class="input" id="userFilter" style="width:auto;">
+        <option value="">Todos os responsaveis</option>
+      </select>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#666;">
+        <input type="checkbox" id="includeDone"> Mostrar concluidas
+      </label>
+      <button class="btn" id="refreshBtn">Atualizar</button>
+      <button class="btn btn-primary" id="newActivityBtn" style="margin-left:auto;">+ Nova Atividade</button>
+    </div>
+    <div id="agendaContainer"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="activityModal">
+  <div class="modal-box">
+    <h2>Nova Atividade</h2>
+    <div class="modal-field">
+      <label>Negocio</label>
+      <input type="text" class="input" id="dealSearchInput" placeholder="Buscar por nome, telefone ou negocio...">
+      <div class="deal-suggestions" id="dealSuggestions"></div>
+      <input type="hidden" id="selectedDealId">
+      <div id="selectedDealLabel" style="font-size:12px;color:#3949ab;margin-top:4px;"></div>
+    </div>
+    <div class="modal-field">
+      <label>Tipo</label>
+      <select class="input" id="actType">
+        <option value="Ligacao">Ligacao</option>
+        <option value="Reuniao">Reuniao</option>
+        <option value="Tarefa">Tarefa</option>
+        <option value="Prazo">Prazo</option>
+        <option value="Email">E-mail</option>
+        <option value="Outro">Outro</option>
+      </select>
+    </div>
+    <div class="modal-field">
+      <label>Assunto</label>
+      <input type="text" class="input" id="actSubject" placeholder="Ex: Ligar para confirmar avaliacao">
+    </div>
+    <div class="modal-field">
+      <label>Data e hora</label>
+      <input type="datetime-local" class="input" id="actDueAt">
+    </div>
+    <div class="modal-field">
+      <label>Responsavel</label>
+      <select class="input" id="actUser"></select>
+    </div>
+    <div class="modal-field">
+      <label>Duracao (min, opcional)</label>
+      <input type="number" class="input" id="actDuration" placeholder="30">
+    </div>
+    <div class="modal-field">
+      <label>Nota (opcional)</label>
+      <textarea class="input" id="actNote" rows="3"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+      <button class="btn" id="cancelActivityBtn">Cancelar</button>
+      <button class="btn btn-primary" id="saveActivityBtn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let usersCache = [];
+let dealSearchTimer = null;
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
+function groupLabel(dueAt) {
+  const now = new Date();
+  const due = new Date(dueAt);
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow = new Date(startOfToday.getTime() + 86400000);
+  const startOfNext7 = new Date(startOfToday.getTime() + 7 * 86400000);
+  if (due < startOfToday) return 'Atrasadas';
+  if (due < startOfTomorrow) return 'Hoje';
+  if (due < new Date(startOfTomorrow.getTime() + 86400000)) return 'Amanha';
+  if (due < startOfNext7) return 'Esta semana';
+  return 'Depois';
+}
+
+async function loadUsers() {
+  const data = await api('/api/crm/ui/users');
+  usersCache = data.users || [];
+  const userFilter = document.getElementById('userFilter');
+  const actUser = document.getElementById('actUser');
+  usersCache.forEach(u => {
+    const opt1 = document.createElement('option'); opt1.value = u.id; opt1.textContent = u.name;
+    userFilter.appendChild(opt1);
+    const opt2 = document.createElement('option'); opt2.value = u.id; opt2.textContent = u.name;
+    actUser.appendChild(opt2);
+  });
+  try {
+    const me = getUser();
+    if (me && me.id && usersCache.some(u => String(u.id) === String(me.id))) {
+      userFilter.value = String(me.id);
+    }
+  } catch (e) {}
+}
+
+
+function ownerOf(a){ return a.user_name || a.deal_owner_name || null; }
+function renderOverdueSummary(){
+  var activities = window.__agendaActivitiesAll || window.__agendaActivities || [];
+  var startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+  var overdue = activities.filter(function(a){ return a.due_at && new Date(a.due_at) < startOfToday && !a.done; });
+  var card = document.getElementById('overdueSummaryCard');
+  var list = document.getElementById('overdueSummaryList');
+  card.style.display = 'block';
+  card.style.background = '#fdecec';
+  card.style.borderColor = '#f3b4b4';
+  var buckets = { 'Helenice': 0, 'Agda': 0, 'Sem dono': 0 };
+  overdue.forEach(function(a){
+    var owner = ownerOf(a);
+    if (owner === 'Helenice') buckets['Helenice']++;
+    else if (owner === 'Agda') buckets['Agda']++;
+    else buckets['Sem dono']++;
+  });
+  var entries = ['Helenice','Agda'].map(function(name){ return { name: name, count: buckets[name] }; });
+  list.innerHTML = entries.map(function(e){
+    var color = e.count > 0 ? '#e33' : '#2a2';
+    var inner = e.count > 0 ? e.count : '&#10003;';
+    var statusText = e.count > 0 ? (e.count + ' em atraso') : 'em dia';
+    return '<div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="openOverdueModal(\'' + e.name + '\')">' +
+      '<div style="width:28px;height:28px;border-radius:50%;background:' + color + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;">' + inner + '</div>' +
+      '<span style="font-size:14px;color:#333;">' + e.name + ' \u2014 ' + statusText + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+function openOverdueModal(ownerName){
+  var startOfToday = new Date(); startOfToday.setHours(0,0,0,0);
+  var all = window.__agendaActivitiesAll || window.__agendaActivities || [];
+  var items = all.filter(function(a){
+    if (!a.due_at || new Date(a.due_at) >= startOfToday || a.done) return false;
+    var owner = ownerOf(a);
+    if (ownerName === 'Sem dono') return owner !== 'Helenice' && owner !== 'Agda';
+    return owner === ownerName;
+  });
+  document.getElementById('overdueModalTitle').textContent = 'Atividades em atraso - ' + ownerName;
+  var box = document.getElementById('overdueModalList');
+  box.innerHTML = items.length ? items.map(function(a){
+    var clickAttr = a.deal_id ? (' onclick="window.location.href=\'detail.html?id=' + a.deal_id + '\'" style="cursor:pointer;"') : '';
+    return '<div class="agenda-item overdue">' +
+      '<div class="time">' + fmtTime(a.due_at) + '</div>' +
+      '<span class="type-badge">' + (a.type || '-') + '</span>' +
+      '<div class="info"' + clickAttr + '>' +
+        '<div class="subj">' + (a.subject || a.content || '(sem assunto)') + '</div>' +
+        '<div class="meta">' + (a.patient_name || '') + (a.deal_title ? ' - ' + a.deal_title : '') + '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('') : '<p style="color:#888;padding:16px 0;">Nenhuma atividade em atraso.</p>';
+  document.getElementById('overdueModal').classList.add('open');
+}
+async function loadAgenda() {
+  const container = document.getElementById('agendaContainer');
+  const totalLabel = document.getElementById('totalLabel');
+  totalLabel.textContent = 'Carregando...';
+  container.innerHTML = '';
+  const userId = document.getElementById('userFilter').value;
+  const includeDone = document.getElementById('includeDone').checked;
+  try {
+    let url = '/api/crm/ui/agenda?includeDone=' + includeDone;
+    if (userId) url += '&userId=' + encodeURIComponent(userId);
+    const data = await api(url);
+    const activities = data.activities || []; window.__agendaActivities = activities;
+    if (userId) {
+      try {
+        const allData = await api('/api/crm/ui/agenda?includeDone=' + includeDone);
+        window.__agendaActivitiesAll = allData.activities || [];
+      } catch (e) {
+        window.__agendaActivitiesAll = activities;
+      }
+    } else {
+      window.__agendaActivitiesAll = activities;
+    }
+    renderOverdueSummary();
+    totalLabel.textContent = activities.length + ' atividade(s)';
+    if (!activities.length) {
+      container.innerHTML = '<p style="color:#888;padding:16px 0;">Nenhuma atividade agendada.</p>';
+      return;
+    }
+    const groups = {};
+    const order = ['Atrasadas', 'Hoje', 'Amanha', 'Esta semana', 'Depois'];
+    activities.forEach(a => {
+      const g = groupLabel(a.due_at);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(a);
+    });
+    let html = '';
+    order.forEach(g => {
+      if (!groups[g] || !groups[g].length) return;
+      html += `<div class="agenda-group"><h3>${g}</h3>`;
+      groups[g].forEach(a => {
+        const isOverdue = a.due_at && new Date(a.due_at) < new Date() && !a.done;
+        const overdue = isOverdue ? 'overdue' : '';
+        const overdueBadge = isOverdue ? '<span class="overdue-badge">Atrasada</span>' : '';
+        html += `
+          <div class="agenda-item ${overdue}" data-id="${a.id}">
+            <input type="checkbox" class="chk act-done-chk" data-id="${a.id}" ${a.done ? 'checked' : ''}>
+            <div class="time">${fmtTime(a.due_at)}</div>
+            <span class="type-badge">${a.type || '-'}</span>
+            <div class="info" ${a.deal_id ? `onclick="window.location.href='detail.html?id=${a.deal_id}'" style="cursor:pointer;"` : ''}>
+              <div class="subj">${a.subject || a.content || '(sem assunto)'}${overdueBadge}</div>
+              <div class="meta">${a.patient_name || a.deal_title || ''}${a.user_name ? ' - ' + a.user_name : ''}</div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    });
+    container.innerHTML = html;
+    document.querySelectorAll('.act-done-chk').forEach(chk => {
+      chk.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = chk.getAttribute('data-id');
+        try {
+          await api('/api/crm/activities/' + id, { method: 'PATCH', body: JSON.stringify({ done: chk.checked }) });
+          loadAgenda();
+        } catch (err) { showToast ? showToast(err.message, 'error') : alert(err.message); }
+      });
+    });
+  } catch (e) {
+    totalLabel.textContent = 'Erro ao carregar: ' + e.message;
+  }
+}
+
+function openModal() {
+  document.getElementById('activityModal').classList.add('open');
+  document.getElementById('dealSearchInput').value = '';
+  document.getElementById('selectedDealId').value = '';
+  document.getElementById('selectedDealLabel').textContent = '';
+  document.getElementById('actSubject').value = '';
+  document.getElementById('actDueAt').value = '';
+  document.getElementById('actDuration').value = '';
+  document.getElementById('actNote').value = '';
+}
+function closeModal() {
+  document.getElementById('activityModal').classList.remove('open');
+}
+
+document.getElementById('newActivityBtn').addEventListener('click', openModal);
+document.getElementById('cancelActivityBtn').addEventListener('click', closeModal);
+document.getElementById('activityModal').addEventListener('click', (e) => {
+  if (e.target.id === 'activityModal') closeModal();
+});
+
+document.getElementById('dealSearchInput').addEventListener('input', (e) => {
+  clearTimeout(dealSearchTimer);
+  const q = e.target.value.trim();
+  const box = document.getElementById('dealSuggestions');
+  if (!q) { box.classList.remove('open'); return; }
+  dealSearchTimer = setTimeout(async () => {
+    try {
+      const data = await api('/api/crm/ui/deals?search=' + encodeURIComponent(q) + '&pageSize=8');
+      const deals = data.deals || data.rows || [];
+      if (!deals.length) { box.innerHTML = '<div style="color:#888;">Nenhum resultado</div>'; box.classList.add('open'); return; }
+      box.innerHTML = deals.map(d => `<div data-id="${d.id}" data-label="${(d.patient_name || d.title || '')} - ${d.title || ''}">${d.patient_name || '-'} - ${d.title || ''} (${d.patient_phone || ''})</div>`).join('');
+      box.classList.add('open');
+      box.querySelectorAll('div[data-id]').forEach(el => {
+        el.addEventListener('click', () => {
+          document.getElementById('selectedDealId').value = el.getAttribute('data-id');
+          document.getElementById('selectedDealLabel').textContent = 'Selecionado: ' + el.getAttribute('data-label');
+          document.getElementById('dealSearchInput').value = el.getAttribute('data-label');
+          box.classList.remove('open');
+        });
+      });
+    } catch (err) { /* ignore */ }
+  }, 300);
+});
+
+document.getElementById('saveActivityBtn').addEventListener('click', async () => {
+  const dealId = document.getElementById('selectedDealId').value;
+  const subject = document.getElementById('actSubject').value.trim();
+  const dueAtLocal = document.getElementById('actDueAt').value;
+  if (!subject) { alert('Informe o assunto'); return; }
+  if (!dueAtLocal) { alert('Informe data e hora'); return; }
+  const dueAtUtc = new Date(dueAtLocal).toISOString().slice(0, 19).replace('T', ' ');
+  try {
+    await api('/api/crm/activities', {
+      method: 'POST',
+      body: JSON.stringify({
+        dealId: dealId || null,
+        type: document.getElementById('actType').value,
+        subject,
+        content: document.getElementById('actNote').value || subject,
+        dueAt: dueAtUtc,
+        assignedUserId: document.getElementById('actUser').value || null,
+        duration: document.getElementById('actDuration').value || null
+      })
+    });
+    closeModal();
+    loadAgenda();
+  } catch (err) { alert(err.message); }
+});
+
+(async () => {
+  await loadUsers();
+  document.getElementById('userFilter').addEventListener('change', loadAgenda);
+  document.getElementById('includeDone').addEventListener('change', loadAgenda);
+  document.getElementById('refreshBtn').addEventListener('click', loadAgenda);
+  loadAgenda();
+})();
+</script>
+</body>
+</html>

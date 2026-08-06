@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f7f7f8; color:#1a1a1a; margin:0; padding:20px; }
+  h1 { font-size:20px; margin:0 0 4px 0; }
+  .sub { color:#666; font-size:13px; margin-bottom:14px; }
+  .stats { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .stat { background:#fff; border:1px solid #e5e5e5; border-radius:8px; padding:10px 14px; font-size:13px; }
+  .stat b { font-size:18px; display:block; }
+  #gridContainer { background:#fff; border-radius:8px; overflow:hidden; }
+  .ok { color:#1a7f37; font-weight:600; }
+  .no { color:#cf222e; font-weight:600; }
+  .warn { color:#9a6700; font-weight:600; }
+  .obs { color:#666; font-size:12px; }
+  #search { margin-bottom:10px; padding:8px 10px; border:1px solid #ddd; border-radius:6px; width:280px; font-size:13px; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css">
+</head>
+<body>
+<h1>Vivera CRM - Status de Implementacao</h1>
+<div class="sub" id="lastUpdated">Ultima atualizacao: carregando...</div>
+<div class="stats" id="stats"></div>
+<input id="search" placeholder="Buscar item..." />
+<div id="gridContainer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js"></script>
+<script>
+const LAST_UPDATED = "23/07/2026 - Leva grande de fixes concluida e testada ao vivo: fuso horario (UTC vs Brasilia), vendas/receita por won_date, filtro Intelig. CRM, percentual de conversao do Funil Executivo, dedupe de campanhas/criativos, drilldown de Vendas no Executivo, atividades de SDR, Agenda (atrasados) e dedupe de lead via Tintim. Agenda visual com Google Calendar construida (falta login do Diego para ativar). Containers legados do Pipedrive desligados. Itens 170-181.";
+
+const DATA = [
+[1,"Fix Executive Dashboard funnel card",false,false,"BUG CRITICO CONFIRMADO 22/07: card Entrada mostra 591, contagem real no banco e 2.645 (~80% subcontagem). Prioridade alta pra corrigir."],
+[2,"Fix terminologia Outbound em Receita por Funil",true,true,"Reconfirmado 22/07: nenhuma ocorrencia de Outbound encontrada no codigo, parece corrigido"],
+[3,"Investigar ambiente (Node deps, docker, dados)",true,false,"OBSOLETO - confirmado 22/07: parte do sistema legado /root/dashboardvivera-prod (fora do crm-server), hoje morto"],
+[4,"Criar banco SQLite local (deals/stages/pipelines)",true,false,"OBSOLETO - confirmado 22/07: pipedriveLocalDB.db do sistema legado, nao usado pelo CRM atual"],
+[5,"Criar motor de sync com controle de taxa",true,false,"OBSOLETO - confirmado 22/07: sistema legado"],
+[6,"Migrar endpoints principais para ler do banco local",false,false,"OBSOLETO - confirmado 22/07: sistema legado, migracao abandonada"],
+[7,"Configurar backup para Google Sheets",false,false,"OBSOLETO - confirmado 22/07: sistema legado"],
+[8,"Deploy, testes e verificacao final",false,false,"OBSOLETO - confirmado 22/07: sistema legado"],
+[9,"Corrigir metricas do Google Ads (Pipeboard)",false,false,"Pipeboard ja foi trocado por integracao direta, mas bug real: leads do CRM caem em Sem campanha/hof em vez da campanha certa"],
+[10,"Corrigir campo leads zerado no Meta Ads",true,true,"Testado ao vivo 22/07: valores batem exatamente com o total (507=507), nao esta mais zerado"],
+[11,"Implementar backup do banco local no Google Sheets",false,false,"OBSOLETO - confirmado 22/07: sistema legado"],
+[12,"Investigar estrutura de codigo Pipedrive/dashboard",true,false,"Investigacao que originou o item 3, hoje sem efeito pratico (Pipedrive descontinuado)"],
+[13,"Achar stage IDs Pipedrive (OBSOLETO)",false,false,"OBSOLETO - confirmado 22/07: Pipedrive 100% descontinuado, token substituido no .env"],
+[14,"Rebuild Leads Pipeline formula Google/Meta Ads",false,false,"Ainda nao verificado a fundo"],
+[15,"Remover metrica duplicada Comparecimentos/Faltas SDR",true,true,"Testado ao vivo 22/07: so existe uma linha Comparecimentos, sem duplicata"],
+[16,"Definir criterio real de lead qualificado",false,false,"Ainda nao verificado"],
+[17,"Custom date range no filtro do painel SDR",true,true,"Testado ao vivo 22/07: opcao Personalizado funciona, atualiza os numeros corretamente"],
+[18,"Auditar aplicabilidade do filtro de data por pagina",false,false,"Testado no painel SDR (funciona), ainda falta testar nas demais paginas"],
+[19,"Fix soma visual Google Ads / Meta Ads",false,false,"BUG CONFIRMADO 22/07: filtro campanhas ativas nao recalcula os cards do topo"],
+[20,"Card Entrada de leads respeitando range de data",false,false,"Ainda nao localizado, precisa investigar mais"],
+[21,"Diagnosticar e corrigir crashes Google Ads/OpenAI/Tintim",true,false,""],
+[22,"Painel de auditoria Tintim vs Pipedrive com fix 1-clique",true,false,""],
+[23,"Corrigir responsividade mobile TopBar/Layout",true,false,""],
+[24,"Remover metrica duplicada + custom date SDR",true,false,""],
+[25,"Investigar caso Laura de Biase",true,false,""],
+[26,"Guardar payload bruto da Tintim em 100% dos leads",true,false,""],
+[27,"Exibir dados brutos de tracking na tela do negocio",true,false,""],
+[28,"Auditar deals sem payload/tracking",true,false,""],
+[29,"Terminar feature Agenda",true,false,""],
+[30,"Corrigir string origem organica (Instagram Organico)",true,false,""],
+[31,"Botoes de acesso rapido a etiquetas de objecao",true,false,""],
+[32,"Trocar etiqueta de mudanca de estagio por atividade concluida",true,false,""],
+[33,"Marcar atividade automatica como automacao do sistema",true,false,""],
+[34,"Registrar quem mudou o estagio no historico",true,false,""],
+[35,"Auditoria completa de leads (mais recentes primeiro)",false,false,""],
+[36,"Corrigir busca unificada nao achando pessoas",true,true,"Reconfirmado 22/07: busca por telefone e por nome achou negocios corretamente"],
+[37,"Agendar atividade direto na tela do negocio",false,false,""],
+[38,"Full lead audit: Tintim vs CRM",false,false,""],
+[39,"Fix bug tags tela do negocio",true,false,""],
+[40,"Botoes de atividade call/message com numeracao+delete",true,false,""],
+[41,"Auditoria completa: 1398 leads Tintim vs CRM",true,false,""],
+[42,"Reconciliacao de valor Pipedrive (OBSOLETO)",false,false,"Pipedrive descontinuado 22/07"],
+[43,"Sidebar: Negocios / Contatos / Dashboard",true,false,""],
+[44,"Webhook Pipedrive para CRM (OBSOLETO)",false,false,"Pipedrive descontinuado, webhook inerte de proposito"],
+[45,"Registrar lista de 123 deals (linhas amarelas)",true,false,""],
+[46,"Reposicionar chips de tag no painel do Negocio",true,false,""],
+[47,"Fix botao +Agendar atividade",true,false,""],
+[48,"Separar Atividades/Anotacoes em abas",false,false,""],
+[49,"Botao Concluir pra atividades agendadas",true,false,""],
+[50,"Fix nomes de deal faltando + usuarios duplicados",true,false,""],
+[51,"Redesenhar botoes rapidos de atividade",true,false,""],
+[52,"Estilizar botao +Agendar atividade",true,false,""],
+[53,"Substituir botao + tag por botao Etiqueta azul",true,false,""],
+[54,"Adicionar x de remover no chip de tag",true,false,""],
+[55,"Fix bug origem Ja e paciente",true,false,""],
+[56,"Mover botao Salvar negocio acima de Trafego Pago",true,false,""],
+[57,"Botao Buscar no Tintim p/ Nao rastreada",true,false,""],
+[58,"Multi-deal patient view",false,false,""],
+[59,"Dashboard clone Command Center",false,false,""],
+[60,"Verificar fix trim campo Trafego Pago",true,false,""],
+[61,"Implementar sidebar aprovado",true,false,""],
+[62,"Multi-select procedimento no fluxo de Ganho",true,false,""],
+[63,"Mapear campos Pipedrive (OBSOLETO)",true,false,"Pipedrive descontinuado 22/07"],
+[64,"Endpoint webhook pipedrive (OBSOLETO)",true,false,"Rota inerte de proposito desde 22/07"],
+[65,"Registrar webhook Pipedrive (OBSOLETO)",true,false,"Pipedrive descontinuado 22/07"],
+[66,"Testar webhook ponta-a-ponta (OBSOLETO)",true,false,"Pipedrive descontinuado 22/07"],
+[67,"Construir 6 abas de dashboard nativas do CRM",true,false,""],
+[68,"Kanban: nome dono + filtro SDR + cor por card",false,false,""],
+[69,"Pessoas: colunas ordenaveis",false,false,"Reconfirmado 22/07: clique no cabecalho NOME nao reordena"],
+[70,"Duplicidade de contatos: botao + merge",false,false,"Reconfirmado 22/07: duplicidade real existe, sem botao de merge"],
+[71,"Duplicidade de negocios: botao + merge",false,false,"Ver item 163 - despacho dedicado rodando agora"],
+[72,"Parados ha mais tempo: nomes clicaveis",false,false,""],
+[73,"Agenda: visao semanal colorida por SDR",false,false,""],
+[74,"Google Ads: filtro status campanha",false,false,""],
+[75,"Fix: atividade nao salva da tela do negocio",false,false,""],
+[76,"Investigar distribuicao leads Agda/Helenice",false,false,""],
+[77,"Fix botao agendar atividade",false,false,""],
+[78,"Investigar TLS cert crm.viveraorofacial.com.br",true,false,""],
+[79,"Fix distribuicao leads: 52/78 Entrada sem dono",false,false,""],
+[80,"Dedupe deals na Lista",false,false,""],
+[81,"Drag-drop de estagio: verificado, sem duplicacao",true,false,""],
+[82,"Botao de atribuir dono na tela do negocio",true,false,""],
+[83,"Seletor de pipeline no modal Novo Negocio",true,false,""],
+[84,"Botao+modal Criar Negocio no Kanban",true,false,""],
+[85,"Promover Sara a admin",true,false,""],
+[86,"Backend: DELETE deal + DELETE patient (admin)",true,false,""],
+[87,"Frontend: botoes de deletar (admin only)",true,false,""],
+[88,"Verificacao ao vivo + limpeza de dados de teste",true,false,""],
+[89,"Rota POST atividades + botao quick-action",false,false,""],
+[90,"Deteccao de duplicidade na criacao de atividade",true,false,""],
+[91,"Popup de confirmacao p/ atividade quase-duplicada",true,false,""],
+[92,"Dedupe agregados SDR",true,false,""],
+[93,"Verificar caso Helenice: Leonardo/Adriana",true,false,""],
+[94,"Deletar atividades quase-duplicadas do dia (urgente)",true,false,""],
+[95,"Modelo de dados profissional/closer p/ Jessica",false,false,""],
+[96,"Menu DIRETORIA + divisor",true,false,"Absorvido pelos itens 100-103"],
+[97,"Storage de metas p/ DIRETORIA",true,false,"Absorvido pelos itens 100-103"],
+[98,"Calculo real dos 10 indicadores DIRETORIA",true,false,"Absorvido pelos itens 100-103"],
+[99,"Verificar DIRETORIA vs print do Diego",true,false,"Absorvido pelos itens 100-103"],
+[100,"Localizar markup sidebar/nav do CRM",true,false,""],
+[101,"Construir pagina DIRETORIA: tabela 10 indicadores+metas",true,false,""],
+[102,"Construir widget SDR Hoje redesenhado",true,false,""],
+[103,"Verificar DIRETORIA + widget Hoje ao vivo",true,false,""],
+[104,"Tracking de value_set_at pros deals",false,false,""],
+[105,"Google Ads: leads CRM nao atribuidos a campanhas",true,false,""],
+[106,"Google Ads: Leads/Vendas/Receita CRM clicaveis",true,false,""],
+[107,"Google Ads: checkbox campanhas ativas",true,false,""],
+[108,"SDR: remover tabela resumo duplicada",true,false,""],
+[109,"Diretoria: cards por periodo + acentos",true,false,""],
+[110,"Motivos de perda: Propaganda + novos motivos",true,false,""],
+[111,"Botao Ligar (WhatsApp) + popup + call_logs",false,false,""],
+[112,"Duplicidade negocios/contatos: detectar + mesclar",false,false,"Ver item 163 - despacho dedicado rodando agora"],
+[113,"Backfill plataforma=Meta Ads (caso Vania)",true,false,""],
+[114,"Buscar no Tintim: deals Google Ads sem gclid/utm",true,false,""],
+[115,"Auditoria Tintim: leads sem rastreio + import",true,false,""],
+[116,"Diretoria: renomear Real para Realizado",true,false,""],
+[117,"Diretoria: drill-down no valor Realizado",true,false,""],
+[118,"Cadastrar metas historicas (faturamento e leads)",true,false,""],
+[120,"Leads por Fonte: drill-down + corrigir duplicidade Meta/Instagram",false,false,""],
+[121,"Popup Ligacao Atendida + verificar Agendar atividade",false,false,""],
+[122,"Grafico evolucao receita: acento + split pago/organico",false,false,""],
+[123,"Tintim: preview de dados antes de importar",false,false,""],
+[124,"Renomear campos no card do deal",true,false,""],
+[125,"WhatsApp: link+template na tabela de rotting deals",true,true,"Adicionada coluna WhatsApp em stalled.html com link wa.me e mensagem de reengajamento usando primeiro nome do paciente. Testado ao vivo: link abre WhatsApp com numero e texto corretos."],
+[126,"Negocios Ganhos: tag dentista + resumo por profissional",false,false,""],
+[127,"Google Ads: coluna ROAS apos Vendas CRM",true,false,""],
+[128,"Meta Ads: coluna ROAS apos Receita",true,false,""],
+[129,"Modal de busca do indicador (indicacao de paciente)",false,false,"Em implementacao"],
+[130,"Ferramenta de deals/pessoas duplicadas",false,false,"Ver item 163 - despacho dedicado rodando agora"],
+[131,"Menu Atividades para agenda.html",true,false,""],
+[132,"Fix bucket Instagram organico/link-bio Meta Ads",true,false,""],
+[133,"Restruturar Funil Executivo p/ 7 estagios",false,false,"Em implementacao"],
+[134,"Fix Agendar atividade salvando data errada",true,false,""],
+[135,"Excluir Recepcao do MKT PAGO e contagem de leads",false,false,"Em implementacao"],
+[136,"Tag indicacao leads com campanha/criativo",false,false,"Em implementacao"],
+[137,"Filtro Atividades default = usuario logado",false,false,"Em implementacao"],
+[138,"Investigar duplicacao de deals + protecao",false,false,"Em implementacao"],
+[139,"Reverter migracao stage_id p/ mapeamento display-only",false,false,"Em implementacao"],
+[140,"Fix Evolucao receita faltando nao-MKT-Pago (Colina Verde)",true,false,""],
+[141,"Fix Ranking Profissionais zerado",true,false,""],
+[142,"Consolidar Instagram Organico vs Organico",false,false,"Em implementacao"],
+[143,"Drilldown em todos paineis Executivo",false,false,"Em implementacao"],
+[144,"Debug tintim-pending retornando 0",true,true,"raw_payload ja vem parseado como objeto pelo mysql2; JSON.parse(objeto) lancava excecao em toda linha, zerando sempre. Fix: checar typeof antes de parsear. Testado via API autenticada: retornou 2 pendentes reais."],
+[145,"% conversao por estagio no Funil Executivo",true,true,"Corrigido 22/07: Ganho/Perdido geravam % invalido (ex: 2960%) por comparar com etapa errada; agora mostram '-' quando nao ha etapa anterior valida. Demais etapas (Entrada..Negociacao) seguem com % de conversao correto (0-100%). Testado ao vivo no dashboard."],
+[146,"Auto-atribuir dono em lead criado manualmente",false,false,"Em implementacao"],
+[147,"Fix menu Atividades inconsistente",false,false,"Em implementacao"],
+[148,"Auditar tudo na pratica",false,false,"Em execucao pelo despacho de conferencia continua"],
+[149,"Verificar Tintim purchase sync + cutoff Pipedrive",false,false,""],
+[150,"Verificar fix de lead duplicado (race condition)",false,false,""],
+[151,"Verificar MKT Pago filtro + tag Ja e paciente",false,false,""],
+[152,"Investigar/corrigir Funil Executivo sem % conversao",true,true,"Mesma correcao do item 145 - bug do % invalido no funil Executivo corrigido e testado ao vivo 22/07"],
+[153,"Investigar/corrigir drilldown graficos Executivo",false,false,""],
+[154,"Investigar/corrigir origem nao identificado",false,false,""],
+[155,"Investigar/corrigir Receita por Fonte so Instagram",true,true,"Query corrigida, receita mensal bateu (+R$3.248 do fechamento corrigido)"],
+[156,"Investigar/corrigir Profissionais vendas/receita zerado",true,true,"Verificado ao vivo no dashboard, valores corretos"],
+[157,"Fix backend ALLOWED_LOSS_REASONS hardcoded",true,true,"Testado com negocio descartavel, funcionou, dado removido"],
+[158,"Fix gclid falso na Final URL do Google Ads",true,false,"Corrigido e confirmado via API; validado com clique simulado"],
+[159,"Desativar cron reconcile-pipedrive destrutivo",true,false,"Desativado, restart sem erros"],
+[160,"Descomissionar Pipedrive 100% (token, push, scripts)",true,false,"Restart sem erros, sem chamadas de saida"],
+[161,"Recuperar 3 deals corrompidos pelo import Pipedrive",true,true,"Confirmado via query direta no banco, valores e datas corretos"],
+[162,"Tornar won_date editavel via API",true,false,"Codigo no ar, nao exercitado via fluxo real de UI ainda"],
+[163,"Ferramenta Duplicidades: detectar+resolver deals por telefone",true,true,"CONCLUIDO 22/07: no ar e testado. 24 grupos/50 negocios duplicados encontrados. Testado resolvendo grupo fabiana (#2680 mantido, #2681 marcado duplicado), confirmado no banco. Restam 23 grupos para revisao manual do Diego pela propria tela (sem criterio automatico seguro pra eles)."],
+[164,"Conversas Paradas: filtros 15/30/90/120 dias (+7 padrao)",true,true,"Testado ao vivo: 7d=881, 15d=724, 30d=511, 90d=113, 120d=17"],
+[165,"MKT Pago: % conversao por coluna + ordenacao por cabecalho",true,true,"Testado ao vivo: percentuais batem, ordenacao asc/desc funcionando em todas as colunas"],
+[166,"Tempo de jornada: lead->agendamento->comparecimento->fechamento e orcamento->fechamento (geral e por canal de aquisicao)",false,false,"Sem prioridade, fim da fila - pedido novo do Diego"],
+[167,"Login Hellen como Secretaria + abrir direto no funil Recepcao",true,true,"CONCLUIDO 22/07: label do papel trocado pra Secretaria em todo lugar, Kanban abre direto no funil Recepcao pra esse role. Testado simulando sessao da Hellen."],
+[168,"Regra de atribuicao fixa: link Tintim Stories Dr Diego = Instagram/Organico/Exojet",true,true,"CONCLUIDO 22/07: implementado no webhook do Tintim, detecta marca dagua invisivel unica do link e forca Instagram/Organico/Stories Dr Diego/Exojet. Testado com webhook simulado, sem falso positivo. Nenhum lead historico encontrado ainda (log so cobre ~3 dias)."],
+[169,"Fix: Atividades em atraso (Agenda) nao respeitava filtro de pessoa",true,true,"CONCLUIDO 22/07: card agora reflete a pessoa filtrada (vermelho com contagem ou verde em dia), testado com Helenice e Agda. Achado: ~371/179 atividades orfas sem user_id vinculado (dado antigo, nao é bug do patch)."],
+[170,"Fix de fuso horario (UTC vs Brasilia)",true,true,"CONCLUIDO E TESTADO 23/07: corrigido fuso horario UTC vs Brasilia nos modulos MKT Pago, Meta Ads, Google Ads, Intelig. CRM, Diretoria e no calculo de hoje/ontem do dashboard.html."],
+[171,"Vendas/Receita usando won_date em vez de add_date",true,true,"CONCLUIDO E TESTADO 23/07: vendas e receita agora usam won_date (data de fechamento) em vez de add_date nas telas Google Ads, Meta Ads, Campanhas, Criativos e no bucket Ganho do Funil Executivo."],
+[172,"Filtro de periodo do Intelig. CRM corrigido",true,true,"CONCLUIDO E TESTADO 23/07: filtro de periodo da tela Intelig. CRM agora funciona de fato, antes era decorativo e nao alterava os dados exibidos."],
+[173,"Fix percentual de conversao quebrado no Funil Executivo",true,true,"CONCLUIDO E TESTADO 23/07: corrigido bug que mostrava percentual de conversao absurdo (2960%) no Funil Executivo."],
+[174,"Consolidar linhas duplicadas (sem campanha)/(sem criativo)",true,true,"CONCLUIDO E TESTADO 23/07: linhas duplicadas (sem campanha) e (sem criativo) consolidadas em uma unica linha nas telas Campanhas e Criativos."],
+[175,"Drilldown do card Vendas no Executivo",true,true,"CONCLUIDO E TESTADO 23/07: drilldown do card Vendas no Executivo criado do zero (nao existia antes), agrupado por origem."],
+[176,"Fix atividades sumindo das metricas de SDR",true,true,"CONCLUIDO E TESTADO 23/07: corrigido bug em que atividades (ligacoes etc.) somiam das metricas de SDR quando o negocio mudava de pipeline ou virava perdido. Afetava tela SDRs e relatorio WhatsApp."],
+[177,"Agenda: quadro Atividades em atraso fixo + selo visual",true,true,"CONCLUIDO E TESTADO 23/07: quadro de Atividades em atraso voltou a ser fixo (nao muda com filtro de periodo), e itens atrasados agora tem selo visual na lista."],
+[178,"Fix duplicidade automatica de lead via Tintim",true,true,"CONCLUIDO E TESTADO 23/07: Tintim nao cria mais negocio duplicado quando ja existe negocio aberto para o mesmo telefone; registra alerta de reentrada como atividade no negocio existente."],
+[179,"Aviso de lead ja existe no cadastro manual (Novo Negocio)",true,true,"CONCLUIDO E TESTADO 23/07: modal Novo Negocio agora avisa antes de criar se o telefone ja existir na base."],
+[180,"Agenda visual tipo Google Calendar com sync bidirecional",true,false,"CONSTRUIDO 23/07: infra OAuth pronta, tela agenda-visual.html funcionando, sync automatico a cada 5 min com Google Calendar do dentista avaliador. Falta login manual do Diego com a conta odontovipflorianopolis@gmail.com para ativar de vez."],
+[181,"Desligar containers Docker legados do Pipedrive",true,true,"CONCLUIDO 23/07: containers Docker legados do sistema Pipedrive (dashboardvivera-backend/frontend) desligados definitivamente por seguranca -- tinham token Pipedrive ativo e acesso direto ao banco."],
+];
+
+function renderStats(){
+  const total = DATA.length;
+  const impl = DATA.filter(d=>d[2]).length;
+  const test = DATA.filter(d=>d[3]).length;
+  document.getElementById('stats').innerHTML = '<div class="stat"><b>' + total + '</b>Itens no total</div><div class="stat"><b>' + impl + '</b>Implementados</div><div class="stat"><b>' + (total-impl) + '</b>Nao implementados</div><div class="stat"><b>' + test + '</b>Testados e funcionando</div>';
+  document.getElementById('lastUpdated').textContent = "Ultima atualizacao: " + LAST_UPDATED;
+}
+renderStats();
+
+const PRIORITY_SET = new Set([1,125,126,129,133,135,136,137,138,139,142,143,144,145,146,147,152,163,167,168]);
+
+let overridesMap = new Map();
+let grid = null;
+
+function computeGridData(){
+  return DATA.map(function(d){
+    const obs = d[4] || '';
+    let pct;
+    if (/OBSOLETO/i.test(obs)) pct = null;
+    else if (d[2] && d[3]) pct = 100;
+    else if (d[2] && !d[3]) pct = 80;
+    else if (/Em implementacao|PRIORIZADO|CONCLUIDO/i.test(obs)) pct = 30;
+    else pct = 0;
+    const isDone = !!(d[2] && d[3]);
+    const status = overridesMap.has(d[0]) ? overridesMap.get(d[0]) : (PRIORITY_SET.has(d[0]) ? 'prioritario' : 'normal');
+    let prioSort;
+    if (isDone) prioSort = 3;
+    else if (status === 'prioritario') prioSort = 0;
+    else if (status === 'excluido') prioSort = 2;
+    else prioSort = 1;
+    return {num:d[0], item:d[1], impl:d[2], test:d[3], pct:pct, status:status, isDone:isDone, prioSort:prioSort, obs:d[4]};
+  }).sort(function(a,b){ return a.prioSort - b.prioSort || a.num - b.num; });
+}
+
+window.__setBacklogPriority = function(num, status){
+  overridesMap.set(num, status);
+  fetch('/api/crm/ui/backlog-priority/' + num, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: status })
+  }).catch(function(e){ console.error('erro ao salvar prioridade', e); });
+  grid.updateConfig({ data: computeGridData() }).forceRender();
+};
+
+function priorityRadios(num, status){
+  const opts = [
+    { value: 'excluido', label: 'Excluir', color: '#cf222e' },
+    { value: 'prioritario', label: 'Prioritario', color: '#9a6700' },
+    { value: 'normal', label: 'Fila normal', color: '#666' }
+  ];
+  let html = '<div style="white-space:nowrap;">';
+  opts.forEach(function(o){
+    const checked = status === o.value ? ' checked' : '';
+    const weight = status === o.value ? '600' : '400';
+    html += '<label style="margin-right:8px;font-size:12px;color:' + o.color + ';font-weight:' + weight + ';cursor:pointer;">' +
+      '<input type="radio" name="prio_' + num + '" value="' + o.value + '" data-item="' + num + '"' + checked + '> ' + o.label +
+      '</label>';
+  });
+  html += '</div>';
+  return html;
+}
+
+fetch('/api/crm/ui/backlog-priority').then(function(r){ return r.json(); }).then(function(j){
+  if (j && j.success && Array.isArray(j.overrides)) {
+    j.overrides.forEach(function(o){ overridesMap.set(o.item_num, o.status); });
+  }
+}).catch(function(e){ console.error('erro ao carregar prioridades salvas', e); }).then(function(){
+  grid = new gridjs.Grid({
+    columns: [
+      { id: 'num', name: '#', width: '50px', sort:true },
+      { id: 'status', name: 'Priorizacao', width:'260px', sort:false, formatter: function(cell, row){
+          const done = !!(row.cells[3].data && row.cells[4].data);
+          if (done) {
+            return gridjs.html('<span style="color:#1a7f37;font-weight:600;font-size:12px;">Concluido &#10003;</span>');
+          }
+          return gridjs.html(priorityRadios(row.cells[0].data, cell));
+        } },
+      { id: 'item', name: 'Item', sort:true, formatter: function(cell, row){
+          const status = row.cells[1].data;
+          const done = !!(row.cells[3].data && row.cells[4].data);
+          if (!done && status === 'excluido') {
+            return gridjs.html('<span style="opacity:0.5;">' + cell + ' <i>(excluido do projeto)</i></span>');
+          }
+          return cell;
+        } },
+      { id: 'impl', name: 'Implementado', width:'120px', sort:true, formatter: (cell) => gridjs.html(cell ? '<span class="ok">SIM</span>' : '<span class="no">NAO</span>') },
+      { id: 'test', name: 'Testado e funcionando', width:'150px', sort:true, formatter: (cell) => gridjs.html(cell ? '<span class="ok">SIM</span>' : '<span class="no">NAO</span>') },
+      { id: 'pct', name: '% Concluido', width:'110px', sort:true, formatter: (cell) => gridjs.html(cell === null ? '<span class="obs">N/A</span>' : (cell >= 100 ? '<span class="ok">' + cell + '%</span>' : (cell === 0 ? '<span class="no">' + cell + '%</span>' : '<span class="warn">' + cell + '%</span>'))) },
+      { id: 'obs', name: 'Obs', formatter: (cell) => gridjs.html('<span class="obs">' + (cell || '') + '</span>') },
+    ],
+    data: computeGridData(),
+    sort: true,
+    search: true,
+    pagination: { limit: 25 },
+    style: { table: { 'font-size':'13px' } }
+  }).render(document.getElementById('gridContainer'));
+});
+
+document.getElementById('gridContainer').addEventListener('change', function(e){
+  const t = e.target;
+  if (t && t.matches('input[type=radio][data-item]')) {
+    const num = parseInt(t.getAttribute('data-item'), 10);
+    window.__setBacklogPriority(num, t.value);
+  }
+});
+
+document.getElementById('search').addEventListener('input', (e) => {
+  grid.updateConfig({ search: { keyword: e.target.value } }).forceRender();
+});
+</script>
+
+<script>(function(){
+  try {
+    var u = JSON.parse(localStorage.getItem('crm_user') || 'null');
+    if (u && u.role === 'comercial_robo' && false) {
+      location.replace('/whatsapp.html');
+    }
+  } catch (e) {}
+})();</script>
+</body>
+</html>

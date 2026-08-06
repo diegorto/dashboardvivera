@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Agenda</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.agenda-group{margin-bottom:24px;}
+.agenda-group h3{font-size:13px;text-transform:uppercase;color:#888;letter-spacing:.05em;margin:0 0 8px;}
+.agenda-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid #e5e5e5;border-radius:8px;margin-bottom:8px;background:#fff;}
+.agenda-item.overdue{border-color:#e0a0a0;background:#fff7f7;}
+.agenda-item .chk{width:18px;height:18px;flex-shrink:0;cursor:pointer;}
+.agenda-item .info{flex:1;min-width:0;}
+.agenda-item .subj{font-weight:600;font-size:14px;}
+.agenda-item .meta{font-size:12px;color:#888;margin-top:2px;}
+.agenda-item .time{font-size:13px;color:#555;white-space:nowrap;}
+.agenda-item .type-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#eef2ff;color:#3949ab;white-space:nowrap;}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:#fff;border-radius:10px;padding:24px;width:440px;max-width:90vw;max-height:85vh;overflow-y:auto;}
+.modal-box h2{margin-top:0;font-size:18px;}
+.modal-field{margin-bottom:14px;}
+.modal-field label{display:block;font-size:12px;color:#666;margin-bottom:4px;}
+.modal-field input,.modal-field select,.modal-field textarea{width:100%;box-sizing:border-box;}
+.deal-suggestions{border:1px solid #ddd;border-radius:6px;margin-top:4px;max-height:160px;overflow-y:auto;display:none;}
+.deal-suggestions.open{display:block;}
+.deal-suggestions div{padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f0f0;}
+.deal-suggestions div:hover{background:#f5f5f5;}
+</style>
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+      <a class="nav-link" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link active" href="agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class="topbar-right" id="topbarRight"></div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Duplicidades</h1><div id="overdueSummaryCard" style="display:none;background:#fdecec;border:1px solid #f3b4b4;border-radius:10px;padding:12px 16px;margin-bottom:16px;"><div style="font-weight:600;color:#a33;margin-bottom:8px;">Atividades em atraso</div><div id="overdueSummaryList" style="display:flex;flex-wrap:wrap;gap:16px;"></div></div><div class="modal-overlay" id="overdueModal"><div class="modal-box"><h2 id="overdueModalTitle">Atividades em atraso</h2><div id="overdueModalList" style="max-height:60vh;overflow-y:auto;"></div><div style="display:flex;justify-content:flex-end;margin-top:16px;"><button class="btn" onclick="document.getElementById('overdueModal').classList.remove('open')">Fechar</button></div></div></div>
+
+  <p class="muted" style="margin:-8px 0 16px;color:#666;font-size:13px;">Negocios abertos que compartilham o mesmo telefone. Escolha qual manter; os outros sao marcados como Perdido - motivo duplicado.</p>
+  <div id="dupesSummary" style="font-weight:600;margin-bottom:12px;font-size:15px;color:#333;"></div>
+  <div id="dupesContainer">Carregando...</div>
+</div>
+
+<script>
+function authHeaders() {
+  var t = localStorage.getItem('crm_token');
+  return t ? { 'Authorization': 'Bearer ' + t } : {};
+}
+async function loadDuplicates() {
+  const box = document.getElementById('dupesContainer');
+  box.textContent = 'Carregando...';
+  try {
+    const resp = await fetch('/api/crm/ui/duplicates', { headers: authHeaders() });
+    const data = await resp.json();
+    if (!data.success) { box.textContent = 'Erro ao carregar.'; return; }
+    document.getElementById('dupesSummary').textContent = (data.clusters||[]).length + ' grupo(s) de negocios duplicados encontrado(s) (mesmo telefone).';
+    if (!data.clusters.length) { box.innerHTML = '<p style="color:#2a2;">Nenhum negocio duplicado encontrado agora.</p>'; return; }
+    box.innerHTML = data.clusters.map(function(c) {
+      var rows = c.deals.map(function(d) {
+        var dt = d.addDate ? new Date(d.addDate).toLocaleString('pt-BR') : '-';
+        var val = d.value ? Number(d.value).toLocaleString('pt-BR', {style:'currency', currency:'BRL'}) : 'R$ 0,00';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #eee;flex-wrap:wrap;">' +
+          '<div style="flex:1;min-width:200px;"><a href="detail.html?id=' + d.id + '" target="_blank" style="font-weight:600;">#' + d.id + ' - ' + (d.title || '(sem titulo)') + '</a>' +
+          '<div style="font-size:12px;color:#666;">' + d.stage + ' - ' + d.owner + ' - ' + dt + ' - ' + val + '</div></div>' +
+          '<button class="btn btn-primary" onclick="keepDeal(\'' + c.phone + '\',' + d.id + ')">Manter este, marcar os outros como duplicado</button>' +
+          '</div>';
+      }).join('');
+      return '<div class="card" style="margin-bottom:16px;"><div style="font-weight:600;margin-bottom:8px;">' + (c.patientName || c.phone) + ' - ' + c.phone + ' (' + c.deals.length + ' negocios)</div>' + rows + '</div>';
+    }).join('');
+  } catch (e) {
+    box.textContent = 'Erro ao carregar.';
+  }
+}
+window.__dupesData = null;
+var dupesClustersCache = [];
+async function keepDeal(phone, keepId) {
+  var resp = await fetch('/api/crm/ui/duplicates', { headers: authHeaders() });
+  var data = await resp.json();
+  var cluster = (data.clusters || []).find(function(c) { return c.phone === phone; });
+  if (!cluster) return;
+  var dropIds = cluster.deals.map(function(d) { return d.id; }).filter(function(id) { return id !== keepId; });
+  if (!dropIds.length) return;
+  if (!confirm('Marcar ' + dropIds.length + ' negocio(s) como duplicado e manter #' + keepId + '?')) return;
+  var r = await fetch('/api/crm/ui/duplicates/resolve', { method: 'POST', headers: Object.assign({'Content-Type':'application/json'}, authHeaders()), body: JSON.stringify({ keepDealId: keepId, dropDealIds: dropIds }) });
+  var rd = await r.json();
+  if (rd.success) { loadDuplicates(); } else { alert(rd.error || 'Erro ao resolver.'); }
+}
+loadDuplicates();
+</script>
+
+<script>(function(){
+  try {
+    var u = JSON.parse(localStorage.getItem('crm_user') || 'null');
+    if (u && u.role === 'comercial_robo' && false) {
+      location.replace('/whatsapp.html');
+    }
+  } catch (e) {}
+})();</script>
+</body>
+</html>

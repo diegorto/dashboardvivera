@@ -1,0 +1,1452 @@
+require('dotenv').config()
+require('dotenv').config({ path: require('path').join(__dirname, '.env.google-calendar') });
+const gcal = require('./google-calendar-service');
+const express = require('express')
+const cors = require('cors')
+const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
+const cron = require('node-cron')
+const pool = require('./db')
+const metaAdsService = require('./metaAdsService')
+const path = require('path')
+const axios = require('axios')
+const JESSICA_USER_ID = 6; // Dra. Jessica - avaliadora padrao fixa (agenda + Google Calendar compartilhado)
+const SARA_USER_ID = 8; // Sara - CEO, unica autorizada a revelar telefones com contact_flag='problema_bloqueio'
+function maskPhone(phone) {
+  let digits = String(phone || '').replace(/\D/g, '')
+  if (digits.length < 4) return '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022'
+  if (digits.length >= 12 && digits.startsWith('55')) digits = digits.slice(2) // remove DDI Brasil
+  const ddd = digits.slice(0, 2)
+  const last2 = digits.slice(-2)
+  return ddd + ' 9\u2022\u2022\u2022-\u2022\u2022' + last2
+}
+function maskDealPhone(d) {
+  if (d && d.patient_contact_flag === 'problema_bloqueio' && d.patient_phone) {
+    return Object.assign({}, d, { patient_phone: maskPhone(d.patient_phone), patient_phone_masked: true })
+  }
+  return d
+}
+
+function capitalizeWord(s) {
+  if (!s) return s
+  const w = String(s).trim()
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
+}
+
+const app = express()
+app.use(cors())
+app.use(express.json())
+
+const PORT = parseInt(process.env.CRM_PORT || '3005')
+const JWT_SECRET = process.env.CRM_JWT_SECRET || 'trocar-este-segredo-no-vps'
+const TOKEN_TTL = '30d'
+
+// ---------------- AUTH ----------------
+
+function sign(user) {
+  return jwt.sign({ id: user.id, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: TOKEN_TTL })
+}
+
+function auth(req, res, next) {
+  const header = req.headers.authorization || ''
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null
+  if (!token) return res.status(401).json({ success: false, error: 'Sem token' })
+  try {
+    req.user = jwt.verify(token, JWT_SECRET)
+    next()
+  } catch {
+    return res.status(401).json({ success: false, error: 'Token inválido ou expirado' })
+  }
+}
+
+function requireAdmin(req, res, next) {
+  return next() // TEMP-REVERT-2026-07-28: restricao SDR desativada, liberado geral
+  next()
+}
+
+app.post('/api/crm/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body || {}
+    if (!email || !password) return res.status(400).json({ success: false, error: 'Informe e-mail e senha' })
+    const [rows] = await pool.query('SELECT * FROM users WHERE email = ? AND active = 1', [email.toLowerCase().trim()])
+    const user = rows[0]
+    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+      return res.status(401).json({ success: false, error: 'E-mail ou senha incorretos' })
+    }
+    if (user.must_reset_password) {
+      return res.json({ success: true, mustReset: true, userId: user.id })
+    }
+    res.json({ success: true, token: sign(user), user: { id: user.id, name: user.name, email: user.email, role: user.role } })
+  } catch (e) {
+    console.error('login error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.get('/api/crm/auth/me', auth, (req, res) => res.json({ success: true, user: req.user }))
+
+app.post('/api/crm/auth/first-login-reset', async (req, res) => {
+  try {
+    const { userId, currentPassword, newPassword, newEmail } = req.body || {}
+    if (!userId || !currentPassword || !newPassword || !newEmail) {
+      return res.status(400).json({ success: false, error: 'Dados incompletos' })
+    }
+    if (String(newPassword).length < 4) {
+      return res.status(400).json({ success: false, error: 'Senha muito curta' })
+    }
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ? AND active = 1', [userId])
+    const user = rows[0]
+    if (!user || !(await bcrypt.compare(currentPassword, user.password_hash))) {
+      return res.status(401).json({ success: false, error: 'Senha atual incorreta' })
+    }
+    const newHash = await bcrypt.hash(String(newPassword), 10)
+    const cleanEmail = String(newEmail).toLowerCase().trim()
+    await pool.query('UPDATE users SET password_hash = ?, email = ?, must_reset_password = 0 WHERE id = ?', [newHash, cleanEmail, user.id])
+    const updatedUser = { id: user.id, name: user.name, email: cleanEmail, role: user.role }
+    res.json({ success: true, token: sign(updatedUser), user: updatedUser })
+  } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ success: false, error: 'E-mail ja esta em uso' })
+    }
+    console.error('first-login-reset error', err)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+// ---------------- BOARD (KANBAN) ----------------
+
+const DEAL_CARD_SQL = `
+  SELECT d.id, d.title, d.value, d.status, d.procedure_name AS procedimento,
+         d.origem, d.campanha, d.conjunto, d.criativo, d.ad_name, d.plataforma, d.palavra_chave,
+         d.utm_source, d.utm_medium, d.utm_campaign, d.utm_content, d.utm_term, d.ctwa_clid, d.ad_account_name, d.tintim_source_raw,
+         d.owner_name, d.add_date, d.stage_entered_at, d.won_date, d.lost_date,
+         d.loss_reason, d.tags, d.lead_score, d.stage_id, d.pipeline_id,
+            d.duplicate_alert,
+          d.reopened_lost_lead,
+         p.id AS patient_id, p.name AS patient_name, p.phone AS patient_phone, p.email AS patient_email, p.contact_flag AS patient_contact_flag,
+         su.name AS sdr_name, cu.name AS closer_name,
+         DATEDIFF(NOW(), d.add_date) AS days_open,
+      GREATEST(0, DATEDIFF(NOW(), COALESCE(d.stage_entered_at, d.add_date))) AS days_in_stage,
+         s.rotting_days
+  FROM deals d
+  JOIN patients p ON p.id = d.patient_id
+  JOIN stages s ON s.id = d.stage_id
+  LEFT JOIN users su ON su.id = d.sdr_user_id
+  LEFT JOIN users cu ON cu.id = d.closer_user_id
+`
+
+async function attachCardExtras(deals) {
+  if (deals.length === 0) return deals
+  const ids = deals.map(d => d.id)
+  const [labelRows] = await pool.query(
+    `SELECT dl.deal_id, l.id, l.name, l.color FROM deal_labels dl
+     JOIN labels l ON l.id = dl.label_id WHERE dl.deal_id IN (?)`, [ids])
+  const [actRows] = await pool.query(
+    `SELECT deal_id,
+            MIN(CASE WHEN done = 0 AND due_at IS NOT NULL THEN due_at END) AS next_due
+     FROM activities WHERE deal_id IN (?) GROUP BY deal_id`, [ids])
+  const labelsBy = {}
+  labelRows.forEach(r => { (labelsBy[r.deal_id] = labelsBy[r.deal_id] || []).push({ id: r.id, name: r.name, color: r.color }) })
+  const nextBy = Object.fromEntries(actRows.map(r => [r.deal_id, r.next_due]))
+  const [lastReplyRows] = await pool.query(
+    `SELECT wc.deal_id AS deal_id, MAX(wm.created_at) AS last_inbound_at
+     FROM whatsapp_conversations wc
+     JOIN whatsapp_messages wm ON wm.conversation_id = wc.id
+     WHERE wc.deal_id IN (?) AND wm.direction = 'in'
+     GROUP BY wc.deal_id`, [ids])
+  const lastReplyBy = Object.fromEntries(lastReplyRows.map(r => [r.deal_id, r.last_inbound_at]))
+  const now = new Date()
+  const endOfToday = new Date(); endOfToday.setHours(23, 59, 59, 999)
+  return deals.map(d => {
+    const nextDue = nextBy[d.id] || null
+    // igual ao Pipedrive: verde = atividade hoje/futura proxima, vermelho = atrasada, cinza = nenhuma
+    const activityStatus = !nextDue ? 'none' : (new Date(nextDue) < now ? 'overdue' : (new Date(nextDue) <= endOfToday ? 'today' : 'planned'))
+    return maskDealPhone({ ...d, labels: labelsBy[d.id] || [], next_activity_at: nextDue, activity_status: activityStatus, last_inbound_at: lastReplyBy[d.id] || null })
+  })
+}
+
+app.get('/api/crm/board', auth, async (req, res) => {
+  try {
+    const slug = req.query.pipeline || 'inbound'
+    const [[pipeline]] = await pool.query('SELECT * FROM pipelines WHERE slug = ?', [slug])
+    if (!pipeline) return res.status(404).json({ success: false, error: 'Funil não encontrado' })
+    const [stages] = await pool.query('SELECT * FROM stages WHERE pipeline_id = ? AND active = 1 ORDER BY sort', [pipeline.id])
+    let boardWhere = " WHERE d.pipeline_id = ? AND d.status = \"open\""
+    let boardParams = [pipeline.id]
+    let [deals] = await pool.query(DEAL_CARD_SQL + boardWhere + ' ORDER BY d.stage_entered_at DESC', boardParams)
+    deals = await attachCardExtras(deals)
+    const [pipelines] = await pool.query('SELECT slug, name FROM pipelines WHERE active = 1 ORDER BY sort')
+    const columns = stages.map(s => ({
+      id: s.id, key: s.skey, label: s.label, rottingDays: s.rotting_days,
+      deals: deals.filter(d => d.stage_id === s.id),
+      totalValue: deals.filter(d => d.stage_id === s.id).reduce((a, d) => a + Number(d.value || 0), 0)
+    }))
+    res.json({ success: true, pipeline: { slug: pipeline.slug, name: pipeline.name }, pipelines, columns })
+  } catch (e) {
+    console.error('board error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+// ---------------- METADADOS (origens, etiquetas, usuarios) ----------------
+
+app.get('/api/crm/meta', auth, async (req, res) => {
+  try {
+    const [origins] = await pool.query('SELECT id, name FROM lead_origins WHERE active = 1 ORDER BY sort')
+    const [labels] = await pool.query('SELECT id, name, color FROM labels WHERE active = 1 ORDER BY name')
+    const [users] = await pool.query('SELECT id, name, role FROM users WHERE active = 1 ORDER BY name')
+    const [procedures] = await pool.query('SELECT id, name, default_value FROM procedures WHERE active = 1 ORDER BY sort, name')
+    res.json({ success: true, origins, labels, users, procedures })
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.post('/api/crm/procedures', auth, async (req, res) => {
+  try {
+    const { name, defaultValue } = req.body || {}
+    if (!name) return res.status(400).json({ success: false, error: 'Nome obrigatório' })
+    const [r] = await pool.query(
+      'INSERT INTO procedures (name, default_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE active = 1',
+      [name.trim(), defaultValue || null])
+    res.json({ success: true, id: r.insertId })
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.post('/api/crm/labels', auth, async (req, res) => {
+  try {
+    const { name, color } = req.body || {}
+    if (!name) return res.status(400).json({ success: false, error: 'Nome obrigatório' })
+    const [r] = await pool.query(
+      'INSERT INTO labels (name, color) VALUES (?, ?) ON DUPLICATE KEY UPDATE color = VALUES(color), active = 1',
+      [name.trim(), color || 'gray'])
+    res.json({ success: true, id: r.insertId })
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.put('/api/crm/deals/:id/labels', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const dealId = parseInt(req.params.id)
+    const { labelIds } = req.body || {}
+    await conn.beginTransaction()
+    await conn.query('DELETE FROM deal_labels WHERE deal_id = ?', [dealId])
+    if (Array.isArray(labelIds) && labelIds.length) {
+      await conn.query('INSERT INTO deal_labels (deal_id, label_id) VALUES ?', [labelIds.map(l => [dealId, l])])
+    }
+    await conn.commit()
+    res.json({ success: true })
+  } catch (e) {
+    await conn.rollback()
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  } finally {
+    conn.release()
+  }
+})
+
+// ---------------- DEALS ----------------
+
+async function findOrCreatePatient(conn, { name, phone, email }) {
+  const normPhone = phone ? phone.replace(/[^+\d]/g, '') : null
+  if (!normPhone) {
+    const [r0] = await conn.query('INSERT INTO patients (name, phone, email) VALUES (?, ?, ?)', [name, normPhone, email || null])
+    return r0.insertId
+  }
+  const lockKey = 'patient_phone:' + normPhone
+  await conn.query('SELECT GET_LOCK(?, 10)', [lockKey])
+  try {
+    const [rows] = await conn.query('SELECT id FROM patients WHERE phone = ?', [normPhone])
+    if (rows[0]) return rows[0].id
+    const [r] = await conn.query('INSERT INTO patients (name, phone, email) VALUES (?, ?, ?)', [name, normPhone, email || null])
+    return r.insertId
+  } finally {
+    await conn.query('SELECT RELEASE_LOCK(?)', [lockKey]).catch(function(){})
+  }
+}
+
+app.post('/api/crm/deals', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  let lockPhoneTail = null
+  try {
+    const { title, patientName, phone, email, value, procedimento, pipeline, stageKey, origem, campanha, conjunto, criativo, referrerPatientId, campaignType } = req.body || {}
+    if (!patientName) return res.status(400).json({ success: false, error: 'Nome do paciente é obrigatório' })
+    if (!phone) return res.status(400).json({ success: false, error: 'Telefone é obrigatório' })
+    await conn.beginTransaction()
+    const [[pl]] = await conn.query('SELECT id FROM pipelines WHERE slug = ?', [pipeline || 'inbound'])
+    const [[stage]] = await conn.query(
+      'SELECT id FROM stages WHERE pipeline_id = ? AND (skey = ? OR ? IS NULL) ORDER BY sort LIMIT 1',
+      [pl.id, stageKey || null, stageKey || null]
+    )
+    const isIndicacaoPipeline = (pipeline || 'inbound') === 'indicacao'
+    const plataformaFinal = isIndicacaoPipeline ? 'Indicação' : null
+    const campanhaFinal = isIndicacaoPipeline ? (campanha || 'Indicação') : (campanha || null)
+    const criativoFinal = isIndicacaoPipeline ? (campanha ? (campaignType === 'empresarial' ? campanha : 'Indicação') : 'Indicação') : (criativo || null)
+    const patientId = await findOrCreatePatient(conn, { name: patientName, phone, email })
+    const phoneDigitsForLock = String(phone || '').replace(/\D/g, '')
+    lockPhoneTail = phoneDigitsForLock.slice(-8) || null
+    if (lockPhoneTail) {
+      await conn.query('SELECT GET_LOCK(?, 10)', ['tintim_phone:' + lockPhoneTail]).catch(function(){})
+    }
+    const [existingOpenDealsCheck] = await conn.query('SELECT id FROM deals WHERE patient_id = ? AND status = "open"', [patientId])
+    if (existingOpenDealsCheck.length > 0) {
+      console.warn('[create-deal] paciente ja possui negocio(s) aberto(s), criando mesmo assim (criacao manual)', patientId, existingOpenDealsCheck.map(function(d){ return d.id }))
+    }
+    const [r] = await conn.query(
+      `INSERT INTO deals (patient_id, pipeline_id, stage_id, title, value, procedure_name, origem, campanha, conjunto, criativo, plataforma, owner_name, stage_entered_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [patientId, pl.id, stage.id, title || patientName, value || 0, procedimento || null,
+       origem || null, campanhaFinal, conjunto || null, criativoFinal, plataformaFinal, req.user.name]
+    )
+    await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, NULL, ?, ?)', [r.insertId, stage.id, req.user.id])
+    await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "system", "Negócio criado")', [r.insertId, patientId, req.user.id])
+    await conn.commit()
+    if (isIndicacaoPipeline && referrerPatientId) { pool.query("INSERT INTO referrals (referrer_patient_id, referred_patient_id, deal_id, status) VALUES (?, ?, ?, 'pendente')", [referrerPatientId, patientId, r.insertId]).catch(function(e){ console.error('[referral-insert]', e.message) }) }
+    res.json({ success: true, id: r.insertId })
+  } catch (e) {
+    await conn.rollback()
+    console.error('create deal error', e)
+    res.status(500).json({ success: false, error: 'Erro ao criar negócio' })
+  } finally {
+    if (lockPhoneTail) {
+      await conn.query('SELECT RELEASE_LOCK(?)', ['tintim_phone:' + lockPhoneTail]).catch(function(){})
+    }
+    conn.release()
+  }
+})
+
+app.post('/api/crm/ui/dashboard/tintim/importar', auth, async (req, res) => {
+  const conn = await pool.getConnection();
+  try {
+    const { phone } = req.body || {};
+    if (!phone) return res.status(400).json({ success: false, error: 'phone obrigatorio' });
+    const [[log]] = await pool.query(
+      "SELECT raw_payload FROM tintim_webhook_log WHERE phone = ? AND event_type = 'lead.create' ORDER BY received_at DESC LIMIT 1",
+      [phone]
+    );
+    if (!log) { conn.release(); return res.status(404).json({ success: false, error: 'Lead nao encontrado no Tintim' }); }
+    let payload = {};
+    try { payload = JSON.parse(log.raw_payload); } catch (e) {}
+    const name = payload.name || ('Lead Tintim ' + phone);
+    const source = payload.source || null;
+    let origem = null;
+    if (source === 'Meta Ads') origem = 'Instagram';
+    else if (source === 'Google Ads') origem = 'Google';
+
+    await conn.beginTransaction();
+    const [[pl]] = await conn.query('SELECT id FROM pipelines WHERE slug = ?', ['inbound']);
+    const [[stage]] = await conn.query('SELECT id FROM stages WHERE pipeline_id = ? ORDER BY sort LIMIT 1', [pl.id]);
+    const patientId = await findOrCreatePatient(conn, { name, phone, email: null });
+    const [r] = await conn.query(
+      `INSERT INTO deals (patient_id, pipeline_id, stage_id, title, value, origem, tintim_source_raw, owner_name, stage_entered_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [patientId, pl.id, stage.id, name, 0, origem, source, req.user.name]
+    );
+    await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, NULL, ?, ?)', [r.insertId, stage.id, req.user.id]);
+    await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "system", "Negocio importado do Tintim")', [r.insertId, patientId, req.user.id]);
+    await conn.commit();
+    res.json({ success: true, dealId: r.insertId, patientId });
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    console.error('importar tintim lead error', e);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  } finally {
+    conn.release();
+  }
+});
+
+app.get('/api/crm/deals/lost-list', auth, async (req, res) => {
+  try {
+    const from = req.query.from;
+    const to = req.query.to;
+    if (!from || !to) return res.status(400).json({ error: 'from e to sao obrigatorios' });
+    let [rows] = await pool.query(
+      'SELECT d.id, d.title, p.name AS patient_name, p.phone, d.value, d.procedure_name, d.owner_name, d.lost_date, d.loss_reason, d.pipeline_id ' +
+      'FROM deals d JOIN patients p ON p.id = d.patient_id ' +
+      "WHERE d.status = 'lost' AND d.lost_date BETWEEN ? AND ? " +
+      'ORDER BY d.lost_date DESC',
+      [from + ' 00:00:00', to + ' 23:59:59']
+    );
+    const total = rows.reduce((acc, r) => acc + Number(r.value || 0), 0);
+    res.json({ success: true, from, to, count: rows.length, total, deals: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.get('/api/crm/deals/won-list', auth, async (req, res) => {
+  try {
+    const from = req.query.from;
+    const to = req.query.to;
+    if (!from || !to) return res.status(400).json({ error: 'from e to sao obrigatorios' });
+    let [rows] = await pool.query(
+      'SELECT d.id, d.title, p.name AS patient_name, p.phone, d.value, d.procedure_name, d.owner_name, d.won_date, d.pipeline_id, pr.name AS professional_name ' +
+      'FROM deals d JOIN patients p ON p.id = d.patient_id LEFT JOIN professionals pr ON pr.id = d.professional_id ' +
+      "WHERE d.status = 'won' AND d.won_date BETWEEN ? AND ? " +
+      'ORDER BY d.won_date DESC',
+      [from + ' 00:00:00', to + ' 23:59:59']
+    );
+    const total = rows.reduce((acc, r) => acc + Number(r.value || 0), 0);
+    res.json({ success: true, from, to, count: rows.length, total, deals: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+app.delete('/api/crm/deals/:id', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Apenas administradores podem excluir negócios.' })
+  const conn = await pool.getConnection()
+  try {
+    const dealId = req.params.id
+    await conn.beginTransaction()
+    await conn.query('DELETE FROM stage_history WHERE deal_id = ?', [dealId])
+    await conn.query('DELETE FROM deal_labels WHERE deal_id = ?', [dealId])
+    await conn.query('DELETE FROM referrals WHERE deal_id = ?', [dealId])
+    await conn.query('DELETE FROM activities WHERE deal_id = ?', [dealId])
+    const [r] = await conn.query('DELETE FROM deals WHERE id = ?', [dealId])
+    await conn.commit()
+    res.json({ success: true, deleted: r.affectedRows })
+  } catch (e) {
+    await conn.rollback()
+    console.error('delete deal error', e)
+    res.status(500).json({ success: false, error: 'Erro ao excluir negócio' })
+  } finally {
+    conn.release()
+  }
+})
+
+const AGENDA_EVENT_STATUS_BY_STAGE_SKEY = { agendamento: 'scheduled', comparecimento: 'attended', 'nao-compareceu': 'no_show', cancelou: 'cancelled' };
+async function syncAgendaFromDealStage(pool, dealId, stageSkey) {
+  try {
+    const targetStatus = AGENDA_EVENT_STATUS_BY_STAGE_SKEY[stageSkey];
+    if (!targetStatus || !dealId) return;
+    const [[event]] = await pool.query('SELECT id, status FROM calendar_events WHERE deal_id = ? ORDER BY id DESC LIMIT 1', [dealId]);
+    if (!event || event.status === targetStatus) return;
+    await pool.query('UPDATE calendar_events SET status = ? WHERE id = ?', [targetStatus, event.id]);
+    console.log('[dealsync] syncAgendaFromDealStage: deal ' + dealId + ' -> evento ' + event.id + ' status ' + targetStatus);
+  } catch (e) {
+    console.error('syncAgendaFromDealStage error', e);
+  }
+}
+
+app.patch('/api/crm/deals/:id/stage', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const dealId = parseInt(req.params.id)
+    const { stageId } = req.body || {}
+    const [[deal]] = await conn.query('SELECT id, stage_id, patient_id FROM deals WHERE id = ?', [dealId])
+    if (!deal) return res.status(404).json({ success: false, error: 'Negócio não encontrado' })
+    if (deal.stage_id === stageId) return res.json({ success: true })
+    const [[stage]] = await conn.query('SELECT id, label, pipeline_id, skey FROM stages WHERE id = ?', [stageId])
+    if (!stage) return res.status(404).json({ success: false, error: 'Etapa não encontrada' })
+    await conn.beginTransaction()
+    await conn.query('UPDATE deals SET stage_id = ?, pipeline_id = ?, stage_entered_at = NOW() WHERE id = ?', [stageId, stage.pipeline_id, dealId])
+    if (stage.pipeline_id === 1) { await syncAgendaFromDealStage(pool, dealId, stage.skey); }
+    await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, ?, ?, ?)', [dealId, deal.stage_id, stageId, req.user.id])
+    await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "stage_change", ?)',
+      [dealId, deal.patient_id, req.user.id, `Movido para "${stage.label}"`])
+    const [[mapRow]] = await conn.query('SELECT activity_type FROM stage_activity_map WHERE stage_id = ?', [stageId])
+    const actType = mapRow ? mapRow.activity_type : ('Passagem de Etapa: ' + stage.label)
+    await conn.query("INSERT INTO activities (deal_id, patient_id, user_id, type, content, subject, status, done_at) VALUES (?, ?, ?, ?, ?, ?, 'Concluído', NOW())", [dealId, deal.patient_id, null, actType, actType + ' (automação registrada pelo sistema)', actType])
+    await conn.commit()
+    res.json({ success: true })
+  } catch (e) {
+    await conn.rollback()
+    console.error('move stage error', e)
+    res.status(500).json({ success: false, error: 'Erro ao mover negócio' })
+  } finally {
+    conn.release()
+  }
+})
+
+
+app.patch('/api/crm/deals/:id/owner', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const dealId = parseInt(req.params.id, 10)
+    const { userId } = req.body || {}
+    if (!userId) return res.status(400).json({ success: false, error: 'userId obrigatorio' })
+    const [[deal]] = await conn.query('SELECT id, owner_name, sdr_user_id, patient_id FROM deals WHERE id = ?', [dealId])
+    if (!deal) return res.status(404).json({ success: false, error: 'Negocio nao encontrado' })
+    const [[newOwner]] = await conn.query('SELECT id, name FROM users WHERE id = ? AND active = 1', [userId])
+    if (!newOwner) return res.status(400).json({ success: false, error: 'Usuario invalido' })
+    if (deal.sdr_user_id === newOwner.id) return res.json({ success: true, unchanged: true })
+    await conn.beginTransaction()
+    await conn.query('UPDATE deals SET owner_name = ?, sdr_user_id = ? WHERE id = ?', [newOwner.name, newOwner.id, dealId])
+    await conn.query('INSERT INTO ownership_history (deal_id, from_owner, to_owner, from_user_id, to_user_id, changed_by_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [dealId, deal.owner_name, newOwner.name, deal.sdr_user_id, newOwner.id, req.user.id])
+    await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, ?, ?)',
+      [dealId, deal.patient_id, req.user.id, 'owner_change', 'Dono do negocio alterado de "' + (deal.owner_name || 'sem dono') + '" para "' + newOwner.name + '"'])
+    await conn.commit()
+    res.json({ success: true, ownerName: newOwner.name })
+  } catch (e) {
+    try { await conn.rollback() } catch (e2) {}
+    console.error('owner change error', e)
+    res.status(500).json({ success: false, error: 'Erro ao alterar dono do negocio' })
+  } finally {
+    conn.release()
+  }
+})
+
+async function applyBulkDealChange(conn, deals, field, value, reqUser) {
+  let newOwner = null
+  let newStage = null
+  if (field === 'owner') {
+    const [[u]] = await conn.query('SELECT id, name FROM users WHERE id = ? AND active = 1', [value])
+    if (!u) { const err = new Error('Usuario invalido'); err.statusCode = 400; throw err }
+    newOwner = u
+  } else if (field === 'pipeline') {
+    const [[pl]] = await conn.query('SELECT id FROM pipelines WHERE slug = ? AND active = 1', [value])
+    if (!pl) { const err = new Error('Funil invalido'); err.statusCode = 400; throw err }
+    const [[st]] = await conn.query('SELECT id, label, pipeline_id, skey FROM stages WHERE pipeline_id = ? AND active = 1 ORDER BY sort LIMIT 1', [pl.id])
+    if (!st) { const err = new Error('Funil sem etapas configuradas'); err.statusCode = 400; throw err }
+    newStage = st
+  } else if (field === 'stage') {
+    const [[st]] = await conn.query('SELECT id, label, pipeline_id, skey FROM stages WHERE id = ? AND active = 1', [value])
+    if (!st) { const err = new Error('Etapa invalida'); err.statusCode = 400; throw err }
+    newStage = st
+  } else {
+    const err = new Error('Campo invalido'); err.statusCode = 400; throw err
+  }
+  let changed = 0
+  for (const d of deals) {
+    if (field === 'owner') {
+      if (d.owner_name === newOwner.name) continue
+      await conn.query('UPDATE deals SET owner_name = ?, sdr_user_id = ? WHERE id = ?', [newOwner.name, newOwner.id, d.id])
+      await conn.query('INSERT INTO ownership_history (deal_id, from_owner, to_owner, from_user_id, to_user_id, changed_by_user_id) VALUES (?, ?, ?, ?, ?, ?)', [d.id, d.owner_name, newOwner.name, d.sdr_user_id, newOwner.id, reqUser.id])
+      await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, ?, ?)', [d.id, d.patient_id, reqUser.id, 'owner_change', '[Alteracao em massa] Dono alterado de ' + (d.owner_name || 'Sem dono') + ' para ' + newOwner.name + ' por ' + reqUser.name])
+    } else {
+      if (d.stage_id === newStage.id) continue
+      await conn.query('UPDATE deals SET stage_id = ?, pipeline_id = ?, stage_entered_at = NOW() WHERE id = ?', [newStage.id, newStage.pipeline_id, d.id])
+      await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, ?, ?, ?)', [d.id, d.stage_id, newStage.id, reqUser.id])
+      const lbl = field === 'pipeline' ? ('[Alteracao em massa] Funil alterado, movido para ' + newStage.label + ' por ' + reqUser.name) : ('[Alteracao em massa] Movido para ' + newStage.label + ' por ' + reqUser.name)
+      await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, ?, ?)', [d.id, d.patient_id, reqUser.id, 'stage_change', lbl])
+      if (newStage.pipeline_id === 1) { await syncAgendaFromDealStage(pool, d.id, newStage.skey); }
+    }
+    changed++
+  }
+  return changed
+}
+
+app.post('/api/crm/deals/bulk-update', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const { dealIds, field, value } = req.body || {}
+    const ids = Array.isArray(dealIds) ? dealIds.map(x => parseInt(x, 10)).filter(x => x) : []
+    if (!ids.length) return res.status(400).json({ success: false, error: 'Selecione ao menos um negocio' })
+    if (['owner', 'pipeline', 'stage'].indexOf(field) === -1) return res.status(400).json({ success: false, error: 'Campo invalido' })
+    const [deals] = await conn.query(`SELECT id, owner_name, sdr_user_id, patient_id, stage_id, pipeline_id FROM deals WHERE id IN (${ids.map(() => '?').join(',')})`, ids)
+    if (!deals.length) return res.status(404).json({ success: false, error: 'Nenhum negocio encontrado' })
+    if (req.user.role === 'sdr' && deals.some(d => d.owner_name !== req.user.name)) {
+      return res.status(403).json({ success: false, error: 'Voce so pode alterar negocios que sao seus' })
+    }
+    await conn.beginTransaction()
+    const changed = await applyBulkDealChange(conn, deals, field, value, req.user)
+    await conn.commit()
+    res.json({ success: true, updated: changed, total: deals.length })
+  } catch (e) {
+    try { await conn.rollback() } catch (e2) {}
+    console.error('bulk-update deals error', e)
+    res.status(e.statusCode || 500).json({ success: false, error: e.statusCode ? e.message : 'Erro ao aplicar alteracao em massa' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.post('/api/crm/patients/bulk-update', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const { patientIds, field, value } = req.body || {}
+    const pids = Array.isArray(patientIds) ? patientIds.map(x => parseInt(x, 10)).filter(x => x) : []
+    if (!pids.length) return res.status(400).json({ success: false, error: 'Selecione ao menos uma pessoa' })
+    if (['owner', 'pipeline'].indexOf(field) === -1) return res.status(400).json({ success: false, error: 'Campo invalido' })
+    const [deals] = await conn.query(`SELECT id, owner_name, sdr_user_id, patient_id, stage_id, pipeline_id FROM deals WHERE patient_id IN (${pids.map(() => '?').join(',')}) AND status = 'open'`, pids)
+    if (!deals.length) return res.status(404).json({ success: false, error: 'As pessoas selecionadas nao tem negocios em aberto' })
+    if (req.user.role === 'sdr' && deals.some(d => d.owner_name !== req.user.name)) {
+      return res.status(403).json({ success: false, error: 'Voce so pode alterar negocios que sao seus' })
+    }
+    await conn.beginTransaction()
+    const changed = await applyBulkDealChange(conn, deals, field, value, req.user)
+    await conn.commit()
+    res.json({ success: true, updated: changed, total: deals.length })
+  } catch (e) {
+    try { await conn.rollback() } catch (e2) {}
+    console.error('bulk-update patients error', e)
+    res.status(e.statusCode || 500).json({ success: false, error: e.statusCode ? e.message : 'Erro ao aplicar alteracao em massa' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.get('/api/crm/professionals', auth, async (req, res) => { try { const [rows] = await pool.query('SELECT id, name FROM professionals WHERE active = 1 ORDER BY name'); res.json(rows); } catch (err) { res.status(500).json({ error: err.message }); } });app.get('/api/crm/deals/:id/professional', auth, async (req, res) => { try { const [rows] = await pool.query('SELECT p.id, p.name FROM deals d JOIN professionals p ON p.id = d.professional_id WHERE d.id = ?', [req.params.id]); res.json(rows[0] || {}); } catch (err) { res.status(500).json({ error: err.message }); } });app.patch('/api/crm/deals/:id', auth, async (req, res, next) => { try { if (req.body && Object.keys(req.body).length === 1 && Object.prototype.hasOwnProperty.call(req.body, 'lead_score')) { const ls = req.body.lead_score; if (ls !== null && (typeof ls !== 'number' || ls < 1 || ls > 5)) { return res.status(400).json({ error: 'lead_score deve ser um numero entre 1 e 5, ou null' }); } await pool.query('UPDATE deals SET lead_score = ? WHERE id = ?', [ls, req.params.id]); return res.json({ ok: true }); } } catch (err) { return res.status(500).json({ error: err.message }); } next(); }); app.patch('/api/crm/deals/:id', auth, async (req, res, next) => { if (req.body && Object.keys(req.body).length === 1 && Object.prototype.hasOwnProperty.call(req.body, 'professional_id')) { try { await pool.query('UPDATE deals SET professional_id = ? WHERE id = ?', [req.body.professional_id, req.params.id]); return res.json({ ok: true }); } catch (err) { return res.status(500).json({ error: err.message }); } } next(); }); app.patch('/api/crm/deals/:id', auth, async (req, res, next) => { if (req.body && Object.keys(req.body).length === 1 && Object.prototype.hasOwnProperty.call(req.body, 'lossReason')) { try { await pool.query('UPDATE deals SET loss_reason = ? WHERE id = ?', [req.body.lossReason, req.params.id]); return res.json({ ok: true }); } catch (err) { return res.status(500).json({ error: err.message }); } } next(); });
+
+app.patch('/api/crm/deals/:id', auth, async (req, res, next) => {
+  if (req.body && Object.keys(req.body).length === 1 && Object.prototype.hasOwnProperty.call(req.body, 'notLead') && req.body.notLead === true) {
+    let conn
+    try {
+      conn = await pool.getConnection()
+      await conn.beginTransaction()
+      const [rows] = await conn.query('SELECT stage_id FROM deals WHERE id = ?', [req.params.id])
+      if (!rows[0]) { await conn.rollback(); conn.release(); return res.status(404).json({ error: 'Negocio nao encontrado' }) }
+      const fromStageId = rows[0].stage_id
+      await conn.query('UPDATE deals SET pipeline_id = 7, stage_id = 52, stage_entered_at = NOW() WHERE id = ?', [req.params.id])
+      await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, ?, 52, ?)', [req.params.id, fromStageId, req.user.id])
+      await conn.query('INSERT INTO activities (deal_id, user_id, type, content) VALUES (?, ?, "system", "Marcado como nao-lead / descartado")', [req.params.id, req.user.id])
+      await conn.commit()
+      conn.release()
+      return res.json({ ok: true })
+    } catch (err) {
+      if (conn) { await conn.rollback().catch(() => {}); conn.release() }
+      return res.status(500).json({ error: err.message })
+    }
+  }
+  next()
+});
+
+app.patch('/api/crm/deals/:id', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const dealId = parseInt(req.params.id)
+    const { status, lossReason, value, procedimento, title, origem, campanha, conjunto, criativo, plataforma, palavra_chave, tags, confirmDuplicate, wonDate } = req.body || {}
+    const [[deal]] = await conn.query('SELECT * FROM deals WHERE id = ?', [dealId])
+    if (!deal) return res.status(404).json({ success: false, error: 'Negócio não encontrado' })
+    const isNewValueEvent = value !== undefined && Number(value) > 0 && Number(value) !== Number(deal.value || 0)
+ if (isNewValueEvent && !confirmDuplicate) {
+ const [[recentBudget]] = await conn.query("SELECT id, created_at FROM activities WHERE deal_id = ? AND type = 'Orcamento Gerado' AND created_at >= (NOW() - INTERVAL 120 SECOND) ORDER BY created_at DESC LIMIT 1", [dealId])
+ if (recentBudget) {
+ return res.json({ success: true, possibleDuplicate: true, lastActivityAt: recentBudget.created_at })
+ }
+ }
+ await conn.beginTransaction()
+    if (title !== undefined) await conn.query('UPDATE deals SET title = ? WHERE id = ?', [title, dealId])
+    if (value !== undefined) await conn.query('UPDATE deals SET value = ? WHERE id = ?', [value, dealId])
+ if (isNewValueEvent) {
+ const ownerNm = deal.owner_name || 'responsavel desconhecido'
+ const fmtVal = Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+ let budgetContent = 'Orcamento gerado: R$ ' + fmtVal
+ if (confirmDuplicate) budgetContent = 'Orcamento registrado novamente em pouco tempo, autorizado e confirmado pelo responsavel pelo negocio (' + ownerNm + '). ' + budgetContent
+ await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content, amount) VALUES (?, ?, ?, ?, ?, ?)', [dealId, deal.patient_id, req.user.id, 'Orcamento Gerado', budgetContent, value])
+ }
+    if (procedimento !== undefined) await conn.query('UPDATE deals SET procedure_name = ? WHERE id = ?', [procedimento, dealId])
+    if (origem !== undefined) await conn.query('UPDATE deals SET origem = ? WHERE id = ?', [origem, dealId])
+    if (campanha !== undefined) await conn.query('UPDATE deals SET campanha = ? WHERE id = ?', [campanha, dealId])
+    if (conjunto !== undefined) await conn.query('UPDATE deals SET conjunto = ? WHERE id = ?', [conjunto, dealId])
+    if (criativo !== undefined) await conn.query('UPDATE deals SET criativo = ? WHERE id = ?', [criativo, dealId])
+    if (plataforma !== undefined) await conn.query('UPDATE deals SET plataforma = ? WHERE id = ?', [plataforma, dealId])
+    if (palavra_chave !== undefined) await conn.query('UPDATE deals SET palavra_chave = ? WHERE id = ?', [palavra_chave, dealId])
+    if (tags !== undefined) await conn.query('UPDATE deals SET tags = ? WHERE id = ?', [tags, dealId])
+    let wonDateWarning = null
+    if (status === 'won') {
+      // Validacao da data de fechamento retroativa (permite data no passado, bloqueia futuro)
+      if (wonDate) {
+        const parsedWonDate = new Date(wonDate)
+        if (isNaN(parsedWonDate.getTime())) {
+          await conn.rollback()
+          return res.status(400).json({ success: false, error: 'Data de fechamento invalida' })
+        }
+        if (parsedWonDate.getTime() > Date.now() + 60000) {
+          await conn.rollback()
+          return res.status(400).json({ success: false, error: 'A data de fechamento nao pode ser no futuro' })
+        }
+        if (deal.add_date && parsedWonDate.getTime() < new Date(deal.add_date).getTime()) {
+          wonDateWarning = 'Atencao: a data de fechamento informada e anterior a data de criacao do negocio'
+        }
+      }
+      // procedimento e OBRIGATORIO para registrar a venda
+      const finalProcedure = procedimento !== undefined ? procedimento : deal.procedure_name
+      if (!finalProcedure || !String(finalProcedure).trim()) {
+        await conn.rollback()
+        return res.status(400).json({ success: false, error: 'Informe o procedimento para registrar a venda' })
+      }
+      // guarda: so processa efeitos colaterais (ltv, log, indicacao) na PRIMEIRA vez que o negocio vira ganho
+      if (deal.status !== 'won') {
+      await conn.query('UPDATE deals SET status = "won", won_date = ? WHERE id = ?', [wonDate ? new Date(wonDate) : new Date(), dealId])
+      await conn.query('UPDATE patients SET ltv = ltv + ? WHERE id = ?', [value !== undefined ? value : deal.value, deal.patient_id])
+      await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "system", "Negócio ganho 🎉")', [dealId, deal.patient_id, req.user.id])
+      // indicacao: se este paciente foi indicado, marca a indicacao como fechada
+      await conn.query('UPDATE referrals SET status = "fechou", closed_at = NOW(), deal_id = ? WHERE referred_patient_id = ? AND status = "pendente"', [dealId, deal.patient_id])
+        syncSaleToTintim(dealId).catch(function(e){ console.error('[tintim-sale]', e.message) })
+    
+      } else if (wonDate) {
+        // negocio ja estava ganho: permite apenas corrigir a data retroativa de fechamento
+        await conn.query('UPDATE deals SET won_date = ? WHERE id = ?', [new Date(wonDate), dealId])
+      }
+      } else if (status === 'lost') {
+      const [activeLossReasons] = await conn.query('SELECT label FROM loss_reasons WHERE active = 1');
+      const ALLOWED_LOSS_REASONS = activeLossReasons.map(r => r.label);
+      const lrTrim = (lossReason || '').trim();
+      const isOutroReason = /^outro:/i.test(lrTrim) && lrTrim.slice(6).trim().length > 0;
+      const lrMatches = ALLOWED_LOSS_REASONS.some(r => r.toLowerCase() === lrTrim.toLowerCase());
+      if (!lrTrim || !(lrMatches || isOutroReason)) {
+        await conn.rollback();
+        return res.status(400).json({ success: false, error: 'Selecione um motivo de perda valido (ou informe "Outro: descricao") antes de marcar como Perdido.' });
+      }
+      await conn.query('UPDATE deals SET status = "lost", lost_date = NOW(), loss_reason = ? WHERE id = ?', [lossReason || null, dealId])
+      await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "system", ?)',
+        [dealId, deal.patient_id, req.user.id, `Negócio perdido${lossReason ? ' — ' + lossReason : ''}`])
+    } else if (status === 'open') {
+      await conn.query('UPDATE deals SET status = "open", won_date = NULL, lost_date = NULL, loss_reason = NULL WHERE id = ?', [dealId])
+    }
+    await conn.commit()
+    res.json({ success: true, wonDateWarning })
+  } catch (e) {
+    await conn.rollback()
+    console.error('update deal error', e)
+    res.status(500).json({ success: false, error: 'Erro ao atualizar negócio' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.get('/api/crm/deals/:id', auth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    let [deals] = await pool.query(DEAL_CARD_SQL + ' WHERE d.id = ?', [id])
+    if (!deals[0]) return res.status(404).json({ success: false, error: 'Negócio não encontrado' })
+    deals = await attachCardExtras(deals)
+    const [activities] = await pool.query(
+      `SELECT a.*, u.name AS user_name FROM activities a
+       LEFT JOIN users u ON u.id = a.user_id
+       WHERE a.deal_id = ? ORDER BY a.done ASC, COALESCE(a.due_at, a.created_at) DESC LIMIT 100`, [id])
+    res.json({ success: true, deal: deals[0], activities })
+  } catch (e) {
+    console.error('deal detail error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+// ---------------- PACIENTES ----------------
+
+app.post('/api/crm/patients', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const { name, phone, email } = req.body || {}
+    if (!name) return res.status(400).json({ success: false, error: 'Nome é obrigatório' })
+    if (!phone) return res.status(400).json({ success: false, error: 'Telefone é obrigatório' })
+    const normPhone = String(phone).replace(/[^+\d]/g, '')
+    if (!normPhone) return res.status(400).json({ success: false, error: 'Telefone inválido' })
+    const [[existing]] = await conn.query('SELECT id, name FROM patients WHERE phone = ?', [normPhone])
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'Já existe uma pessoa com esse telefone: ' + existing.name, existingPatientId: existing.id })
+    }
+    const [r] = await conn.query('INSERT INTO patients (name, phone, email) VALUES (?, ?, ?)', [name, normPhone, email || null])
+    res.json({ success: true, patientId: r.insertId })
+  } catch (e) {
+    console.error('create patient error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.delete('/api/crm/patients/:id', auth, async (req, res) => {
+  if (req.user.role !== 'admin') return res.status(403).json({ success: false, error: 'Apenas administradores podem excluir pessoas.' })
+  const conn = await pool.getConnection()
+  try {
+    const patientId = req.params.id
+    await conn.beginTransaction()
+    await conn.query('DELETE FROM stage_history WHERE deal_id IN (SELECT id FROM deals WHERE patient_id = ?)', [patientId])
+    await conn.query('DELETE FROM deal_labels WHERE deal_id IN (SELECT id FROM deals WHERE patient_id = ?)', [patientId])
+    await conn.query('DELETE FROM referrals WHERE deal_id IN (SELECT id FROM deals WHERE patient_id = ?) OR referrer_patient_id = ? OR referred_patient_id = ?', [patientId, patientId, patientId])
+    await conn.query('DELETE FROM activities WHERE deal_id IN (SELECT id FROM deals WHERE patient_id = ?) OR patient_id = ?', [patientId, patientId])
+    await conn.query('DELETE FROM deals WHERE patient_id = ?', [patientId])
+    const [r] = await conn.query('DELETE FROM patients WHERE id = ?', [patientId])
+    await conn.commit()
+    res.json({ success: true, deleted: r.affectedRows })
+  } catch (e) {
+    await conn.rollback()
+    console.error('delete patient error', e)
+    res.status(500).json({ success: false, error: 'Erro ao excluir pessoa' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.get('/api/crm/patients', auth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').toString().trim()
+    const params = []
+    let where = ''
+    if (search) {
+      where = 'WHERE p.name LIKE ? OR p.phone LIKE ?'
+      params.push(`%${search}%`, `%${search}%`)
+    }
+    if (req.user.role === 'sdr') {
+      var sdrCond = `(SELECT d.owner_name FROM deals d WHERE d.patient_id = p.id ORDER BY (d.status='open') DESC, d.add_date DESC LIMIT 1) = ?`
+      where = where ? (where + ' AND ' + sdrCond) : ('WHERE ' + sdrCond)
+      params.push(req.user.name)
+    }
+    const [rows] = await pool.query(
+      `SELECT p.id, p.name, p.phone, p.email, p.ltv, p.cashback_balance, p.created_at, p.contact_flag,
+              rp.name AS referred_by_name,
+              (SELECT COUNT(*) FROM deals d WHERE d.patient_id = p.id) AS total_deals,
+              (SELECT COUNT(*) FROM deals d WHERE d.patient_id = p.id AND d.status = 'open') AS open_deals,
+              (SELECT COUNT(*) FROM referrals r WHERE r.referrer_patient_id = p.id AND r.status = 'fechou') AS referrals_won,
+              (SELECT MAX(d.won_date) FROM deals d WHERE d.patient_id = p.id AND d.status = 'won') AS last_purchase,
+              (SELECT d.procedure_name FROM deals d WHERE d.patient_id = p.id ORDER BY d.add_date DESC LIMIT 1) AS last_procedure,
+              (SELECT d.owner_name FROM deals d WHERE d.patient_id = p.id ORDER BY (d.status='open') DESC, d.add_date DESC LIMIT 1) AS owner_name,
+              (SELECT GROUP_CONCAT(DISTINCT pl.slug) FROM deals d JOIN pipelines pl ON pl.id = d.pipeline_id WHERE d.patient_id = p.id) AS pipeline_slugs
+       FROM patients p
+       LEFT JOIN patients rp ON rp.id = p.referred_by_patient_id
+       ${where}
+       ORDER BY p.created_at DESC
+       LIMIT 20000`, params)
+    rows.forEach(r => { if (r.contact_flag === 'problema_bloqueio') { r.phone = maskPhone(r.phone); r.phone_masked = true } })
+    res.json({ success: true, patients: rows })
+  } catch (e) {
+    console.error('patients error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.get('/api/crm/patients/:id', auth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const [[patient]] = await pool.query(
+      `SELECT p.*, rp.name AS referred_by_name FROM patients p
+       LEFT JOIN patients rp ON rp.id = p.referred_by_patient_id WHERE p.id = ?`, [id])
+    if (!patient) return res.status(404).json({ success: false, error: 'Paciente não encontrado' })
+    if (patient.contact_flag === 'problema_bloqueio') { patient.phone = maskPhone(patient.phone); patient.phone_masked = true }
+    let patDealsWhere = ' WHERE d.patient_id = ?'
+    let patDealsParams = [id]
+    let [deals] = await pool.query(DEAL_CARD_SQL + patDealsWhere + ' ORDER BY d.add_date DESC', patDealsParams)
+    deals = deals.map(maskDealPhone)
+    const [activities] = await pool.query(
+      `SELECT a.*, u.name AS user_name FROM activities a
+       LEFT JOIN users u ON u.id = a.user_id
+       WHERE a.patient_id = ? ORDER BY a.created_at DESC LIMIT 200`, [id])
+    const [journey] = await pool.query(
+      `SELECT sh.deal_id, sh.changed_at, fs.label AS from_label, ts.label AS to_label, u.name AS user_name
+       FROM stage_history sh
+       LEFT JOIN stages fs ON fs.id = sh.from_stage_id
+       JOIN stages ts ON ts.id = sh.to_stage_id
+       LEFT JOIN users u ON u.id = sh.changed_by_user_id
+       JOIN deals d ON d.id = sh.deal_id
+       WHERE d.patient_id = ? ORDER BY sh.changed_at`, [id])
+    const [referralsMade] = await pool.query(
+      `SELECT r.*, p2.name AS referred_name FROM referrals r
+       JOIN patients p2 ON p2.id = r.referred_patient_id WHERE r.referrer_patient_id = ?`, [id])
+    const [cashback] = await pool.query(
+      'SELECT * FROM cashback_ledger WHERE patient_id = ? ORDER BY created_at DESC LIMIT 100', [id])
+    res.json({ success: true, patient, deals, activities, journey, referralsMade, cashback })
+  } catch (e) {
+    console.error('patient detail error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.post('/api/crm/patients/:id/reveal-contact', auth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id)
+    const { saraPassword } = req.body || {}
+    if (!saraPassword) return res.status(400).json({ success: false, error: 'Senha obrigatoria' })
+    const [[patient]] = await pool.query('SELECT id, name, phone, contact_flag FROM patients WHERE id = ?', [id])
+    if (!patient) return res.status(404).json({ success: false, error: 'Paciente nao encontrado' })
+    const [[sara]] = await pool.query('SELECT id, password_hash FROM users WHERE id = ?', [SARA_USER_ID])
+    const ok = !!(sara && await bcrypt.compare(saraPassword, sara.password_hash))
+    const logMsg = ok
+      ? `Revelacao de contato bloqueado AUTORIZADA (senha da Sara confirmada) - solicitado por ${req.user.name}`
+      : `Tentativa de revelar contato bloqueado FALHOU (senha incorreta) - solicitado por ${req.user.name}`
+    await pool.query(
+      'INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (NULL, ?, ?, "system", ?)',
+      [id, req.user.id, logMsg]
+    )
+    if (!ok) return res.status(401).json({ success: false, error: 'Senha da Sara incorreta' })
+    return res.json({ success: true, phone: patient.phone })
+  } catch (e) {
+    console.error('reveal-contact error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+// ---------------- ATIVIDADES ----------------
+
+app.post('/api/crm/activities', auth, async (req, res) => {
+  try {
+    const { dealId, patientId, type, content, dueAt, subject, assignedUserId, duration, done, confirmDuplicate } = req.body || {}
+    if (!content && !subject) return res.status(400).json({ success: false, error: 'Assunto ou conteudo obrigatorio' })
+    let pid = patientId
+ if (!pid && dealId) {
+ const [[d]] = await pool.query('SELECT patient_id FROM deals WHERE id = ?', [dealId])
+ pid = d ? d.patient_id : null
+ }
+ let finalContent = content || subject || ''
+ if (dealId && type && !confirmDuplicate) {
+ const [[recentAct]] = await pool.query('SELECT id, created_at FROM activities WHERE deal_id = ? AND type = ? AND created_at >= (NOW() - INTERVAL 120 SECOND) ORDER BY created_at DESC LIMIT 1', [dealId, type])
+ if (recentAct) { return res.json({ success: true, possibleDuplicate: true, lastActivityAt: recentAct.created_at }) }
+ }
+ if (confirmDuplicate && dealId) {
+ const [[dealOwnerRow]] = await pool.query('SELECT owner_name FROM deals WHERE id = ?', [dealId])
+ const ownerNm = (dealOwnerRow && dealOwnerRow.owner_name) || 'responsavel desconhecido'
+ finalContent = 'Atividade dupla em pouco tempo autorizada e confirmada pelo responsavel pelo negocio (' + ownerNm + '). ' + finalContent
+ }
+ const [result] = await pool.query(
+ 'INSERT INTO activities (deal_id, patient_id, user_id, type, content, due_at, subject, duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+ [dealId || null, pid, assignedUserId || req.user.id, type || 'note', finalContent, dueAt || null, subject || null, duration || null])
+    if (done) { await pool.query('UPDATE activities SET done = 1, done_at = NOW() WHERE id = ?', [result.insertId]) }
+    res.json({ success: true, activityId: result.insertId })
+  } catch (e) {
+    console.error('activity error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.post('/api/crm/deals/:id/lookup-tintim', auth, async (req, res) => {
+  try {
+    const dealId = parseInt(req.params.id, 10)
+    const [[deal]] = await pool.query('SELECT d.id, p.phone FROM deals d JOIN patients p ON p.id = d.patient_id WHERE d.id = ?', [dealId])
+    if (!deal || !deal.phone) return res.json({ success: true, found: false })
+    let digits = String(deal.phone).replace(/\D/g, '')
+    if (!digits.startsWith('55')) digits = '55' + digits
+    const CODE = process.env.TINTIM_ACCOUNT_CODE
+    const TOKEN = process.env.TINTIM_ACCOUNT_TOKEN
+    const r = await fetch('https://s.tintim.app/api/v1/' + CODE + '/lead/' + digits + '?token=' + TOKEN)
+    if (r.status === 404) return res.json({ success: true, found: false })
+    const lead = await r.json().catch(() => null)
+    if (!lead || (!lead.phone && !lead.name)) return res.json({ success: true, found: false })
+    const payload = Object.assign({}, lead, { event_type: 'lead.create', overwrite: true })
+    const secret = process.env.TINTIM_WEBHOOK_SECRET
+    const r2 = await fetch('https://crm.viveraorofacial.com.br:8443/api/crm/webhooks/tintim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-webhook-secret': secret || '' },
+      body: JSON.stringify(payload)
+    })
+    const res2 = await r2.json().catch(() => ({}))
+    if (r2.ok && res2.success) return res.json({ success: true, found: true })
+    return res.json({ success: true, found: false })
+  } catch (e) {
+    console.error('lookup-tintim error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.delete('/api/crm/activities/:id', auth, async (req, res) => {
+  try {
+    const actId = parseInt(req.params.id, 10)
+    const [[orig]] = await pool.query('SELECT a.*, u.name AS orig_user_name FROM activities a LEFT JOIN users u ON u.id = a.user_id WHERE a.id = ?', [actId])
+    if (!orig) return res.status(404).json({ success: false, error: 'Atividade nao encontrada' })
+    await pool.query('DELETE FROM activities WHERE id = ?', [actId])
+    const origLabel = orig.content || orig.type
+    const origAuthor = orig.orig_user_name || orig.user_name || 'Sistema'
+    const origWhen = orig.created_at ? new Date(orig.created_at).toLocaleString('pt-BR') : ''
+    const nowStr = new Date().toLocaleString('pt-BR')
+    const deleter = (req.user && req.user.name) || 'Sistema'
+    const logContent = 'Atividade excluida: "' + origLabel + '" (registrada por ' + origAuthor + (origWhen ? ' em ' + origWhen : '') + ') - excluida por ' + deleter + ' em ' + nowStr
+    await pool.query(
+      'INSERT INTO activities (deal_id, patient_id, user_id, type, content, done, created_at) VALUES (?, ?, ?, ?, ?, 1, NOW())',
+      [orig.deal_id || null, orig.patient_id || null, (req.user && req.user.id) || null, 'system', logContent])
+    res.json({ success: true })
+  } catch (e) {
+    console.error('activity delete error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.patch('/api/crm/activities/:id', auth, async (req, res) => {
+  try {
+    const { done, created_at, type, content } = req.body || {}
+    if (done !== undefined) {
+      if (done) {
+        await pool.query('UPDATE activities SET done = 1, done_at = NOW(), user_id = ?, user_name = ? WHERE id = ?', [req.user.id, req.user.name, parseInt(req.params.id)])
+      } else {
+        await pool.query('UPDATE activities SET done = 0, done_at = NULL WHERE id = ?', [parseInt(req.params.id)])
+      }
+    }
+    if (created_at !== undefined) await pool.query('UPDATE activities SET created_at = ? WHERE id = ?', [created_at, parseInt(req.params.id)])
+    if (type !== undefined) await pool.query('UPDATE activities SET type = ? WHERE id = ?', [type, parseInt(req.params.id)])
+    if (content !== undefined) await pool.query('UPDATE activities SET content = ? WHERE id = ?', [content, parseInt(req.params.id)])
+    res.json({ success: true })
+  } catch (e) {
+    console.error('activity patch error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+// ---------------- WEBHOOK TINTIM (classificacao automatica de origem) ----------------
+const ROUND_ROBIN_OWNERS = [ { name: 'Agda', userId: 3 }, { name: 'Helenice', userId: 2 } ];
+async function getNextRoundRobinOwner() {
+  try {
+    const [[last]] = await pool.query("SELECT owner_name FROM deals WHERE owner_name IN ('Agda','Helenice') AND pipeline_id = 1 ORDER BY id DESC LIMIT 1");
+    if (last && last.owner_name === 'Agda') return ROUND_ROBIN_OWNERS[1];
+    return ROUND_ROBIN_OWNERS[0];
+  } catch (e) {
+    console.error('getNextRoundRobinOwner error', e.message);
+    return ROUND_ROBIN_OWNERS[0];
+  }
+}
+function togglePhoneNinthDigit(phone) {
+  const ddi = phone.slice(0,2), ddd = phone.slice(2,4), num = phone.slice(4)
+  if (num.length === 9 && num[0] === '9') return ddi + ddd + num.slice(1)
+  if (num.length === 8) return ddi + ddd + '9' + num
+  return null
+}
+
+async function tintimStatusPost(phone, payload) {
+  const url = 'https://s.tintim.app/api/v1/' + process.env.TINTIM_ACCOUNT_CODE + '/lead/' + phone + '/status?token=' + process.env.TINTIM_ACCOUNT_TOKEN
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  const text = await r.text()
+  return { ok: r.ok, status: r.status, text: text }
+}
+
+async function syncSaleToTintim(dealId) {
+  if (!process.env.TINTIM_ACCOUNT_CODE || !process.env.TINTIM_ACCOUNT_TOKEN) return
+  const [[row]] = await pool.query(
+    'SELECT d.id, d.value, d.won_date, d.tintim_sale_synced_at, p.phone FROM deals d JOIN patients p ON p.id = d.patient_id WHERE d.id = ?',
+    [dealId]
+  )
+  if (!row || row.tintim_sale_synced_at) return
+  if (!row.phone) { console.error('[tintim-sale] sem telefone, deal', dealId); return }
+  let phone = String(row.phone).replace(/\D/g, '')
+  if (phone.length <= 11) phone = '55' + phone
+  const statusId = process.env.TINTIM_STATUS_COMPROU_ID
+  if (!statusId) { console.error('[tintim-sale] TINTIM_STATUS_COMPROU_ID nao configurado'); return }
+  const saleDatetime = (row.won_date ? new Date(row.won_date) : new Date()).toISOString().slice(0, 19)
+  const payload = { id: Number(statusId), sale_amount: Number(row.value || 0), sale_datetime: saleDatetime }
+  let result = null
+  try {
+    result = await tintimStatusPost(phone, payload)
+    if (!result.ok) {
+      const alt = togglePhoneNinthDigit(phone)
+      if (alt) {
+        const retryResult = await tintimStatusPost(alt, payload)
+        if (retryResult.ok) { result = retryResult; phone = alt }
+      }
+    }
+  } catch (e) {
+    result = { ok: false, status: null, text: e.message }
+  }
+  const success = result && result.ok ? 1 : 0
+  if (success) {
+    await pool.query('UPDATE deals SET tintim_sale_synced_at = NOW() WHERE id = ?', [dealId])
+  } else {
+    console.error('[tintim-sale] falhou', dealId, result && result.status, result && result.text)
+  }
+  await pool.query(
+    'INSERT INTO conversion_dispatch_log (deal_id, destino, payload, http_status, response, success) VALUES (?, "tintim", ?, ?, ?, ?)',
+    [dealId, JSON.stringify(payload), result ? result.status : null, (result ? String(result.text).slice(0, 2000) : ''), success]
+  ).catch(function(){})
+}
+
+
+async function buildLostLeadAISummary(patientId) {
+  try {
+    const [lostDeals] = await pool.query(
+      "SELECT id, procedure_name, tags, loss_reason, add_date FROM deals WHERE patient_id = ? AND status = 'lost' ORDER BY add_date DESC LIMIT 3",
+      [patientId]
+    )
+    if (!lostDeals.length) return null
+    const dealIds = lostDeals.map(function (d) { return d.id })
+    const [notes] = await pool.query(
+      "SELECT deal_id, content FROM activities WHERE deal_id IN (?) AND type = 'note' ORDER BY created_at DESC LIMIT 20",
+      [dealIds]
+    )
+    const [callStats] = await pool.query(
+      "SELECT deal_id, SUM(CASE WHEN type LIKE '%Liga%' OR type = 'Chamada Realizada' THEN 1 ELSE 0 END) AS tentativas, SUM(CASE WHEN type LIKE '%Atendida%' THEN 1 ELSE 0 END) AS atendidas FROM activities WHERE deal_id IN (?) GROUP BY deal_id",
+      [dealIds]
+    )
+    const dealsInfo = lostDeals.map(function (d) {
+      const dealNotes = notes.filter(function (n) { return n.deal_id === d.id }).map(function (n) { return n.content }).join(' | ')
+      const stats = callStats.find(function (c) { return c.deal_id === d.id }) || { tentativas: 0, atendidas: 0 }
+      let tagsStr = ''
+      try {
+        const t = JSON.parse(d.tags || '[]')
+        tagsStr = Array.isArray(t) ? t.join(', ') : String(d.tags || '')
+      } catch (e) { tagsStr = String(d.tags || '') }
+      const dataStr = d.add_date ? new Date(d.add_date).toLocaleDateString('pt-BR') : '?'
+      return 'Negocio #' + d.id + ' (perdido em ' + dataStr + '): interesse=' + (d.procedure_name || 'nao informado') + '; motivo da perda=' + (d.loss_reason || 'nao informado') + '; tags=' + (tagsStr || 'nenhuma') + '; tentativas de contato=' + (stats.tentativas || 0) + '; ligacoes atendidas=' + (stats.atendidas || 0) + '; notas=' + (dealNotes || 'sem notas')
+    }).join('\n')
+    const prompt = 'Voce e um assistente de uma clinica odontologica (Vivera Orofacial). Um lead que ja teve negocio(s) PERDIDO(S) no passado voltou a entrar em contato via WhatsApp. Resuma o historico anterior dele(a) em portugues, de forma curta (3 a 5 frases), destacando: interesse/procedimento, motivo da perda anterior, nivel de engajamento (tentativas e ligacoes atendidas) e qualquer informacao relevante das notas, para ajudar o time comercial a retomar o atendimento com contexto. Use apenas as informacoes fornecidas no historico abaixo; nao invente nomes, lugares, valores ou detalhes que nao estejam explicitamente nele.\n\nHistorico:\n' + dealsInfo + '\n\nResumo:'
+    const resp = await axios.post('https://api.openai.com/v1/chat/completions', {
+      model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.5
+    }, {
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.OPENAI_API_KEY },
+      timeout: 20000
+    })
+    const summary = resp.data && resp.data.choices && resp.data.choices[0] && resp.data.choices[0].message && resp.data.choices[0].message.content
+    return summary ? summary.trim() : null
+  } catch (e) {
+    console.error('[reopened-lost-lead-ai-summary]', e.message)
+    return null
+  }
+}
+
+
+async function autoResolveDealAdName(dealId, rawCriativo) {
+  try {
+    if (!dealId || !rawCriativo) return
+    const idStr = String(rawCriativo)
+    if (!/^[0-9]{10,}$/.test(idStr)) return
+    const nameMap = await metaAdsService.resolveAdNames([idStr])
+    const resolved = nameMap && nameMap[idStr]
+    const finalName = resolved || ('Anuncio ' + idStr + ' (nao encontrado no Meta)')
+    await pool.query('UPDATE deals SET ad_name = ? WHERE id = ?', [finalName, dealId])
+    console.log('[tintim-webhook] ad_name resolvido deal=' + dealId + ' -> ' + finalName)
+  } catch (e) {
+    console.error('[tintim-webhook] autoResolveDealAdName erro deal=' + dealId, e.message)
+  }
+}
+
+app.post('/api/crm/webhooks/tintim', async (req, res) => {
+  try {
+    const secret = process.env.TINTIM_WEBHOOK_SECRET
+    const provided = req.query.secret || req.headers['x-webhook-secret']
+    if (secret && provided !== secret) return res.status(401).json({ success: false, error: 'Segredo inválido' })
+
+    const b = req.body || {}
+    console.log('[tintim-webhook] event_type=', b.event_type, 'from_me=', b.from_me, 'msg=', b.message ? String(b.message).slice(0,60) : null)
+    // aceita variacoes de payload do Tintim
+    const phone = b.phone || b.telefone || b.customer_phone || (b.lead && b.lead.phone)
+    let campanha = b.campanha || b.campaign || b.campaign_name || (b.ad && b.ad.campaign_name) || b.utm_campaign || null
+    // Meta Ads (dynamic URL params) manda utm_term={{adset.id}} e utm_content={{ad.id}} quando o Tintim
+    // ainda nao resolveu os nomes (b.ad null). Google Ads usa utm_term=palavra-chave (texto) e por isso
+    // NAO pode ser tratado como o mesmo fallback. Detectamos pelo formato de ID numerico do Meta (10+ digitos).
+    const metaIdRe = /^[0-9]{10,}$/
+    const metaConjuntoFromUtm = (b.utm_term && metaIdRe.test(String(b.utm_term))) ? b.utm_term : null
+    const metaCriativoFromUtm = (b.utm_content && metaIdRe.test(String(b.utm_content))) ? b.utm_content : null
+    const conjunto = b.conjunto || b.adset || b.adset_name || (b.ad && b.ad.adset_name) || metaConjuntoFromUtm || b.utm_content || null
+    const palavraChave = b.palavraChave || b.palavra_chave || b.keyword || (b.ad && b.ad.ad_name) || metaCriativoFromUtm || b.utm_term || null
+    let criativo = b.criativo || palavraChave || null
+    const isPaidMetaAd = !!(b.ad && (b.ad.campaign_name || b.ad.adset_name || b.ad.ad_name))
+    const isOrganicUtm = !!(b.utm_source && /^organ/i.test(b.utm_source))
+    function detectMetaOrigemFromAd(ad) {
+      if (!ad) return null
+      const txt = [ad.adset_name, ad.campaign_name, ad.ad_name].filter(Boolean).join(' ')
+      if (/\[IG\]/i.test(txt) || /instagram/i.test(txt)) return 'Instagram'
+      if (/\[FB\]/i.test(txt) || /facebook/i.test(txt)) return 'Facebook'
+      return null
+    }
+    let plataforma = (isPaidMetaAd ? 'Meta Ads' : null) || b.plataforma || b.platform || b.source_platform || (b.ad && b.ad.ad_account_name) || (b.utm_medium ? capitalizeWord(b.utm_medium) : null) || null
+    const origemRawChain = b.origem || b.origemSugerida ||
+      (isOrganicUtm ? (capitalizeWord(b.utm_medium || plataforma || 'Outro') + ' Orgânico') : null) ||
+      (isPaidMetaAd ? (detectMetaOrigemFromAd(b.ad) || 'Meta Ads') : null) ||
+      (b.source && !/^meta ads$/i.test(b.source) ? capitalizeWord(b.source) : null) ||
+      (plataforma && /insta/i.test(plataforma) ? 'Instagram' : plataforma && /face/i.test(plataforma) ? 'Facebook' : plataforma && /meta/i.test(plataforma) ? 'Meta' : null) ||
+      (b.utm_source && /google/i.test(b.utm_source) ? 'Google' : null)
+    const origemNorm = (origemRawChain && /^(meta ads|facebook)$/i.test(String(origemRawChain).trim())) ? 'Instagram' : origemRawChain
+    let origem = (origemNorm && /^instagram org[aâ]nico$/i.test(String(origemNorm).trim())) ? 'Organico' : origemNorm
+    const name = b.name || b.nome || b.customer_name || (b.lead && b.lead.name)
+    const isRawContactId = name && /(@lid|@c\.us|@s\.whatsapp\.net)$/i.test(String(name).trim())
+    const isDigitsOnlyName = name && /^[\d\s+()\-.]+$/.test(String(name).trim())
+    const resolvedName = (name && !isRawContactId && !isDigitsOnlyName) ? name : null
+    const utmSource = b.utm_source || null
+    const utmMedium = b.utm_medium || null
+    const utmCampaign = b.utm_campaign || null
+    const utmContent = b.utm_content || null
+    const utmTerm = b.utm_term || null
+    const ctwaClid = b.ctwa_clid || (b.ad && b.ad.ctwa_clid) || null
+    const adAccountName = (b.ad && b.ad.ad_account_name) || null
+    const sourceRaw = b.source || null
+
+      // === OVERRIDE: atribuicao fixa para link especifico do Stories do Instagram (Tintim) ===
+      // Link: https://tintim.link/whatsapp/f0fb74f6-c6fb-448f-b0ee-e5a4e49e886d/eddc7af8-95b8-404c-8644-dc48e75784ab
+      // O payload do Tintim nao expoe um campo 'link_id'/'click_id' direto. A mensagem pre-preenchida
+      // gerada por ESTE link especifico carrega uma marca d'agua invisivel (caracteres Unicode de largura
+      // zero: U+200B, U+200C, U+2060, U+FEFF) embutida no texto da mensagem que o lead envia no WhatsApp.
+      // Essa marca eh unica por link e serve como fingerprint confiavel para identificar cliques nele.
+      try {
+        const TINTIM_FIXED_ATTRIBUTION_LINKS = [
+          {
+            linkId: 'eddc7af8-95b8-404c-8644-dc48e75784ab',
+            // fingerprint codificado em base64 (2 bits por simbolo; alfabeto: 0=U+200B,1=U+200C,2=U+2060,3=U+FEFF)
+            fingerprintB64: '1FZQElASUBJQGUEZRWUBJFGUUlFZQGUAZFGUQlEZQBlBZFGUBJRWUBZQEkUZQWUBZQCVAlAZQWUBZQWUFJQSUEJQEw==',
+            fixed: {
+              plataforma: 'Instagram',
+              origem: 'Orgânico',
+              campanha: 'Stories feito pelo Dr. Diego',
+              criativo: 'Exojet'
+            }
+          }
+        ];
+        function decodeTintimFingerprint(b64) {
+          const alphabet = ['​', '‌', '⁠', '﻿'];
+          const bin = Buffer.from(b64, 'base64');
+          let bits = '';
+          for (const byte of bin) bits += byte.toString(2).padStart(8, '0');
+          let out = '';
+          for (let i = 0; i + 2 <= bits.length; i += 2) out += alphabet[parseInt(bits.slice(i, i + 2), 2)];
+          return out;
+        }
+        const tintimRawPayloadStr = JSON.stringify(b);
+        for (const linkRule of TINTIM_FIXED_ATTRIBUTION_LINKS) {
+          const fp = decodeTintimFingerprint(linkRule.fingerprintB64);
+          if (tintimRawPayloadStr.includes(fp) || tintimRawPayloadStr.includes(linkRule.linkId)) {
+            plataforma = linkRule.fixed.plataforma;
+            origem = linkRule.fixed.origem;
+            campanha = linkRule.fixed.campanha;
+            criativo = linkRule.fixed.criativo;
+            console.log('[tintim-webhook] override de atribuicao fixa aplicado para link', linkRule.linkId, '- phone:', phone);
+          }
+        }
+      } catch (tintimOverrideErr) {
+        console.error('[tintim-webhook] erro no override de atribuicao fixa', tintimOverrideErr.message);
+      }
+      // === FIM OVERRIDE ===
+
+    let webhookLogId = null
+    try {
+      const [logRes] = await pool.query('INSERT INTO tintim_webhook_log (phone, event_type, raw_payload) VALUES (?, ?, ?)', [phone || null, b.event_type || null, JSON.stringify(b)])
+      webhookLogId = logRes.insertId
+    } catch (logErr) { console.error('[tintim-webhook] log error', logErr.message) }
+
+    if (!phone) return res.status(400).json({ success: false, error: 'Payload sem telefone' })
+    const digits = String(phone).replace(/\D/g, '')
+    const tail = digits.slice(-8) // casa pelos ultimos 8 digitos (padrao BR)
+    const lockConn = await pool.getConnection()
+    await lockConn.query('SELECT GET_LOCK(?, 10)', ['tintim_phone:' + tail])
+    try {
+
+    const [patients] = await pool.query(
+      "SELECT id, name FROM patients WHERE RIGHT(REGEXP_REPLACE(COALESCE(phone,''), '[^0-9]', ''), 8) = ? LIMIT 1", [tail])
+
+    let patientId
+    let created = false
+    if (patients[0]) {
+      patientId = patients[0].id
+    } else {
+      // lead novo vindo do trafego: cria paciente + negocio na primeira etapa
+      const [r] = await pool.query('INSERT INTO patients (name, phone) VALUES (?, ?)',
+        [resolvedName || 'Lead sem nome rastreado', '+' + (digits.startsWith('55') ? digits : '55' + digits)])
+      patientId = r.insertId
+      created = true
+    }
+
+    // negocios abertos sem atribuicao -> preenche; se lead novo, cria o negocio
+    // === REGRA INTRANSPONIVEL (2026-07-22): nao criar negocio duplicado se ja existe negocio ABERTO para este telefone (Tintim) ===
+    const [openByPhone] = await pool.query(
+      `SELECT d.id, d.patient_id, s.label AS stage_label
+       FROM deals d JOIN patients p ON p.id = d.patient_id
+       LEFT JOIN stages s ON s.id = d.stage_id
+       WHERE d.status = 'open' AND RIGHT(REGEXP_REPLACE(COALESCE(p.phone,''), '[^0-9]', ''), 8) = ?`,
+      [tail])
+    if (openByPhone.length > 0) {
+      const reentryDatetime = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+      const trackingParts = [origem, campanha, criativo].filter(Boolean).join(' / ')
+      for (const d of openByPhone) {
+        const reentryNote = `⚠️ LEAD REENTROU VIA TINTIM em ${reentryDatetime} — negocio ja esta aberto (etapa: ${d.stage_label || 'atual'}).` + (trackingParts ? ` Novo evento — origem/campanha/criativo: ${trackingParts}.` : '') + ' Nenhum negocio novo foi criado para evitar duplicidade.'
+        await pool.query(
+          'INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
+          [d.id, d.patient_id, reentryNote])
+        if (webhookLogId) { await pool.query('UPDATE tintim_webhook_log SET deal_id = ? WHERE id = ?', [d.id, webhookLogId]).catch(() => {}) }
+            autoResolveDealAdName(d.id, criativo)
+      }
+      // [2026-07-23 Diego] nao bloqueia mais criacao -- DESATIVADO: return res.json({ success: true, patientId, created, dealsUpdated: 0, reentry: true, existingDealIds: openByPhone.map(x => x.id) })
+    }
+    const [closedHistForNote] = await pool.query(
+      `SELECT d.id, d.status, d.add_date
+       FROM deals d JOIN patients p ON p.id = d.patient_id
+       WHERE d.status IN ('won','lost') AND RIGHT(REGEXP_REPLACE(COALESCE(p.phone,''), '[^0-9]', ''), 8) = ?
+       ORDER BY d.add_date DESC LIMIT 5`,
+      [tail])
+    const [open] = await pool.query(
+      'SELECT id, campanha FROM deals WHERE patient_id = ? AND status = "open"', [patientId])
+    let updated = 0
+    if (open.length === 0 && created) {
+      const [[pl]] = await pool.query("SELECT id FROM pipelines WHERE slug = 'inbound'")
+      const [[st]] = await pool.query('SELECT id FROM stages WHERE pipeline_id = ? ORDER BY sort LIMIT 1', [pl.id])
+      const nextOwner = await getNextRoundRobinOwner();
+      const [r] = await pool.query(
+        `INSERT INTO deals (patient_id, pipeline_id, stage_id, title, origem, campanha, conjunto, criativo, palavra_chave, plataforma, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ctwa_clid, ad_account_name, tintim_source_raw, owner_name, sdr_user_id, stage_entered_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [patientId, pl.id, st.id, resolvedName || 'Lead sem nome rastreado', origem, campanha, conjunto, criativo, palavraChave, plataforma, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, ctwaClid, adAccountName, sourceRaw, nextOwner.name, nextOwner.userId])
+      await pool.query(
+        'INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", "Lead criado automaticamente pelo Tintim")',
+        [r.insertId, patientId])
+        autoResolveDealAdName(r.insertId, criativo)
+      if (closedHistForNote.length > 0) {
+        const histList = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date(h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
+        await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
+          [r.insertId, patientId, `Reengajamento — telefone possui historico anterior de negocio(s): ${histList}`])
+      }
+      updated = 1
+      if (webhookLogId) { await pool.query('UPDATE tintim_webhook_log SET deal_id = ? WHERE id = ?', [r.insertId, webhookLogId]).catch(() => {}) }
+        if (openByPhone.length > 0) { await pool.query("UPDATE deals SET duplicate_alert=1 WHERE id=?", [r.insertId]).catch(()=>{}) }
+} else if (open.length === 0 && !created) {
+const [[plRec]] = await pool.query("SELECT id FROM pipelines WHERE slug = 'inbound'")
+const [[stRec]] = await pool.query('SELECT id FROM stages WHERE pipeline_id = ? ORDER BY sort LIMIT 1', [plRec.id])
+const [[prevLostOwner]] = await pool.query(
+"SELECT owner_name FROM deals WHERE patient_id = ? AND status = 'lost' ORDER BY add_date DESC LIMIT 1",
+[patientId]
+)
+const [[prevWonDeal]] = await pool.query(
+"SELECT id FROM deals WHERE patient_id = ? AND status = 'won' LIMIT 1",
+[patientId]
+)
+const isReopenedLostLead = !!(prevLostOwner && prevLostOwner.owner_name)
+const isAlreadyPatient = !isReopenedLostLead && !!prevWonDeal
+const hasRealMktClick = !!(utmSource || ctwaClid)
+let reengagedOwnerName = (prevLostOwner && prevLostOwner.owner_name) ? prevLostOwner.owner_name : null
+let reengagedOwnerUserId = null
+if (!reengagedOwnerName) {
+const fallbackOwner = await getNextRoundRobinOwner()
+reengagedOwnerName = fallbackOwner.name
+reengagedOwnerUserId = fallbackOwner.userId
+}
+const [r2] = await pool.query(
+`INSERT INTO deals (patient_id, pipeline_id, stage_id, title, origem, campanha, conjunto, criativo, palavra_chave, plataforma, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ctwa_clid, ad_account_name, tintim_source_raw, owner_name, sdr_user_id, already_patient, stage_entered_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+[patientId, plRec.id, stRec.id, resolvedName || 'Lead sem nome rastreado', origem, campanha, conjunto, criativo, palavraChave, plataforma, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, ctwaClid, adAccountName, sourceRaw, reengagedOwnerName, reengagedOwnerUserId, isAlreadyPatient ? 1 : 0]
+)
+let noteText
+if (isReopenedLostLead) {
+noteText = 'Lead com deal perdido anterior — reengajado no Inbound'
+} else if (isAlreadyPatient && hasRealMktClick) {
+noteText = 'Este lead entrou pelo Mkt mas já é paciente'
+} else if (isAlreadyPatient) {
+noteText = 'Contato já é paciente (reengajamento) — Inbound via rodízio de SDR'
+} else {
+noteText = 'Contato já cadastrado na base, sem deal aberto - roteado automaticamente'
+}
+await pool.query(
+'INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
+[r2.insertId, patientId, noteText]
+)
+autoResolveDealAdName(r2.insertId, criativo)
+if (isReopenedLostLead) {
+await pool.query('UPDATE deals SET reopened_lost_lead = 1 WHERE id = ?', [r2.insertId]).catch(function(){})
+const aiSummary = await buildLostLeadAISummary(patientId)
+if (aiSummary) {
+await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "note", ?)',
+[r2.insertId, patientId, 'Histórico anterior (lead reaberto): ' + aiSummary])
+}
+}
+if (closedHistForNote.length > 0) {
+const histList2 = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date(h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
+await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
+[r2.insertId, patientId, `Reengajamento — telefone possui historico anterior de negocio(s): ${histList2}`])
+}
+updated = 1
+if (webhookLogId) { await pool.query('UPDATE tintim_webhook_log SET deal_id = ? WHERE id = ?', [r2.insertId, webhookLogId]).catch(() => {}) }
+if (openByPhone.length > 0) { await pool.query("UPDATE deals SET duplicate_alert=1 WHERE id=?", [r2.insertId]).catch(()=>{}) }
+    } else {
+
+      for (const d of open) {
+        if (!d.campanha || b.overwrite) {
+          await pool.query(
+            `UPDATE deals SET origem = COALESCE(?, origem), campanha = COALESCE(?, campanha), conjunto = COALESCE(?, conjunto), criativo = COALESCE(?, criativo), palavra_chave = COALESCE(?, palavra_chave), plataforma = COALESCE(?, plataforma), utm_source = COALESCE(?, utm_source), utm_medium = COALESCE(?, utm_medium), utm_campaign = COALESCE(?, utm_campaign), utm_content = COALESCE(?, utm_content), utm_term = COALESCE(?, utm_term), ctwa_clid = COALESCE(?, ctwa_clid), ad_account_name = COALESCE(?, ad_account_name), tintim_source_raw = COALESCE(?, tintim_source_raw)
+
+             WHERE id = ?`, [origem, campanha, conjunto, criativo, palavraChave, plataforma, utmSource, utmMedium, utmCampaign, utmContent, utmTerm, ctwaClid, adAccountName, sourceRaw, d.id])
+             if (webhookLogId) { await pool.query('UPDATE tintim_webhook_log SET deal_id = ? WHERE id = ?', [d.id, webhookLogId]).catch(() => {}) }
+            autoResolveDealAdName(d.id, criativo)
+          await pool.query(
+            'INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
+            [d.id, patientId, `Origem classificada automaticamente pelo Tintim${campanha ? ' — ' + campanha : ''}`])
+          updated++
+        }
+      }
+    }
+    res.json({ success: true, patientId, created, dealsUpdated: updated })
+    } finally {
+      await lockConn.query('SELECT RELEASE_LOCK(?)', ['tintim_phone:' + tail]).catch(function(){})
+      lockConn.release()
+    }
+  } catch (e) {
+    console.error('tintim webhook error', e)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+// ---------------- STATUS DA VARREDURA ----------------
+
+app.get('/api/crm/sync/status', auth, async (req, res) => {
+  try {
+    const [runs] = await pool.query('SELECT * FROM sync_runs ORDER BY started_at DESC LIMIT 10')
+    const [[counts]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+              SUM(sync_status = 'verified') AS verified,
+              SUM(sync_status = 'divergent') AS divergent,
+              SUM(sync_status = 'imported') AS pending
+       FROM deals WHERE pipedrive_id IS NOT NULL`)
+    res.json({ success: true, runs, counts })
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.get('/api/crm/health', (req, res) => res.json({ success: true, service: 'crm-server', ts: new Date().toISOString() }))
+
+// ---------------- CRON: sync conversas Tintim (a cada 3h) ----------------
+if (process.env.CRM_ENABLE_TINTIM_SYNC !== 'false') {
+  cron.schedule('0 */3 * * *', () => {
+    console.log('[cron] Iniciando sync de conversas Tintim...')
+    require('./scripts/sync-tintim-conversations').run()
+      .then(r => console.log('[cron] Sync Tintim concluido:', JSON.stringify(r)))
+      .catch(e => console.error('[cron] Erro no sync Tintim:', e.message))
+  }, { timezone: 'America/Sao_Paulo' })
+}
+
+
+app.get('/', (req, res) => res.redirect('/board.html'));
+app.get('/whatsapp.html', (req, res) => res.sendFile(path.join(__dirname, 'public', 'whatsapp.html')))
+app.use('/', express.static(path.join(__dirname, 'public')))
+require('./crm-ui-api')(app, pool, auth)
+// ---------------- GOOGLE CALENDAR OAUTH ----------------
+
+app.get('/api/crm/google-calendar/auth-url', auth, (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'A conta do Google Calendar e da clinica (compartilhada). Apenas usuarios administradores podem conectar.' });
+    }
+    const state = jwt.sign({ uid: req.user.id, purpose: 'gcal_connect' }, JWT_SECRET, { expiresIn: '15m' });
+    res.json({ success: true, url: gcal.buildAuthUrl(state) });
+  } catch (e) {
+    console.error('gcal auth-url error', e);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+app.get('/api/crm/google-calendar/callback', async (req, res) => {
+  try {
+    const { code, state, error } = req.query;
+    if (error) return res.redirect('/agenda-visual.html?google_connected=0&reason=' + encodeURIComponent(error));
+    if (!code || !state) return res.status(400).send('Faltando code ou state');
+    let payload;
+    try {
+      payload = jwt.verify(state, JWT_SECRET);
+    } catch (e) {
+      return res.status(400).send('State invalido ou expirado. Tente conectar novamente.');
+    }
+    const tokens = await gcal.exchangeCodeForTokens(code);
+    await gcal.saveTokens(JESSICA_USER_ID, tokens); // conta compartilhada da clinica - salva sempre sob o id usado pelos eventos, independente do admin que conectou
+    res.redirect('/agenda-visual.html?google_connected=1');
+  } catch (e) {
+    console.error('gcal callback error', e.response ? e.response.data : e);
+    res.redirect('/agenda-visual.html?google_connected=0');
+  }
+});
+
+app.get('/api/crm/google-calendar/status', auth, async (req, res) => {
+  try {
+    const row = await gcal.getTokenRow(JESSICA_USER_ID); // calendario compartilhado da Dra. Jessica, independente de quem esta logado
+    res.json({ success: true, connected: !!row, calendarId: row ? row.calendar_id : null, updatedAt: row ? row.updated_at : null });
+  } catch (e) {
+    console.error('gcal status error', e);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+app.get('/api/crm/google-calendar/sync-now', auth, async (req, res) => {
+  try {
+    const results = await gcal.pollAllUsers();
+    res.json({ success: true, results: results });
+  } catch (e) {
+    console.error('gcal sync-now error', e);
+    res.status(500).json({ success: false, error: 'Erro interno' });
+  }
+});
+
+const GCAL_POLL_INTERVAL_MS = 5 * 60 * 1000;
+let gcalPollInFlight = false;
+setInterval(function() {
+if (gcalPollInFlight) { console.warn('[gcal-poll] ciclo anterior ainda em execucao, pulando este tick'); return; }
+gcalPollInFlight = true;
+gcal.pollAllUsers().then(function(results) {
+var withChanges = results.filter(function(r){ return r && ((r.created||0)+(r.updated||0)+(r.cancelled||0) > 0); });
+if (withChanges.length) { console.log('[gcal-poll]', JSON.stringify(results)); }
+}).catch(function(e) {
+console.error('gcal poll interval error', e);
+}).finally(function() { gcalPollInFlight = false; });
+}, GCAL_POLL_INTERVAL_MS);
+
+app.listen(PORT, () => console.log(`CRM server rodando na porta ${PORT}`))

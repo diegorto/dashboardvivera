@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Entrar</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <form id="loginForm">
+      <div class="field">
+        <label>E-mail</label>
+        <input class="input" type="email" id="email" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Senha</label>
+        <input class="input" type="password" id="password" required autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;" id="submitBtn">Entrar</button>
+      <div class="error-msg" id="errorMsg"></div>
+    </form>
+    <form id="resetForm" style="display:none;">
+      <p style="margin:0 0 12px;font-size:14px;color:#555;">Primeiro acesso: defina uma nova senha e informe seu e-mail para recuperacao futura.</p>
+      <div class="field">
+        <label>Novo e-mail</label>
+        <input class="input" type="email" id="resetEmail" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Nova senha</label>
+        <input class="input" type="password" id="resetPassword" required minlength="4" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Confirmar nova senha</label>
+        <input class="input" type="password" id="resetPassword2" required minlength="4" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" type="submit" style="width:100%; justify-content:center;" id="resetSubmitBtn">Salvar e entrar</button>
+      <div class="error-msg" id="resetErrorMsg"></div>
+    </form>
+  </div>
+</div>
+<script src="app.js"></script>
+<script>
+  if (getToken()) window.location.href = 'index.html';
+
+  let pendingUserId = null;
+  let pendingPassword = null;
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const errorMsg = document.getElementById('errorMsg');
+    const submitBtn = document.getElementById('submitBtn');
+    errorMsg.textContent = '';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Entrando...';
+    try {
+      const res = await fetch('/api/crm/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Nao foi possivel entrar');
+      }
+      if (data.mustReset) {
+        pendingUserId = data.userId;
+        pendingPassword = password;
+        document.getElementById('loginForm').style.display = 'none';
+        document.getElementById('resetForm').style.display = '';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Entrar';
+        return;
+      }
+      setSession(data.token, data.user);
+      window.location.href = 'index.html';
+    } catch (err) {
+      errorMsg.textContent = err.message;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Entrar';
+    }
+  });
+
+document.getElementById('resetForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newEmail = document.getElementById('resetEmail').value.trim();
+  const newPassword = document.getElementById('resetPassword').value;
+  const newPassword2 = document.getElementById('resetPassword2').value;
+  const resetErrorMsg = document.getElementById('resetErrorMsg');
+  const resetSubmitBtn = document.getElementById('resetSubmitBtn');
+  resetErrorMsg.textContent = '';
+  if (newPassword !== newPassword2) {
+    resetErrorMsg.textContent = 'As senhas nao coincidem';
+    return;
+  }
+  resetSubmitBtn.disabled = true;
+  resetSubmitBtn.textContent = 'Salvando...';
+  try {
+    const res = await fetch('/api/crm/auth/first-login-reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: pendingUserId, currentPassword: pendingPassword, newPassword, newEmail })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Nao foi possivel salvar');
+    }
+    setSession(data.token, data.user);
+    window.location.href = 'index.html';
+  } catch (err) {
+    resetErrorMsg.textContent = err.message;
+    resetSubmitBtn.disabled = false;
+    resetSubmitBtn.textContent = 'Salvar e entrar';
+  }
+});
+</script>
+</body>
+</html>

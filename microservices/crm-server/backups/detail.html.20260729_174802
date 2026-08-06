@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Detalhe</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="user-chip" id="userChip"></span>
+    <button class="btn" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="page">
+  <div class="back-link" onclick="window.history.back()">&larr; Voltar</div>
+
+  <div class="deal-breadcrumb" id="breadcrumbWrap">
+    <span class="deal-breadcrumb-trigger" id="breadcrumbTrigger">Carregando...</span>
+    <div class="stage-popover" id="stagePopover" style="display:none;">
+      <div class="field">
+        <label>Funil</label>
+        <select class="input" id="pipelineSelect"></select>
+      </div>
+      <div class="field">
+        <label>Etapa do funil</label>
+        <div class="chevron-stepper" id="chevronStepper"></div>
+        <div class="stage-label-current" id="stageLabelCurrent"></div>
+      </div>
+      <div class="stage-popover-actions">
+        <button class="btn" id="stageCancelBtn">Cancelar</button>
+        <button class="btn btn-primary" id="stageSaveBtn">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="deal-header">
+    <div>
+      <h1 class="page-title" id="pageTitle" style="margin-bottom:4px;">Carregando...</h1>
+      <p class="page-sub" id="pageSub" style="margin:0;"></p>
+        <div id="ownerRow" style="display:flex;align-items:center;gap:6px;margin-top:6px;">
+          <span style="font-size:12px;color:#666;">CRC Responsável:</span>
+          <span id="ownerBadge" style="font-weight:600;font-size:13px;">-</span>
+          <button type="button" class="btn" id="changeOwnerBtn" style="font-size:11px;padding:2px 10px;">Trocar</button>
+        </div>
+        <div id="ownerPopover" style="display:none;align-items:center;gap:6px;margin-top:6px;">
+          <select class="input" id="ownerSelect" style="font-size:13px;padding:4px 8px;max-width:200px;"></select>
+          <button type="button" class="btn" id="ownerCancelBtn">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="ownerSaveBtn">Confirmar</button>
+        </div>
+    </div>
+    <div class="deal-header-actions"><button class="btn btn-danger" id="deleteDealBtn" style="display:none;margin-right:8px;" onclick="deleteDeal()">Excluir Negocio</button>
+      <div class="label-chips" id="labelChips" style="display:none;"></div>
+      <span class="label-chip" id="labelChip">Etiqueta</span>
+      <button type="button" class="btn quick-obj-btn" data-obj="Parou de responder após o valor da consulta" style="font-size:11px;padding:2px 8px;margin-left:4px;">Parou (valor)</button><button type="button" class="btn quick-obj-btn" data-obj="Objeção de distância(muito longe)" style="font-size:11px;padding:2px 8px;margin-left:4px;">Distância</button><button type="button" class="btn quick-obj-btn" data-obj="Objeção financeira" style="font-size:11px;padding:2px 8px;margin-left:4px;">Financeira</button>
+      <div class="label-dropdown" id="labelDropdown" style="display:none;">
+        <input class="input label-search" id="labelSearch" type="text" placeholder="Buscar etiquetas">
+        <div class="label-list" id="labelList"></div>
+        <div class="stage-popover-actions" style="margin-top:8px;">
+          <button class="btn" id="labelCancelBtn">Cancelar</button>
+          <button class="btn btn-primary" id="labelSaveBtn" style="background:#16a34a;border-color:#16a34a;">Salvar</button>
+        </div>
+      </div>
+      <button class="btn btn-won" id="btnWon">Ganho</button>
+      <input type="date" id="wonDateInput" title="Data do fechamento (permite data retroativa)" style="padding:6px 8px;border-radius:6px;border:1px solid #ccc;margin-left:4px;">
+      <button class="btn" id="btnSaveWonDate" style="display:none;background:#16a34a;border-color:#16a34a;color:#fff;margin-left:4px;">Salvar data</button>
+      <button class="btn btn-lost" id="btnLost">Perdido</button>
+      <button class="btn" id="btnReopen" style="display:none;">Reabrir</button>
+<button class="btn" id="btnNotLead" style="background:#f59e0b;border-color:#f59e0b;color:#fff;">Nao e lead</button>
+        <button class="btn" id="btnFindPatient" style="background:#0ea5e9;border-color:#0ea5e9;color:#fff;">Buscar Paciente</button>
+    </div>
+  </div>
+  <div class="status-banner" id="statusBanner" style="display:none;"></div>
+
+  <div class="grid-3-detail">
+    <div class="card">
+      <div class="section-title">Dados da Pessoa</div>
+      <div class="field">
+        <label>Nome</label>
+        <input class="input" id="patientName">
+      </div>
+      <div class="field">
+        <label>Telefone</label>
+        <input class="input" id="patientPhone">
+      </div>
+      <div class="field">
+        <label>E-mail</label>
+        <input class="input" id="patientEmail" type="email">
+      </div>
+      <button class="btn btn-primary" id="savePatientBtn">Salvar paciente</button>
+<div id="daysSinceContact" style="margin-top:10px;padding:8px 10px;border-radius:8px;background:#fee2e2;font-size:13px;font-weight:700;text-align:center;"></div>
+    </div>
+  <div class="card">
+    <div class="tabs-bar">
+      <div class="tab-btn active" data-tab="atividade">Atividade</div>
+      <div class="tab-btn" data-tab="historico">Historico</div>
+    </div>
+
+    <div class="tab-panel active" id="tabAtividade">
+      <div class="field">
+        <div class="stage-popover-actions" style="flex-wrap:wrap;margin-bottom:10px;">
+          <div class="quick-act-grid">
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Agendou"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>Agendou</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Compareceu"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="8,12 11,15 16,9"/></svg><span>Compareceu</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Faltou"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>Faltou</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Cancelou/Desmarcou"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.5" y1="5.5" x2="18.5" y2="18.5"/></svg><span>Cancelou/Desmarcou</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Ligação Atendida"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg><span>Ligação Atendida</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Chamada Realizada"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/><polyline points="16,2 22,2 22,8"/><line x1="22" y1="2" x2="15" y2="9"/></svg><span>Chamada Realizada</span></button>
+            <button class="btn quick-act-btn" type="button" data-quick-activity="Contato por Msg Realizado"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8A8.4 8.4 0 0 1 12.5 3a8.4 8.4 0 0 1 8.5 8.5z"/></svg><span>Contato por Msg Realizado</span></button>
+          </div>
+        </div>
+        <textarea class="input" id="newActivityText" rows="2" style="width:100%; resize:vertical;" placeholder="Escreva uma anotacao ou atividade..."></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" id="addActivityBtn">Adicionar</button>
+        <button class="btn btn-primary" id="openScheduleActivityBtn" type="button" style="font-size:12px;">+ Agendar atividade</button>
+<button class="btn" id="openScheduleConsultBtn" type="button" style="font-size:12px;background:#dcfce7;border-color:#16a34a;color:#15803d;display:inline-flex;align-items:center;gap:6px;"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg><span>Agendar consulta</span></button>
+      </div>
+      <div id="activityList" style="margin-top:16px;"></div>
+    </div>
+
+    <div class="tab-panel" id="tabHistorico">
+      <div id="historicoList"><span class="muted">Carregando...</span></div>
+    </div>
+  </div>
+
+    <div class="card">
+      <div class="detail-section" id="secNegocio">
+        <div class="detail-section-head" data-toggle="secNegocio">
+          <div class="detail-section-head-left">
+            <span class="detail-section-caret">&#9660;</span>
+            <span class="detail-section-title">Negocio</span>
+          </div>
+        </div>
+        <div class="detail-section-body">
+        <div id="labelChipsNegocio" class="label-chips" style="font-size:12px;margin-bottom:10px;"></div>
+          <div class="field">
+            <label>Titulo</label>
+            <input class="input" id="dealTitle">
+          </div>
+          <div class="field">
+            <label>Valor (R$)</label>
+            <input class="input" id="dealValue" type="number" step="0.01">
+          </div>
+        <div class="field">
+          <label>Avaliador</label>
+          <input type="text" id="dealProfessionalSearch" class="input" placeholder="Buscar profissional..." autocomplete="off">
+          <ul id="dealProfessionalList" style="list-style:none;padding:0;margin:4px 0;"></ul>
+          <input type="hidden" id="dealProfessionalId">
+          <div id="dealProfessionalChip"></div>
+        </div>
+        <div class="field">
+          <label>Lead Scoring</label>
+          <div id="dealLeadScoreButtons" style="display:flex;gap:6px;margin-top:4px;"></div>
+          <div class="muted" style="font-size:11px;margin-top:4px;">Potencial de comparecimento a consulta (1 = frio, 5 = quente)</div>
+        </div>
+          <div class="field">
+            <label>Status</label>
+            <select class="input" id="dealStatus">
+              <option value="open">Aberto</option>
+              <option value="won">Ganho</option>
+              <option value="lost">Perdido</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Procedimento</label>
+<div class="input" id="dealProcedimento" style="height:auto;max-height:220px;overflow-y:auto;padding:8px;"></div>
+<div class="muted" style="font-size:11px;margin-top:2px;">Toque para marcar um ou mais procedimentos</div>
+        <button type="button" class="btn btn-primary" id="saveProcedimentosBtn" style="margin-top:6px;">Salvar procedimentos</button>
+            <div id="procedimentoNewWrap" style="display:none;margin-top:6px;">
+              <input class="input" id="procedimentoNewInput" placeholder="Nome do novo procedimento">
+              <button type="button" class="btn" id="procedimentoNewSaveBtn" style="margin-top:6px;">Cadastrar procedimento</button>
+            </div>
+            <a href="#" id="procedimentoNewToggle" style="font-size:12px;display:inline-block;margin-top:4px;">+ Novo procedimento</a>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="saveDealBtn" style="margin:12px 0;">Salvar negocio</button>
+
+      <div class="detail-section" id="secTrafego">
+        <div class="detail-section-head" data-toggle="secTrafego">
+          <div class="detail-section-head-left">
+            <span class="detail-section-caret">&#9660;</span>
+            <span class="detail-section-title">Trafego Pago</span>
+            <span class="detail-section-count" id="trafegoCount">0/5</span>
+          </div>
+          <button type="button" id="buscarTintimBtn" class="btn btn-primary" style="display:none;font-size:12px;" onclick="event.stopPropagation();">Buscar no Tintim</button>
+        </div>
+        <div class="detail-section-body">
+          <div class="kv-row">
+            <label>Origem</label>
+            <select class="input" id="dealOrigem">
+              <option value="">(Nenhum)</option>
+            </select>
+          </div>
+          <div class="kv-row">
+            <label>Plataforma</label>
+            <input class="input" id="dealPlataforma">
+          </div>
+          <div class="kv-row">
+            <label>Campanha</label>
+            <input class="input" id="dealCampanha">
+          </div>
+          <div class="kv-row">
+            <label>Conjunto de anuncio</label>
+            <input class="input" id="dealConjunto">
+          </div>
+          <div class="kv-row">
+            <label>Keyword/Ad</label>
+            <input class="input" id="dealPalavraChave">
+          </div>
+            <input type="hidden" id="dealCriativo">
+            <span id="dealAdAccountName" style="display:none;"></span>
+            <span id="dealUtmInfo" style="display:none;"></span>
+            <span id="dealCtwaInfo" style="display:none;"></span>
+        </div>
+      </div>
+
+      
+    </div>
+  </div>
+
+
+<div class="modal-overlay" id="lostModal" style="display:none;">
+  <div class="modal-box">
+    <div class="section-title">Marcar como perdido</div>
+    <div class="field">
+      <label>Motivo da perda <span style="color:#dc2626;">*</span></label>
+      <select class="input" id="lossReasonSelect">
+        <option value="">Selecione um motivo...</option>
+      </select>
+    </div>
+    <div class="stage-popover-actions">
+      <button class="btn" id="lostCancelBtn">Cancelar</button>
+      <button class="btn btn-lost" id="lostConfirmBtn">Marcar como perdido</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="findPatientModal" style="display:none;">
+  <div class="modal-box" style="max-width:520px;">
+    <div class="section-title">Buscar Paciente</div>
+    <div id="findPatientBody" style="max-height:420px;overflow:auto;font-size:13px;padding:4px 0;">Buscando...</div>
+    <div class="stage-popover-actions" style="margin-top:10px;">
+      <button class="btn" id="findPatientCloseBtn">Fechar</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="campanhaPopup" style="display:none;">
+  <div class="modal-box">
+    <div class="section-title">Origem marcada como "Ja e paciente"</div>
+    <div id="campanhaStepAsk">
+      <p style="margin:0 0 12px;font-size:14px;color:#555;">Isso e de alguma campanha especifica da clinica ou e uma acao normal do dia a dia?</p>
+      <div class="stage-popover-actions">
+        <button class="btn" id="campanhaNormalBtn">Acao normal do dia a dia</button>
+        <button class="btn btn-primary" id="campanhaEspecificaBtn">Campanha especifica</button>
+      </div>
+    </div>
+    <div id="campanhaStepList" style="display:none;">
+      <p style="margin:0 0 12px;font-size:14px;color:#555;">Selecione a campanha:</p>
+      <ul id="campanhaOptionsList" style="list-style:none;padding:0;margin:0 0 12px;max-height:220px;overflow-y:auto;"></ul>
+      <div class="field">
+        <label>Nova campanha</label>
+        <input class="input" type="text" id="campanhaNewInput" placeholder="Nome da nova campanha">
+      </div>
+      <div class="stage-popover-actions">
+        <button class="btn" id="campanhaBackBtn">Voltar</button>
+        <button class="btn btn-primary" id="campanhaCreateBtn">Cadastrar e usar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="app.js"></script>
+<script>
+  requireAuth();
+  const user = getUser();
+  document.getElementById('userChip').textContent = user ? user.name : '';
+  if (user && user.role === 'admin') { var _ddb = document.getElementById('deleteDealBtn'); if (_ddb) _ddb.style.display = 'inline-block'; }
+  async function deleteDeal(){
+    if (!confirm('Tem certeza que deseja excluir este negocio? Essa acao nao pode ser desfeita.')) return;
+    try {
+      await api('/api/crm/deals/' + dealId, { method: 'DELETE' });
+      showToast('Negocio excluido.', 'success');
+      window.location.href = 'index.html';
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  const dealId = qs('id');
+  if (!dealId) window.location.href = 'index.html';
+
+  let currentDeal = null;
+  let campaignOptionsCache = [];
+  let procedureOptionsCache = [];
+  let allActivities = [];
+  let stagesByPipeline = {};
+  let pipelinesList = [];
+  let pendingStageId = null;
+  let pendingPipelineSlug = null;
+
+  document.querySelectorAll('.detail-section-head').forEach(head => {
+    head.addEventListener('click', () => {
+      document.getElementById(head.dataset.toggle).classList.toggle('collapsed');
+    });
+  });
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).classList.add('active');
+    });
+  });
+
+  function renderActivityLists() {
+    const manual = allActivities.filter(a => a.type !== 'stage_change' && a.type !== 'system');
+    const el = document.getElementById('activityList');
+    if (!manual.length) {
+      el.innerHTML = '<span class="muted">Nenhuma atividade registrada.</span>';
+    } else {
+      el.innerHTML = manual.map(a => `
+        <div class="activity-item">
+          <div>${escapeHtml(a.content || a.type)}</div>
+          <div class="activity-meta">${escapeHtml(a.user_name) || 'Sistema'} - <span class="activity-date-view" data-act-id="${a.id}" data-act-date="${a.created_at}">${fmtDateTime(a.due_at || a.created_at)}</span> <button type="button" class="activity-edit-date-btn" data-act-id="${a.id}" style="border:none;background:none;color:#6d5efc;cursor:pointer;font-size:12px;padding:0;">editar data</button>${!a.done ? '<button type="button" class="activity-done-btn" data-act-id="'+a.id+'" style="border:none;background:none;color:#16a34a;cursor:pointer;font-size:12px;padding:0;margin-left:8px;" title="Concluir">&#10003; Concluir</button>' : ''}<button type="button" class="activity-delete-btn" data-act-id="${a.id}" style="border:none;background:none;color:#e5484d;cursor:pointer;font-size:12px;padding:0;margin-left:8px;" title="Excluir atividade">🗑️</button></div>
+        </div>
+      `).join('');
+    }
+
+    const histEl = document.getElementById('historicoList');
+    if (!allActivities.length) {
+      histEl.innerHTML = '<span class="muted">Nenhum registro no historico.</span>';
+    } else {
+      histEl.innerHTML = allActivities.map(a => `
+        <div class="activity-item">
+          <div>${escapeHtml(a.content || a.type)}</div>
+          <div class="activity-meta">${escapeHtml(a.user_name) || 'Sistema'} - <span class="activity-date-view" data-act-id="${a.id}" data-act-date="${a.created_at}">${fmtDateTime(a.due_at || a.created_at)}</span> <button type="button" class="activity-edit-date-btn" data-act-id="${a.id}" style="border:none;background:none;color:#6d5efc;cursor:pointer;font-size:12px;padding:0;">editar data</button></div>
+        </div>
+      `).join('');
+    }
+  }
+
+  function promptCallAnsweredNote() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('callAnsweredModal');
+    const textarea = document.getElementById('callAnsweredNote');
+    const cancelBtn = document.getElementById('callAnsweredCancelBtn');
+    const confirmBtn = document.getElementById('callAnsweredConfirmBtn');
+    textarea.value = '';
+    modal.style.display = 'flex';
+    setTimeout(() => textarea.focus(), 0);
+    function cleanup(result) {
+      modal.style.display = 'none';
+      cancelBtn.removeEventListener('click', onCancel);
+      confirmBtn.removeEventListener('click', onConfirm);
+      resolve(result);
+    }
+    function onCancel() { cleanup(null); }
+    function onConfirm() {
+      const val = textarea.value.trim();
+      if (!val) { showToast('Descreva o assunto da ligação antes de confirmar', 'error'); return; }
+      cleanup(val);
+    }
+    cancelBtn.addEventListener('click', onCancel);
+    confirmBtn.addEventListener('click', onConfirm);
+  });
+}
+document.querySelectorAll('[data-quick-activity]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const label = btn.dataset.quickActivity;
+          let callNote = null;
+          if (label === 'Ligação Atendida') {
+            callNote = await promptCallAnsweredNote();
+            if (callNote === null) { return; }
+          }
+      const priorCount = (allActivities || []).filter(a => a.type === label).length;
+      const ordLabel = (priorCount + 1) + 'ª ' + label;
+          const activityContent = callNote ? (ordLabel + ' - ' + callNote) : ordLabel;
+      try {
+        let activityResp = await api('/api/crm/activities', { method: 'POST', body: JSON.stringify({ dealId: parseInt(dealId, 10), type: label, content: activityContent, done: true }) });
+ if (activityResp && activityResp.possibleDuplicate) {
+ const confirmedDup = window.confirm('Voce acabou de registrar essa mesma atividade, tem certeza que voce quer registrar novamente a mesma atividade?');
+ if (!confirmedDup) { return; }
+ activityResp = await api('/api/crm/activities', { method: 'POST', body: JSON.stringify({ dealId: parseInt(dealId, 10), type: label, content: activityContent, done: true, confirmDuplicate: true }) });
+ }
+ showToast('Atividade registrada: ' + ordLabel, 'success');
+        const QUICK_ACT_STAGE_SKEY = { 'Agendou': 'agendamento', 'Compareceu': 'comparecimento', 'Faltou': 'nao-compareceu', 'Cancelou/Desmarcou': 'cancelou' };
+        const targetSkey = QUICK_ACT_STAGE_SKEY[label];
+        if (targetSkey && currentDeal) {
+          const stagesHere = stagesByPipeline[currentDeal.pipeline_id] || [];
+          const targetStage = stagesHere.find(function(s){ return s.skey === targetSkey; });
+          if (targetStage && targetStage.id !== currentDeal.stage_id) {
+            try {
+              await api('/api/crm/deals/' + dealId + '/stage', { method: 'PATCH', body: JSON.stringify({ stageId: targetStage.id }) });
+            } catch (stageErr) {
+              showToast('Atividade registrada, mas nao foi possivel mover a etapa: ' + stageErr.message, 'error');
+            }
+          }
+        }
+        await loadDeal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  const activityListEl = document.getElementById('activityList');
+  if (activityListEl) {
+    activityListEl.addEventListener('click', async (e) => {
+      const doneBtn = e.target.closest('.activity-done-btn');
+      if (doneBtn) {
+        try {
+          await api('/api/crm/activities/' + doneBtn.dataset.actId, { method: 'PATCH', body: JSON.stringify({ done: true }) });
+          showToast('Atividade concluída.', 'success');
+          await loadDeal();
+        } catch (err) { showToast(err.message, 'error'); }
+        return;
+      }
+      const delBtn = e.target.closest('.activity-delete-btn');
+      if (!delBtn) return;
+      if (!confirm('Tem certeza que deseja excluir esta atividade?')) return;
+      try {
+        await api('/api/crm/activities/' + delBtn.dataset.actId, { method: 'DELETE' });
+        showToast('Atividade excluída', 'success');
+        await loadDeal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+
+  document.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.activity-edit-date-btn');
+    if (editBtn) {
+      const id = editBtn.dataset.actId;
+      const span = document.querySelector('.activity-date-view[data-act-id="' + id + '"]');
+      if (!span || span.dataset.editing) return;
+      span.dataset.editing = '1';
+      const rawDate = span.dataset.actDate;
+      const dt = new Date(rawDate);
+      const pad = n => String(n).padStart(2, '0');
+      const localValue = isNaN(dt) ? '' : `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+      const wrap = document.createElement('span');
+      wrap.innerHTML = `<input type="datetime-local" class="input" style="display:inline-block;width:auto;padding:2px 6px;font-size:12px;" value="${localValue}"> <button type="button" class="btn" style="padding:2px 8px;font-size:12px;">salvar</button>`;
+      span.replaceWith(wrap);
+      wrap.querySelector('button').addEventListener('click', async () => {
+        const newVal = wrap.querySelector('input').value;
+        if (!newVal) return;
+        try {
+          await api('/api/crm/activities/' + id, { method: 'PATCH', body: JSON.stringify({ created_at: new Date(newVal).toISOString().slice(0,19).replace('T',' ') }) });
+          showToast('Data da atividade atualizada.', 'success');
+          await loadDeal();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    }
+  });
+
+
+function renderProcedimentoOptions(selected) {
+      const wrap = document.getElementById('dealProcedimento');
+      if (!wrap) return;
+      const selectedList = (selected || '').split(',').map(s => s.trim()).filter(Boolean);
+      let opts = procedureOptionsCache.slice();
+      selectedList.forEach(nm => { if (!opts.some(p => p.name === nm)) opts = [{ id: 'legacy', name: nm }, ...opts]; });
+      wrap.innerHTML = opts.map(p => {
+        const checked = selectedList.indexOf(p.name) !== -1 ? ' checked' : '';
+        return '<label style="display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer;">' +
+          '<input type="checkbox" value="' + escapeHtml(p.name) + '"' + checked + ' style="width:17px;height:17px;flex:none;">' +
+          '<span>' + escapeHtml(p.name) + '</span></label>';
+      }).join('');
+    }
+    function getSelectedProcedimentos() {
+      const wrap = document.getElementById('dealProcedimento');
+      if (!wrap) return '';
+      return Array.from(wrap.querySelectorAll('input[type=checkbox]:checked')).map(o => o.value).join(', ');
+    }
+
+    document.getElementById('saveProcedimentosBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('saveProcedimentosBtn');
+      btn.disabled = true;
+      try {
+        const procedimento = getSelectedProcedimentos();
+        await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ procedimento }) });
+        if (currentDeal) currentDeal.procedimento = procedimento;
+        showToast('Procedimentos salvos.', 'success');
+      } catch (err) {
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('procedimentoNewToggle').addEventListener('click', (e) => {
+    e.preventDefault();
+    const wrap = document.getElementById('procedimentoNewWrap');
+    wrap.style.display = wrap.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('procedimentoNewSaveBtn').addEventListener('click', async () => {
+    const name = document.getElementById('procedimentoNewInput').value.trim();
+    if (!name) { showToast('Digite o nome do procedimento', 'error'); return; }
+    try {
+      const resp = await api('/api/crm/procedures', { method: 'POST', body: JSON.stringify({ name }) });
+      if (!resp || resp.success === false) throw new Error((resp && resp.error) || 'Nao foi possivel cadastrar');
+      procedureOptionsCache.push({ id: resp.id, name });
+const already = getSelectedProcedimentos();
+renderProcedimentoOptions(already ? already + ', ' + name : name);
+      document.getElementById('procedimentoNewInput').value = '';
+      document.getElementById('procedimentoNewWrap').style.display = 'none';
+      showToast('Procedimento cadastrado: ' + name, 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+
+  document.getElementById('addActivityBtn').addEventListener('click', async () => {
+    const text = document.getElementById('newActivityText').value.trim();
+    if (!text) return;
+    try {
+      await api('/api/crm/activities', {
+        method: 'POST',
+        body: JSON.stringify({ dealId: parseInt(dealId, 10), type: 'note', content: text })
+      });
+      document.getElementById('newActivityText').value = '';
+      showToast('Atividade adicionada.', 'success');
+      await loadDeal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  // ---- Breadcrumb / trocar funil e etapa ----
+  document.getElementById('breadcrumbTrigger').addEventListener('click', () => {
+    const pop = document.getElementById('stagePopover');
+    const opening = pop.style.display === 'none';
+    pop.style.display = opening ? 'block' : 'none';
+    if (opening) {
+      pendingPipelineSlug = pipelinesList.find(p => p.id === currentDeal.pipeline_id)?.slug || pipelinesList[0]?.slug;
+      pendingStageId = currentDeal.stage_id;
+      document.getElementById('pipelineSelect').value = pendingPipelineSlug;
+      renderChevronStepper();
+    }
+  });
+
+  document.getElementById('stageCancelBtn').addEventListener('click', () => {
+    document.getElementById('stagePopover').style.display = 'none';
+  });
+
+  document.getElementById('pipelineSelect').addEventListener('change', (e) => {
+    pendingPipelineSlug = e.target.value;
+    const pipeline = pipelinesList.find(p => p.slug === pendingPipelineSlug);
+    const stages = stagesByPipeline[pipeline.id] || [];
+    pendingStageId = stages.length ? stages[0].id : null;
+    renderChevronStepper();
+  });
+
+  function renderChevronStepper() {
+    const pipeline = pipelinesList.find(p => p.slug === pendingPipelineSlug);
+    const stages = (stagesByPipeline[pipeline.id] || []).slice().sort((a, b) => a.sort - b.sort);
+    const currentIdx = stages.findIndex(s => s.id === pendingStageId);
+    const stepper = document.getElementById('chevronStepper');
+    stepper.innerHTML = stages.map((s, i) => `
+      <div class="chevron-seg ${i < currentIdx ? 'filled' : ''} ${i === currentIdx ? 'current' : ''}" data-stage-id="${s.id}" title="${escapeHtml(s.label)}"></div>
+    `).join('');
+    stepper.querySelectorAll('.chevron-seg').forEach(seg => {
+      seg.addEventListener('click', () => {
+        pendingStageId = parseInt(seg.dataset.stageId, 10);
+        renderChevronStepper();
+      });
+    });
+    const cur = stages[currentIdx];
+    document.getElementById('stageLabelCurrent').textContent = cur ? cur.label : '';
+  }
+
+  document.getElementById('stageSaveBtn').addEventListener('click', async () => {
+    try {
+      if (!pendingStageId) throw new Error('Selecione uma etapa');
+      await api('/api/crm/deals/' + dealId + '/stage', {
+        method: 'PATCH',
+        body: JSON.stringify({ stageId: pendingStageId })
+      });
+      document.getElementById('stagePopover').style.display = 'none';
+      showToast('Funil/etapa atualizados.', 'success');
+      await loadDeal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+
+  async function loadPipelines() {
+    const data = await api('/api/crm/ui/pipelines');
+    pipelinesList = data.pipelines;
+    stagesByPipeline = {};
+    data.stages.forEach(s => {
+      if (!stagesByPipeline[s.pipeline_id]) stagesByPipeline[s.pipeline_id] = [];
+      stagesByPipeline[s.pipeline_id].push(s);
+    });
+    const sel = document.getElementById('pipelineSelect');
+    sel.innerHTML = pipelinesList.map(p => `<option value="${p.slug}">${escapeHtml(p.name)}</option>`).join('');
+  }
+
+  function updateBreadcrumb() {
+    const pipeline = pipelinesList.find(p => p.id === currentDeal.pipeline_id);
+    const stages = stagesByPipeline[currentDeal.pipeline_id] || [];
+    const stage = stages.find(s => s.id === currentDeal.stage_id);
+    document.getElementById('breadcrumbTrigger').textContent =
+      (pipeline ? pipeline.name : '-') + ' → ' + (stage ? stage.label : '-');
+  }
+
+  // ---- Meta (motivos de perda + etiquetas do Pipedrive) ----
+  let metaData = { lossReasons: [], labels: [] };
+  const LABEL_COLORS = {
+    green:'#10b981', red:'#ef4444', pink:'#ec4899', orange:'#f97316',
+    'dark-gray':'#6b7280', brown:'#92400e', purple:'#8b5cf6', blue:'#3b82f6',
+    yellow:'#eab308', gray:'#9ca3af', 'light-blue':'#38bdf8', 'dark-blue':'#1d4ed8',
+    'light-green':'#86efac', 'dark-green':'#15803d'
+  };
+
+  async function loadMeta() {
+    try {
+      metaData = await api('/api/crm/ui/meta');
+      const sel = document.getElementById('lossReasonSelect');
+      sel.innerHTML = '<option value="">Selecione um motivo...</option>' +
+        metaData.lossReasons.map(r => `<option value="${escapeHtml(r.label)}">${escapeHtml(r.label)}</option>`).join('');;
+    sel.innerHTML += '<option value="__new__">+ Adicionar novo motivo...</option>';
+    if (!sel.dataset.newBound) {
+      sel.dataset.newBound = '1';
+      sel.addEventListener('change', async function(){
+        if (sel.value !== '__new__') return;
+        const label = prompt('Nome do novo motivo de perda:');
+        if (!label || !label.trim()) { sel.value = ''; return; }
+        try {
+          const resp = await api('/api/crm/ui/loss-reasons', { method: 'POST', body: JSON.stringify({ label: label.trim() }) });
+          if (!resp || resp.success === false) throw new Error((resp && resp.error) || 'Nao foi possivel criar o motivo');
+          metaData.lossReasons.push(resp.lossReason);
+          const opt = document.createElement('option');
+          opt.value = resp.lossReason.label;
+          opt.textContent = resp.lossReason.label;
+          const newOpt = sel.querySelector('option[value="__new__"]');
+          sel.insertBefore(opt, newOpt);
+          sel.value = resp.lossReason.label;
+          showToast('Motivo criado: ' + resp.lossReason.label, 'success');
+        } catch (err) {
+          showToast(err.message, 'error');
+          sel.value = '';
+        }
+      });
+    }      const so = document.getElementById('dealOrigem');
+      so.innerHTML = '<option value="">(Nenhum)</option>' +
+        (metaData.origens || []).map(o => `<option value="${escapeHtml(o.label)}">${escapeHtml(o.label)}</option>`).join('');
+        campaignOptionsCache = metaData.campanhas || [];
+        try {
+          const metaData2 = await api('/api/crm/meta');
+          procedureOptionsCache = (metaData2 && metaData2.procedures) || [];
+          renderProcedimentoOptions();
+        } catch (e2) { /* procedures opcional */ }
+    } catch (err) { /* meta opcional */ }
+  }
+
+  function currentTags() {
+    const t = currentDeal.tags;
+    if (Array.isArray(t)) return t.filter(Boolean);
+    if (!t) return [];
+    if (typeof t === 'string') {
+      try { const arr = JSON.parse(t); if (Array.isArray(arr)) return arr.filter(Boolean); } catch (e) {}
+      return t.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  function renderLabelChip() {
+    const chips = document.getElementById('labelChips');
+    const chipsNegocio = document.getElementById('labelChipsNegocio');
+    const tags = currentTags();
+    const chipHtml = tags.map(t => {
+      const lb = metaData.labels.find(l => l.name === t);
+      const c = lb ? (LABEL_COLORS[lb.color] || '#9ca3af') : '#9ca3af';
+      return `<span class="label-chip" style="background:${c};color:#fff;">${escapeHtml(t)}<span class="chip-remove-x" data-tag="${escapeHtml(t)}" title="Remover etiqueta" style="margin-left:6px;font-weight:700;cursor:pointer;">&times;</span></span>`;
+    }).join('');
+    chips.innerHTML = chipHtml;
+    if (chipsNegocio) chipsNegocio.innerHTML = chipHtml;
+    [chips, chipsNegocio].forEach(function(cont){
+      if (!cont) return;
+      cont.querySelectorAll('.chip-remove-x').forEach(function(x){
+        x.addEventListener('click', async function(ev){
+          ev.stopPropagation();
+          var tag = x.dataset.tag;
+          if (!confirm('Remover a etiqueta "' + tag + '"?')) return;
+          try {
+            var next = currentTags().filter(function(t){ return t !== tag; });
+            await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ tags: JSON.stringify(next) }) });
+            showToast('Etiqueta removida.', 'success');
+            await loadDeal();
+          } catch (err) { showToast(err.message, 'error'); }
+        });
+      });
+    });
+    document.getElementById('labelChip').textContent = 'Etiqueta';
+    var _lc = document.getElementById('labelChip'); _lc.style.background = '#6366f1'; _lc.style.color = '#fff'; _lc.style.border = 'none';
+  }
+
+  let pendingLabels = new Set();
+
+  function renderLabelList() {
+    const q = document.getElementById('labelSearch').value.trim().toLowerCase();
+    const list = document.getElementById('labelList');
+    const items = metaData.labels.filter(l => !q || l.name.toLowerCase().includes(q));
+    list.innerHTML = items.length ? items.map(l => `
+      <div class="label-item" data-name="${escapeHtml(l.name)}">
+        <span class="label-tag" style="background:${LABEL_COLORS[l.color] || '#9ca3af'};">${escapeHtml(l.name)}</span>
+        <span class="label-check">${pendingLabels.has(l.name) ? '&#10003;' : ''}</span>
+      </div>`).join('') : '<div class="muted" style="padding:8px;">Nenhuma etiqueta encontrada.</div>';
+    list.querySelectorAll('.label-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const n = item.dataset.name;
+        if (pendingLabels.has(n)) pendingLabels.delete(n); else pendingLabels.add(n);
+        renderLabelList();
+      });
+    });
+  }
+
+  document.getElementById('labelChip').addEventListener('click', () => {
+    const dd = document.getElementById('labelDropdown');
+    if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
+    pendingLabels = new Set(currentTags());
+    document.getElementById('labelSearch').value = '';
+    renderLabelList();
+    dd.style.display = 'block';
+    document.getElementById('labelSearch').focus();
+  });
+  document.getElementById('labelSearch').addEventListener('input', renderLabelList);
+  document.getElementById('labelCancelBtn').addEventListener('click', () => {
+    document.getElementById('labelDropdown').style.display = 'none';
+  });
+  async function quickAddLabel(name) {
+    try {
+      const existing = currentTags();
+      if (existing.includes(name)) { showToast('Etiqueta já aplicada.', 'success'); return; }
+      const next = existing.concat([name]);
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ tags: JSON.stringify(next) }) });
+      showToast('Etiqueta adicionada: ' + name, 'success');
+      await loadDeal();
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+  document.querySelectorAll('.quick-obj-btn').forEach(btn => {
+    btn.addEventListener('click', () => quickAddLabel(btn.dataset.obj));
+  });
+
+  document.getElementById('labelSaveBtn').addEventListener('click', async () => {
+    try {
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ tags: JSON.stringify(Array.from(pendingLabels)) }) });
+      document.getElementById('labelDropdown').style.display = 'none';
+      showToast('Etiquetas atualizadas.', 'success');
+      await loadDeal();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  // ---- Ganho / Perdido / Reabrir ----
+  function toDateInputValue(d) {
+    const dt = (d instanceof Date) ? d : new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    const pad = n => String(n).padStart(2, '0');
+    return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate());
+  }
+
+  function renderHeaderStatus() {
+    const st = currentDeal.status;
+    document.getElementById('btnWon').style.display = st === 'open' ? '' : 'none';
+    document.getElementById('btnLost').style.display = st === 'open' ? '' : 'none';
+    document.getElementById('btnReopen').style.display = st === 'open' ? 'none' : '';
+    const wonDateInput = document.getElementById('wonDateInput');
+    const btnSaveWonDate = document.getElementById('btnSaveWonDate');
+    if (wonDateInput) {
+      const todayStr = toDateInputValue(new Date());
+      wonDateInput.max = todayStr;
+      wonDateInput.style.display = st === 'lost' ? 'none' : '';
+      if (st === 'won' && currentDeal.won_date) {
+        wonDateInput.value = toDateInputValue(new Date(String(currentDeal.won_date).replace(' ', 'T')));
+      } else if (st === 'open' && !wonDateInput.value) {
+        wonDateInput.value = todayStr;
+      }
+    }
+    if (btnSaveWonDate) btnSaveWonDate.style.display = st === 'won' ? '' : 'none';
+    const banner = document.getElementById('statusBanner');
+    if (st === 'lost') {
+      banner.className = 'status-banner banner-lost';
+      banner.textContent = 'Negócio PERDIDO' + (currentDeal.loss_reason ? ' — Motivo: ' + currentDeal.loss_reason : '');
+      banner.style.display = 'block';
+    } else if (st === 'won') {
+      banner.className = 'status-banner banner-won';
+      banner.textContent = 'Negócio GANHO' + (currentDeal.procedimento ? ' — ' + currentDeal.procedimento : '');
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  document.getElementById('btnWon').addEventListener('click', async () => {
+const procedimento = getSelectedProcedimentos();
+    if (!procedimento) {
+      showToast('Informe o procedimento para marcar como Ganho.', 'error');
+      document.getElementById('secNegocio').classList.remove('collapsed');
+      document.getElementById('dealProcedimento').focus();
+      return;
+    }
+      const wonDateInput2 = document.getElementById('wonDateInput');
+      const wonDate = wonDateInput2 && wonDateInput2.value ? wonDateInput2.value : undefined;
+    try {
+        const resp = await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ status: 'won', procedimento, wonDate }) });
+        showToast(resp && resp.wonDateWarning ? resp.wonDateWarning : 'Negócio marcado como GANHO.', resp && resp.wonDateWarning ? 'warning' : 'success');
+        await loadDeal();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+document.getElementById('btnSaveWonDate').addEventListener('click', async () => {
+  const wonDateInput = document.getElementById('wonDateInput');
+  const wonDate = wonDateInput ? wonDateInput.value : '';
+  if (!wonDate) { showToast('Selecione uma data de fechamento.', 'error'); return; }
+  try {
+    const resp = await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ status: 'won', wonDate }) });
+    showToast(resp && resp.wonDateWarning ? resp.wonDateWarning : 'Data de fechamento atualizada.', resp && resp.wonDateWarning ? 'warning' : 'success');
+    await loadDeal();
+  } catch (err) { showToast(err.message, 'error'); }
+});
+
+  document.getElementById('btnLost').addEventListener('click', () => {
+    document.getElementById('lossReasonSelect').value = '';
+    document.getElementById('lostModal').style.display = 'flex';
+  });
+    document.getElementById('btnNotLead').addEventListener('click', async () => {
+      if (!confirm('Marcar este negocio como NAO E LEAD? Ele sai de todas as contagens de leads (Leads por Fonte, Funil, MKT PAGO) mas os dados ficam preservados.')) return;
+      try {
+        await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ notLead: true }) });
+        showToast('Marcado como nao-lead.', 'success');
+        window.location.href = 'board.html';
+      } catch (err) { showToast(err.message, 'error'); }
+    });
+
+    document.getElementById('btnFindPatient').addEventListener('click', async () => {
+      const modal = document.getElementById('findPatientModal');
+      const body = document.getElementById('findPatientBody');
+      body.innerHTML = 'Buscando...';
+      modal.style.display = 'flex';
+      try {
+        const data = await api('/api/crm/ui/deals/' + dealId + '/patient-matches');
+        renderFindPatientResults(data);
+      } catch (err) {
+        body.innerHTML = '<div class="muted">Erro ao buscar: ' + escapeHtml(err.message) + '</div>';
+      }
+    });
+
+    document.getElementById('findPatientCloseBtn').addEventListener('click', () => {
+      document.getElementById('findPatientModal').style.display = 'none';
+    });
+
+    function renderFindPatientResults(data) {
+      const body = document.getElementById('findPatientBody');
+      if (!data.matches || data.matches.length === 0) {
+        body.innerHTML = '<div class="muted" style="padding:8px;">Nenhum paciente correspondente encontrado na base.</div>';
+        return;
+      }
+      let html = '';
+      data.matches.forEach(function (m) {
+        html += '<div style="border:1px solid #333;border-radius:8px;padding:10px;margin-bottom:8px;">';
+        html += '<div style="font-weight:600;">' + escapeHtml(m.name || '(sem nome)') + (m.isRealPatient ? ' <span style="color:#22c55e;">- ja e paciente de verdade</span>' : '') + '</div>';
+        html += '<div>Telefone: ' + escapeHtml(m.phone || '-') + '</div>';
+        html += '<div>Ultima interacao: ' + fmtDateTime(m.lastInteraction) + '</div>';
+        if (m.deals && m.deals.length) {
+          html += '<div style="margin-top:4px;">Negocios: ' + m.deals.map(function (d) {
+            return escapeHtml(d.title || ('#' + d.id)) + ' (' + escapeHtml(d.pipelineName || '') + (d.stageLabel ? ' - ' + escapeHtml(d.stageLabel) : '') + ', ' + escapeHtml(d.status) + ')';
+          }).join('; ') + '</div>';
+        }
+        if (m.isRealPatient && !isRecepcao() && data.recepcaoEntryStageId) {
+          html += '<button type="button" class="btn btn-primary transfer-recepcao-btn" data-stage-id="' + data.recepcaoEntryStageId + '" style="margin-top:8px;">Transferir para Recepcao</button>';
+        }
+        html += '</div>';
+      });
+      body.innerHTML = html;
+      body.querySelectorAll('.transfer-recepcao-btn').forEach(function (btn) {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Transferir este negocio para o pipeline Recepcao?')) return;
+          try {
+            await api('/api/crm/deals/' + dealId + '/stage', { method: 'PATCH', body: JSON.stringify({ stageId: Number(btn.dataset.stageId) }) });
+            showToast('Negocio transferido para Recepcao.', 'success');
+            document.getElementById('findPatientModal').style.display = 'none';
+            await loadDeal();
+          } catch (err) {
+            showToast(err.message, 'error');
+          }
+        });
+      });
+    }
+
+  document.getElementById('lostCancelBtn').addEventListener('click', () => {
+    document.getElementById('lostModal').style.display = 'none';
+  });
+  document.getElementById('lostConfirmBtn').addEventListener('click', async () => {
+    const reason = document.getElementById('lossReasonSelect').value;
+    if (!reason) {
+      showToast('O motivo da perda é obrigatório.', 'error');
+      return;
+    }
+    try {
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ status: 'lost', lossReason: reason }) });
+      document.getElementById('lostModal').style.display = 'none';
+      showToast('Negócio marcado como PERDIDO.', 'success');
+      await loadDeal();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  document.getElementById('btnReopen').addEventListener('click', async () => {
+    try {
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ status: 'open' }) });
+      showToast('Negócio reaberto.', 'success');
+      await loadDeal();
+    } catch (err) { showToast(err.message, 'error'); }
+  });
+
+  function isRecepcao() {
+    if (!currentDeal) return false;
+    const pipeline = pipelinesList.find(p => p.id === currentDeal.pipeline_id);
+    if (!pipeline) return false;
+    return pipeline.slug === 'recepcao' || /recep/i.test(pipeline.name || '');
+  }
+
+  function countTrafegoFilled() {
+    const fields = [currentDeal.origem, currentDeal.plataforma, currentDeal.campanha, currentDeal.conjunto, (currentDeal.palavra_chave || currentDeal.criativo)];
+    return fields.filter(v => v && String(v).trim()).length;
+  }
+
+function updateOwnerUI() {
+  const badge = document.getElementById('ownerBadge');
+  const ownerName = (currentDeal && currentDeal.owner_name) ? currentDeal.owner_name : '';
+  if (badge) badge.textContent = ownerName || 'Sem dono';
+  var OWNER_BG_COLORS = { 'Agda': '#ffe3e3', 'Helenice': '#dcebff' };
+  document.body.style.background = OWNER_BG_COLORS[ownerName] || '#f4f5f7';
+}
+
+  function renderDaysSinceContact() {
+  var el = document.getElementById('daysSinceContact');
+  if (!el) return;
+  if (!allActivities || !allActivities.length) {
+    el.textContent = 'Sem contato registrado';
+    el.style.background = '#fee2e2';
+    el.style.color = '#dc2626';
+    return;
+  }
+  var maxDate = null;
+  allActivities.forEach(function(a){
+    var d = a.created_at ? new Date(a.created_at) : null;
+    if (d && !isNaN(d.getTime()) && (!maxDate || d > maxDate)) maxDate = d;
+  });
+  if (!maxDate) { el.textContent = 'Sem contato registrado'; el.style.background = '#fee2e2'; el.style.color = '#dc2626'; return; }
+  var days = Math.floor((Date.now() - maxDate.getTime()) / 86400000);
+  el.textContent = days + (days === 1 ? ' dia sem contato' : ' dias sem contato');
+  if (days >= 7) { el.style.background = '#fee2e2'; el.style.color = '#dc2626'; }
+  else if (days >= 3) { el.style.background = '#fef3c7'; el.style.color = '#d97706'; }
+  else { el.style.background = '#dcfce7'; el.style.color = '#16a34a'; }
+}
+
+function renderLeadScoreButtons(score) {
+      var wrap = document.getElementById('dealLeadScoreButtons');
+      if (!wrap) return;
+      var colors = { 1: '#93c5fd', 2: '#60a5fa', 3: '#fbbf24', 4: '#fb923c', 5: '#ef4444' };
+      var html = '';
+      for (var i = 1; i <= 5; i++) {
+        var active = Number(score) === i;
+        var bg = active ? colors[i] : '#f3f4f6';
+        var fg = active ? '#fff' : '#374151';
+        var border = active ? colors[i] : '#e5e7eb';
+        html += '<button type="button" onclick="setLeadScore(' + i + ')" style="width:32px;height:32px;border-radius:50%;border:2px solid ' + border + ';background:' + bg + ';color:' + fg + ';font-weight:700;cursor:pointer;">' + i + '</button>';
+      }
+      if (score) {
+        html += '<button type="button" onclick="setLeadScore(null)" style="margin-left:6px;border:none;background:none;color:#9ca3af;font-size:12px;cursor:pointer;">limpar</button>';
+      }
+      wrap.innerHTML = html;
+    }
+
+    async function setLeadScore(score) {
+      try {
+        var r = await api('/api/crm/deals/' + currentDeal.id, { method: 'PATCH', body: JSON.stringify({ lead_score: score }) });
+        if (!r || r.error) throw new Error((r && r.error) || 'erro');
+        currentDeal.lead_score = score;
+        renderLeadScoreButtons(score);
+        showToast('Lead scoring atualizado', 'success');
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    async function loadDeal() {
+    const data = await api('/api/crm/deals/' + dealId);
+    currentDeal = data.deal;
+    allActivities = data.activities || [];
+      renderDaysSinceContact();
+
+    document.getElementById('pageTitle').textContent = currentDeal.title || ('Negocio #' + currentDeal.id);
+    updateOwnerUI();
+    document.getElementById('pageSub').textContent = 'Pessoa: ' + currentDeal.patient_name + '  ·  Negocio #' + currentDeal.id;
+
+    document.getElementById('patientName').value = currentDeal.patient_name || '';
+    document.getElementById('patientPhone').value = currentDeal.patient_phone || '';
+    document.getElementById('patientEmail').value = currentDeal.patient_email || '';
+
+    document.getElementById('dealTitle').value = currentDeal.title || '';
+    document.getElementById('dealValue').value = currentDeal.value || 0;
+    document.getElementById('dealStatus').value = currentDeal.status || 'open';
+      renderLeadScoreButtons(currentDeal.lead_score);
+    renderProcedimentoOptions(currentDeal.procedimento || '');
+
+    const origemSel = document.getElementById('dealOrigem');
+    const origemVal = currentDeal.origem || '';
+    if (origemVal && !Array.from(origemSel.options).some(o => o.value === origemVal)) {
+      const op = document.createElement('option'); op.value = origemVal; op.textContent = origemVal; origemSel.appendChild(op);
+    }
+    origemSel.value = origemVal;
+    var _btb = document.getElementById('buscarTintimBtn');
+    if (_btb) _btb.style.display = '';
+    document.getElementById('dealPlataforma').value = currentDeal.plataforma || '';
+    (async () => { const prof = await loadProfessional(dealId); if (prof && prof.id) selectProfessional(prof); })();
+    document.getElementById('dealCampanha').value = currentDeal.campanha || '';
+    document.getElementById('dealConjunto').value = currentDeal.conjunto || '';
+    document.getElementById('dealCriativo').value = (currentDeal.ad_name || currentDeal.criativo || '');
+    document.getElementById('dealAdAccountName').textContent = currentDeal.ad_account_name || '(nao informado)';
+    const _utmParts = ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].map(k => currentDeal[k]).filter(Boolean);
+    document.getElementById('dealUtmInfo').textContent = _utmParts.length ? _utmParts.join(' / ') : '(sem UTM - lead via clique direto no anuncio)';
+    document.getElementById('dealCtwaInfo').textContent = currentDeal.ctwa_clid ? 'Sim - clique real confirmado pela Meta' : 'Nao';
+    const pkInput = document.getElementById('dealPalavraChave');
+    if (isRecepcao()) {
+      pkInput.value = 'Já é paciente - ação interna';
+      pkInput.readOnly = true;
+      pkInput.classList.add('input-note');
+    } else {
+      pkInput.dataset.rawCriativo = currentDeal.criativo || ''; pkInput.dataset.autoAdName = currentDeal.ad_name || ''; pkInput.value = currentDeal.palavra_chave || currentDeal.ad_name || currentDeal.criativo || '';
+      pkInput.readOnly = false;
+      pkInput.classList.remove('input-note');
+    }
+    document.getElementById('trafegoCount').textContent = countTrafegoFilled() + '/5';
+
+    updateBreadcrumb();
+    renderActivityLists();
+    renderHeaderStatus();
+    renderLabelChip();
+  }
+
+  document.getElementById('savePatientBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('savePatientBtn');
+    btn.disabled = true;
+    try {
+      await api('/api/crm/ui/patients/' + currentDeal.patient_id, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: document.getElementById('patientName').value,
+          phone: document.getElementById('patientPhone').value,
+          email: document.getElementById('patientEmail').value,
+        })
+      });
+      showToast('Paciente atualizado.', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function openCampanhaPopup() {
+    document.getElementById('campanhaStepAsk').style.display = '';
+    document.getElementById('campanhaStepList').style.display = 'none';
+    document.getElementById('campanhaNewInput').value = '';
+    document.getElementById('campanhaPopup').style.display = 'flex';
+  }
+  function closeCampanhaPopup() {
+    document.getElementById('campanhaPopup').style.display = 'none';
+  }
+  function renderCampanhaOptionsList() {
+    const ul = document.getElementById('campanhaOptionsList');
+    ul.innerHTML = campaignOptionsCache.length
+      ? campaignOptionsCache.map(c => `<li><button class="btn" style="width:100%;text-align:left;margin-bottom:6px;" data-label="${escapeHtml(c.label)}">${escapeHtml(c.label)}</button></li>`).join('')
+      : '<li style="color:#888;font-size:13px;">Nenhuma campanha cadastrada ainda.</li>';
+    ul.querySelectorAll('button[data-label]').forEach(b => {
+      b.addEventListener('click', () => applyCampanha(b.dataset.label));
+    });
+  }
+  async function applyCampanha(label) {
+    try {
+      document.getElementById('dealCampanha').value = label;
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ campanha: label, origem: 'Já é paciente' }) });
+      showToast('Campanha vinculada: ' + label, 'success');
+      closeCampanhaPopup();
+      await loadDeal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+  document.getElementById('campanhaNormalBtn').addEventListener('click', async () => {
+    try {
+      document.getElementById('dealCampanha').value = 'Acao normal do dia a dia';
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ campanha: 'Acao normal do dia a dia', origem: 'Já é paciente' }) });
+    } catch (err) { showToast(err.message, 'error'); }
+    closeCampanhaPopup();
+    await loadDeal();
+  });
+  document.getElementById('campanhaEspecificaBtn').addEventListener('click', () => {
+    document.getElementById('campanhaStepAsk').style.display = 'none';
+    document.getElementById('campanhaStepList').style.display = '';
+    renderCampanhaOptionsList();
+  });
+  document.getElementById('campanhaBackBtn').addEventListener('click', () => {
+    document.getElementById('campanhaStepAsk').style.display = '';
+    document.getElementById('campanhaStepList').style.display = 'none';
+  });
+  document.getElementById('campanhaCreateBtn').addEventListener('click', async () => {
+    const label = document.getElementById('campanhaNewInput').value.trim();
+    if (!label) { showToast('Digite o nome da campanha', 'error'); return; }
+    try {
+      const resp = await api('/api/crm/ui/campaign-options', { method: 'POST', body: JSON.stringify({ label }) });
+      if (!resp || resp.success === false) throw new Error((resp && resp.error) || 'Nao foi possivel cadastrar');
+      campaignOptionsCache.push(resp.campaign);
+      await applyCampanha(resp.campaign.label);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+  document.getElementById('dealOrigem').addEventListener('change', async (e) => {
+    if (e.target.value !== 'J\u00e1 é paciente' && e.target.value !== 'J\u00e1 \u00e9 paciente') return;
+    try {
+      const pk = document.getElementById('dealPalavraChave');
+      pk.value = 'j\u00e1 \u00e9 paciente';
+      await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ palavra_chave: 'j\u00e1 \u00e9 paciente' }) });
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+    openCampanhaPopup();
+  });
+  
+
+  document.getElementById('saveDealBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('saveDealBtn');
+    btn.disabled = true;
+    try {
+      const status = document.getElementById('dealStatus').value;
+const procedimento = getSelectedProcedimentos();
+      if (status === 'won' && !procedimento) {
+        throw new Error('Informe o procedimento para marcar como Ganho');
+      }
+      const patchBody = {
+        title: document.getElementById('dealTitle').value,
+        value: parseFloat(document.getElementById('dealValue').value) || 0,
+        status,
+        procedimento,
+        origem: document.getElementById('dealOrigem').value,
+        plataforma: document.getElementById('dealPlataforma').value,
+        campanha: document.getElementById('dealCampanha').value,
+        conjunto: document.getElementById('dealConjunto').value,
+      };
+      if (!isRecepcao()) {
+const kwVal = document.getElementById('dealPalavraChave').value;
+const platText = ((document.getElementById('dealPlataforma').value || '') + ' ' + (document.getElementById('dealOrigem').value || '')).toLowerCase();
+if (platText.indexOf('google') !== -1) {
+patchBody.palavra_chave = kwVal;
+patchBody.criativo = document.getElementById('dealCriativo').value;
+} else {
+const pkEl2 = document.getElementById('dealPalavraChave');
+const autoNm = pkEl2 ? (pkEl2.dataset.autoAdName || '') : '';
+const rawCr = pkEl2 ? (pkEl2.dataset.rawCriativo || '') : '';
+patchBody.criativo = (autoNm && kwVal === autoNm && rawCr) ? rawCr : kwVal;
+patchBody.palavra_chave = '';
+}
+      }
+      let saveResp = await api('/api/crm/deals/' + dealId, {
+      method: 'PATCH',
+      body: JSON.stringify(patchBody)
+    });
+    if (saveResp && saveResp.possibleDuplicate) {
+      const confirmedDup = window.confirm('Voce esta registrando novamente esse mesmo orcamento em pouco tempo, tem certeza que quer registrar de novo?');
+      if (!confirmedDup) { btn.disabled = false; return; }
+      patchBody.confirmDuplicate = true;
+      saveResp = await api('/api/crm/deals/' + dealId, {
+        method: 'PATCH',
+        body: JSON.stringify(patchBody)
+      });
+    }
+    showToast('Negocio atualizado.', 'success');
+      await loadDeal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  (async () => {
+    try {
+      await loadPipelines();
+      await loadMeta();
+      await loadDeal();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  })();
+
+async function loadProfessionals(){
+try{window.professionals=await api(`/api/crm/professionals`)}catch(err){console.error(err);window.professionals=[]}
+}
+async function loadProfessional(dealId){
+try{return await api(`/api/crm/deals/${dealId}/professional`)}catch(err){console.error(err);return null}
+}
+function renderProfessionalList(query=""){
+const list=document.getElementById("dealProfessionalList");if(!list)return;list.innerHTML="";const filtered=query?window.professionals.filter(p=>p.name.toLowerCase().includes(query.toLowerCase())):window.professionals;filtered.forEach(prof=>{const li=document.createElement("li");li.textContent=prof.name;li.onclick=()=>selectProfessional(prof);list.appendChild(li)})
+}
+function selectProfessional(prof){
+document.getElementById("dealProfessionalId").value=prof.id;const chip=document.getElementById("dealProfessionalChip");chip.innerHTML=`<div class="chip">${escapeHtml(prof.name)} <span class="remove-chip" onclick="removeProfessional()">×</span></div>`;document.getElementById("dealProfessionalSearch").value="";document.getElementById("dealProfessionalList").innerHTML=""
+    api("/api/crm/deals/" + dealId, { method: "PATCH", body: JSON.stringify({ professional_id: prof.id }) });
+}
+function removeProfessional(){
+document.getElementById("dealProfessionalId").value="";document.getElementById("dealProfessionalChip").innerHTML="";document.getElementById("dealProfessionalSearch").value=""
+    api("/api/crm/deals/" + dealId, { method: "PATCH", body: JSON.stringify({ professional_id: null }) });
+}
+
+async function _ensureUsersLoaded() {
+  if (window._usersCache) return window._usersCache;
+  try { const d = await api('/api/crm/ui/users'); window._usersCache = d.users || []; } catch (e) { window._usersCache = []; }
+  return window._usersCache;
+}
+document.getElementById('openScheduleActivityBtn')?.addEventListener('click', async () => {
+  const sel = document.getElementById('schedUser');
+  sel.innerHTML = '';
+  const users = await _ensureUsersLoaded();
+  users.forEach(u => { const o = document.createElement('option'); o.value = u.id; o.textContent = u.name; sel.appendChild(o); });
+  document.getElementById('schedType').value = 'Ligacao';
+  document.getElementById('schedSubject').value = '';
+  document.getElementById('schedDueAt').value = '';
+  document.getElementById('scheduleActivityModal').style.display = 'flex';
+});
+document.addEventListener('DOMContentLoaded', function() {
+const _schedCancelBtn = document.getElementById('schedCancelBtn');
+if (_schedCancelBtn) {
+  _schedCancelBtn.addEventListener('click', () => {
+    document.getElementById('scheduleActivityModal').style.display = 'none';
+  });
+}
+document.getElementById('schedSaveBtn')?.addEventListener('click', async () => {
+  const type = document.getElementById('schedType').value;
+  const subject = document.getElementById('schedSubject').value.trim();
+  const dueAtLocal = document.getElementById('schedDueAt').value;
+  const userId = parseInt(document.getElementById('schedUser').value, 10) || null;
+  if (!subject) { showToast('Informe o assunto', 'error'); return; }
+  if (!dueAtLocal) { showToast('Informe data e hora', 'error'); return; }
+  try {
+    await api('/api/crm/activities', { method: 'POST', body: JSON.stringify({
+      dealId: parseInt(dealId, 10), type: type, subject: subject, content: subject,
+      dueAt: new Date(dueAtLocal).toISOString().slice(0, 19).replace('T', ' '), assignedUserId: userId
+    }) });
+    showToast('Atividade agendada.', 'success');
+    document.getElementById('scheduleActivityModal').style.display = 'none';
+    await loadDeal();
+  } catch (err) { showToast(err.message, 'error'); }
+});
+});
+const _buscarTintimBtnEl = document.getElementById('buscarTintimBtn');
+if (_buscarTintimBtnEl) {
+  _buscarTintimBtnEl.addEventListener('click', async () => {
+    const btn = _buscarTintimBtnEl;
+    btn.disabled = true; const _origTxt = btn.textContent; btn.textContent = 'Buscando...';
+    try {
+      const resp = await api('/api/crm/deals/' + dealId + '/lookup-tintim', { method: 'POST' });
+      if (resp && resp.found) {
+        showToast('Dados encontrados no Tintim e preenchidos.', 'success');
+        await loadDeal();
+      } else {
+        document.getElementById('tintimNotFoundModal').style.display = 'flex';
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = _origTxt;
+    }
+  });
+}
+const _tintimOkBtn = document.getElementById('tintimNotFoundOkBtn');
+if (_tintimOkBtn) _tintimOkBtn.addEventListener('click', () => {
+  document.getElementById('tintimNotFoundModal').style.display = 'none';
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const changeOwnerBtn = document.getElementById('changeOwnerBtn');
+  const ownerPopover = document.getElementById('ownerPopover');
+  const ownerSelect = document.getElementById('ownerSelect');
+  const ownerCancelBtn = document.getElementById('ownerCancelBtn');
+  const ownerSaveBtn = document.getElementById('ownerSaveBtn');
+  if (changeOwnerBtn) {
+    changeOwnerBtn.addEventListener('click', async () => {
+      const users = await _ensureUsersLoaded();
+      ownerSelect.innerHTML = '';
+      users.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = u.name;
+        if (currentDeal && currentDeal.sdr_user_id === u.id) opt.selected = true;
+        ownerSelect.appendChild(opt);
+      });
+      ownerPopover.style.display = 'flex';
+    });
+  }
+  if (ownerCancelBtn) {
+    ownerCancelBtn.addEventListener('click', () => { ownerPopover.style.display = 'none'; });
+  }
+  if (ownerSaveBtn) {
+    ownerSaveBtn.addEventListener('click', async () => {
+      const sel = ownerSelect.options[ownerSelect.selectedIndex];
+      if (!sel) return;
+      const newOwnerName = sel.textContent;
+      const currentOwnerName = (currentDeal && currentDeal.owner_name) ? currentDeal.owner_name : 'sem dono';
+      if (!confirm('Trocar o dono do negocio de "' + currentOwnerName + '" para "' + newOwnerName + '"?')) return;
+      try {
+        await api('/api/crm/deals/' + dealId + '/owner', { method: 'PATCH', body: JSON.stringify({ userId: parseInt(sel.value, 10) }) });
+        showToast('Dono do negocio atualizado.', 'success');
+        ownerPopover.style.display = 'none';
+        await loadDeal();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  }
+});
+
+document.addEventListener("DOMContentLoaded",async()=>{await loadProfessionals();const search=document.getElementById("dealProfessionalSearch");if(search){search.addEventListener("input",(e)=>renderProfessionalList(e.target.value));search.addEventListener("focus",()=>renderProfessionalList(""))}}
+);
+</script>
+
+<div class="modal-overlay" id="scheduleActivityModal" style="display:none;">
+  <div class="modal-box">
+    <div class="section-title">Agendar atividade</div>
+    <div class="field">
+      <label>Tipo</label>
+      <select class="input" id="schedType">
+        <option value="Ligacao">Ligacao</option>
+        <option value="Reuniao">Reuniao</option>
+        <option value="Mensagem">Mensagem</option>
+        <option value="Consulta">Consulta</option>
+        <option value="Outro">Outro</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Assunto</label>
+      <input class="input" type="text" id="schedSubject" placeholder="Ex: Retornar ligacao">
+    </div>
+    <div class="field">
+      <label>Data e hora</label>
+      <input class="input" type="datetime-local" id="schedDueAt">
+    </div>
+    <div class="field">
+      <label>Responsavel</label>
+      <select class="input" id="schedUser"></select>
+    </div>
+    <div class="stage-popover-actions">
+      <button class="btn" id="schedCancelBtn">Cancelar</button>
+      <button class="btn btn-primary" id="schedSaveBtn">Agendar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="consultScheduleModal" style="display:none;">
+<div class="modal-box" style="max-width:540px;">
+<div class="section-title">Agendar consulta</div>
+<div id="consultDealHeader" style="font-size:13px;color:#666;margin:-8px 0 16px;"></div>
+<div class="field">
+<label>Dia da semana</label>
+<div id="consultWeekdayPicker" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+</div>
+<div class="field">
+<label>Horarios disponiveis</label>
+<div id="consultSlotsContainer" style="max-height:320px;overflow-y:auto;">
+<p style="font-size:13px;color:#888;margin:8px 0;">Selecione um dia da semana acima para ver os horarios disponiveis.</p>
+</div>
+</div>
+<div class="stage-popover-actions">
+<button class="btn" id="consultCancelBtn">Cancelar</button>
+</div>
+</div>
+</div>
+<div class="modal-overlay" id="callAnsweredModal" style="display:none;">
+  <div class="modal-box">
+    <div class="section-title">Ligação Atendida</div>
+    <div class="field">
+      <label>O que foi falado nessa ligação?</label>
+      <textarea class="input" id="callAnsweredNote" rows="4" placeholder="Descreva o assunto conversado..."></textarea>
+    </div>
+    <div class="stage-popover-actions">
+      <button class="btn" id="callAnsweredCancelBtn">Cancelar</button>
+      <button class="btn btn-primary" id="callAnsweredConfirmBtn">Registrar</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="tintimNotFoundModal" style="display:none;">
+  <div class="modal-box">
+    <div class="section-title">Nao encontrado no Tintim</div>
+    <p style="margin:0 0 12px;font-size:14px;color:#555;">Nao encontramos esse contato no Tintim. Preencha os dados de origem/campanha manualmente apos conversar com o lead.</p>
+    <div class="stage-popover-actions">
+      <button class="btn btn-primary" id="tintimNotFoundOkBtn">Entendi</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function () {
+  var CONSULT_BUSINESS_START_HOUR = 9;
+  var CONSULT_BUSINESS_END_HOUR = 18;
+  var CONSULT_SLOT_MINUTES = 30;
+  var WEEKDAYS = [
+    { label: 'Seg', dow: 1 },
+    { label: 'Ter', dow: 2 },
+    { label: 'Qua', dow: 3 },
+    { label: 'Qui', dow: 4 },
+    { label: 'Sex', dow: 5 }
+  ];
+  var selectedWeekdayDow = null;
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function toLocalNaive(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':00';
+  }
+  function fmtDateShort(d) {
+    return pad2(d.getDate()) + '/' + pad2(d.getMonth() + 1);
+  }
+  function fmtWeekdayDate(d) {
+    var weekNames = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
+    return weekNames[d.getDay()] + ' ' + fmtDateShort(d);
+  }
+  function nextOccurrences(dow, count) {
+    var results = [];
+    var cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    if (cursor.getDay() === dow) {
+      var now = new Date();
+      var lastSlotStart = new Date(cursor);
+      lastSlotStart.setHours(CONSULT_BUSINESS_END_HOUR, 0, 0, 0);
+      lastSlotStart.setMinutes(lastSlotStart.getMinutes() - CONSULT_SLOT_MINUTES);
+      if (now > lastSlotStart) { cursor.setDate(cursor.getDate() + 1); }
+    } else {
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    while (results.length < count) {
+      if (cursor.getDay() === dow) {
+        results.push(new Date(cursor));
+        cursor.setDate(cursor.getDate() + 7);
+      } else {
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+    return results;
+  }
+  function buildDaySlots(dateAtMidnight) {
+    var slots = [];
+    var isToday = (new Date()).toDateString() === dateAtMidnight.toDateString();
+    var now = new Date();
+    var cursor = new Date(dateAtMidnight);
+    cursor.setHours(CONSULT_BUSINESS_START_HOUR, 0, 0, 0);
+    var end = new Date(dateAtMidnight);
+    end.setHours(CONSULT_BUSINESS_END_HOUR, 0, 0, 0);
+    while (cursor < end) {
+      var slotStart = new Date(cursor);
+      var slotEnd = new Date(cursor.getTime() + CONSULT_SLOT_MINUTES * 60000);
+      if (!(isToday && slotStart <= now)) {
+        slots.push({ start: slotStart, end: slotEnd });
+      }
+      cursor = slotEnd;
+    }
+    return slots;
+  }
+  function overlaps(aStart, aEnd, bStart, bEnd) {
+    return aStart < bEnd && aEnd > bStart;
+  }
+  async function fetchBusyEvents(dentistUserId, rangeStart, rangeEnd) {
+    var params = new URLSearchParams({
+      start: toLocalNaive(rangeStart),
+      end: toLocalNaive(rangeEnd),
+      dentistUserId: dentistUserId
+    });
+    var data = await api('/api/crm/ui/calendar-events?' + params.toString());
+    return (data.events || []).map(function (ev) {
+      return { start: new Date(ev.start), end: new Date(ev.end) };
+    });
+  }
+  function renderDealHeader() {
+    var el = document.getElementById('consultDealHeader');
+    if (!el) return;
+    if (!currentDeal) { el.textContent = ''; return; }
+    var patient = currentDeal.patient_name || 'Paciente';
+    el.textContent = patient + ' · Negocio #' + currentDeal.id + ' · Consulta · ' + CONSULT_SLOT_MINUTES + ' min';
+  }
+  function renderWeekdayPicker() {
+    var wrap = document.getElementById('consultWeekdayPicker');
+    if (!wrap) return;
+    wrap.innerHTML = WEEKDAYS.map(function (w) {
+      var active = (selectedWeekdayDow === w.dow);
+      return '<button type="button" class="btn consult-weekday-btn" data-dow="' + w.dow + '" style="padding:6px 14px;border-radius:999px;' +
+        (active ? 'background:#16a34a;border-color:#16a34a;color:#fff;' : 'background:#fff;') + '">' + w.label + '</button>';
+    }).join('');
+    wrap.querySelectorAll('.consult-weekday-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedWeekdayDow = parseInt(btn.getAttribute('data-dow'), 10);
+        renderWeekdayPicker();
+        loadSlotsForSelectedWeekday();
+      });
+    });
+  }
+  async function loadSlotsForSelectedWeekday() {
+    var container = document.getElementById('consultSlotsContainer');
+    if (!container || selectedWeekdayDow === null) return;
+    container.innerHTML = '<p style="font-size:13px;color:#888;margin:8px 0;">Carregando horarios...</p>';
+    try {
+      var dates = nextOccurrences(selectedWeekdayDow, 4);
+      var dentistUserId = 6; /* Dra. Jessica - avaliadora padrao fixa */
+      var rangeStart = new Date(dates[0]);
+      var rangeEnd = new Date(dates[dates.length - 1]);
+      rangeEnd.setHours(23, 59, 59, 999);
+      var busy = await fetchBusyEvents(dentistUserId, rangeStart, rangeEnd);
+      var html = '';
+      dates.forEach(function (date, idx) {
+        var slots = buildDaySlots(date); // overbooking allowed - trava removida a pedido do Diego (2026-07-28)
+        var isNearest = (idx === 0);
+        html += '<div style="margin-bottom:14px;">';
+        html += '<div style="font-size:12px;font-weight:600;margin-bottom:6px;' + (isNearest ? 'color:#16a34a;' : 'color:#555;') + '">' + fmtWeekdayDate(date) + (isNearest ? ' (mais proximo)' : '') + '</div>';
+        if (!slots.length) {
+          html += '<div style="font-size:12px;color:#999;">Sem horarios livres neste dia.</div>';
+        } else {
+          html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+          slots.forEach(function (slot) {
+            var iso = toLocalNaive(slot.start);
+            var label = pad2(slot.start.getHours()) + ':' + pad2(slot.start.getMinutes());
+            html += '<button type="button" class="btn consult-slot-btn" data-start="' + iso + '" style="padding:6px 10px;font-size:12px;' +
+              (isNearest ? 'background:#dcfce7;border-color:#16a34a;color:#15803d;' : 'background:#fff;') + '">' + label + '</button>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+      container.innerHTML = html || '<p style="font-size:13px;color:#888;">Nenhum horario disponivel.</p>';
+      container.querySelectorAll('.consult-slot-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { bookSlot(btn.getAttribute('data-start')); });
+      });
+    } catch (e) {
+      container.innerHTML = '<p style="font-size:13px;color:#e5484d;">Erro ao carregar horarios: ' + (e.message || e) + '</p>';
+    }
+  }
+  async function bookSlot(startIso) {
+    if (!currentDeal) return;
+    var start = new Date(startIso);
+    var end = new Date(start.getTime() + CONSULT_SLOT_MINUTES * 60000);
+    var dentistUserId = 6; /* Dra. Jessica - avaliadora padrao fixa */
+    var title = 'Consulta - ' + (currentDeal.patient_name || currentDeal.title || ('Negocio #' + currentDeal.id));
+    try {
+      await api('/api/crm/ui/calendar-events', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title,
+          description: null,
+          startAt: toLocalNaive(start),
+          endAt: toLocalNaive(end),
+          dentistUserId: dentistUserId,
+          dealId: currentDeal.id
+        })
+      });
+      var modalEl = document.getElementById('consultScheduleModal');
+      if (modalEl) modalEl.style.display = 'none';
+      showToast('Consulta agendada para ' + fmtDateShort(start) + ' as ' + pad2(start.getHours()) + ':' + pad2(start.getMinutes()) + '.', 'success');
+      if (typeof loadDeal === 'function') { await loadDeal(); }
+    } catch (e) {
+      showToast(e.message || 'Erro ao agendar consulta', 'error');
+    }
+  }
+  document.addEventListener('DOMContentLoaded', function () {
+    var openBtn = document.getElementById('openScheduleConsultBtn');
+    var cancelBtn = document.getElementById('consultCancelBtn');
+    var modal = document.getElementById('consultScheduleModal');
+    if (openBtn) {
+      openBtn.addEventListener('click', function () {
+        selectedWeekdayDow = null;
+        renderDealHeader();
+        renderWeekdayPicker();
+        var cont = document.getElementById('consultSlotsContainer');
+        if (cont) cont.innerHTML = '<p style="font-size:13px;color:#888;margin:8px 0;">Selecione um dia da semana acima para ver os horarios disponiveis.</p>';
+        if (modal) modal.style.display = 'flex';
+      });
+    }
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () { if (modal) modal.style.display = 'none'; });
+    }
+  });
+})();
+</script>
+</body>
+</html>

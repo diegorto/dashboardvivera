@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang EQ "pt-BR">
+<head>
+<meta charset EQ "utf-8">
+<meta name EQ "viewport" content EQ "width EQ device-width, initial-scale EQ 1">
+<title>Vivera CRM - Agenda</title>
+<link rel EQ "stylesheet" href EQ "app.css">
+<style>
+.agenda-group{margin-bottom COLON 24px;}
+.agenda-group h3{font-size COLON 13px;text-transform COLON uppercase;color COLON #888;letter-spacing COLON .05em;margin COLON 0 0 8px;}
+.agenda-item{display COLON flex;align-items COLON center;gap COLON 12px;padding COLON 12px 14px;border COLON 1px solid #e5e5e5;border-radius COLON 8px;margin-bottom COLON 8px;background COLON #fff;}
+.agenda-item.overdue{border-color COLON #e0a0a0;background COLON #fff7f7;}
+.agenda-item .chk{width COLON 18px;height COLON 18px;flex-shrink COLON 0;cursor COLON pointer;}
+.agenda-item .info{flex COLON 1;min-width COLON 0;}
+.agenda-item .subj{font-weight COLON 600;font-size COLON 14px;}
+.agenda-item .meta{font-size COLON 12px;color COLON #888;margin-top COLON 2px;}
+.agenda-item .time{font-size COLON 13px;color COLON #555;white-space COLON nowrap;}
+.agenda-item .type-badge{font-size COLON 11px;padding COLON 2px 8px;border-radius COLON 10px;background COLON #eef2ff;color COLON #3949ab;white-space COLON nowrap;}
+.modal-overlay{display COLON none;position COLON fixed;inset COLON 0;background COLON rgba(0,0,0,.4);z-index COLON 100;align-items COLON center;justify-content COLON center;}
+.modal-overlay.open{display COLON flex;}
+.modal-box{background COLON #fff;border-radius COLON 10px;padding COLON 24px;width COLON 440px;max-width COLON 90vw;max-height COLON 85vh;overflow-y COLON auto;}
+.modal-box h2{margin-top COLON 0;font-size COLON 18px;}
+.modal-field{margin-bottom COLON 14px;}
+.modal-field label{display COLON block;font-size COLON 12px;color COLON #666;margin-bottom COLON 4px;}
+.modal-field input,.modal-field select,.modal-field textarea{width COLON 100%;box-sizing COLON border-box;}
+.deal-suggestions{border COLON 1px solid #ddd;border-radius COLON 6px;margin-top COLON 4px;max-height COLON 160px;overflow-y COLON auto;display COLON none;}
+.deal-suggestions.open{display COLON block;}
+.deal-suggestions div{padding COLON 8px 10px;cursor COLON pointer;font-size COLON 13px;border-bottom COLON 1px solid #f0f0f0;}
+.deal-suggestions div COLON hover{background COLON #f5f5f5;}
+</style>
+</head>
+<body>
+<div class EQ "crm-sidebar" id EQ "crmSidebar">
+ <a href EQ "board.html" data-match EQ "index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href EQ "pessoas.html" data-match EQ "pessoas.html">Pessoas</a>
+ <hr>
+ <div class EQ "sb-group-label">Intelligence</div>
+ <a class EQ "sb-sub" href EQ "dashboard.html#executive" data-match EQ "dashboard.html">Executivo</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#crmintel">Intelig. CRM</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#tintim">Tintim</a>
+ <div class EQ "sb-group-label">Media</div>
+ <a class EQ "sb-sub" href EQ "dashboard.html#googleads">Google Ads</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#metaads">Meta Ads</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#campaigns">Campanhas</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#creatives">Criativos</a>
+ <div class EQ "sb-group-label">Operations</div>
+ <a class EQ "sb-sub" href EQ "dashboard.html#agenda">Agenda</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#professionals">Profis.</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#sdrs">SDRs</a>
+ <a class EQ "sb-sub" href EQ "dashboard.html#whatsapp">WhatsApp</a>
+</div>
+<script>(function(){var p EQ location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m EQ (a.dataset.match||'').split(',');if(m.indexOf(p)! EQ  EQ -1)a.classList.add('active');});})();</script>
+
+<div class EQ "topbar">
+  <div class EQ "topbar-left">
+    <div class EQ "brand">
+      <div class EQ "name">VIVERA</div>
+      <div class EQ "sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class EQ "nav-links">
+      <a class EQ "nav-link" href EQ "index.html">Lista</a>
+      <a class EQ "nav-link" href EQ "board.html">Kanban</a>
+      <a class EQ "nav-link" href EQ "stalled.html">Conversas Paradas</a>
+      <a class EQ "nav-link active" href EQ "agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class EQ "topbar-right" id EQ "topbarRight"></div>
+</div>
+
+<div class EQ "page">
+  <h1 class EQ "page-title">Agenda</h1>
+  <p class EQ "page-sub" id EQ "totalLabel">Carregando...</p>
+
+  <div class EQ "card">
+    <div class EQ "toolbar">
+      <select class EQ "input" id EQ "userFilter" style EQ "width COLON auto;">
+        <option value EQ "">Todos os responsaveis</option>
+      </select>
+      <label style EQ "display COLON flex;align-items COLON center;gap COLON 6px;font-size COLON 13px;color COLON #666;">
+        <input type EQ "checkbox" id EQ "includeDone"> Mostrar concluidas
+      </label>
+      <button class EQ "btn" id EQ "refreshBtn">Atualizar</button>
+      <button class EQ "btn btn-primary" id EQ "newActivityBtn" style EQ "margin-left COLON auto;">+ Nova Atividade</button>
+    </div>
+    <div id EQ "agendaContainer"></div>
+  </div>
+</div>
+
+<div class EQ "modal-overlay" id EQ "activityModal">
+  <div class EQ "modal-box">
+    <h2>Nova Atividade</h2>
+    <div class EQ "modal-field">
+      <label>Negocio</label>
+      <input type EQ "text" class EQ "input" id EQ "dealSearchInput" placeholder EQ "Buscar por nome, telefone ou negocio...">
+      <div class EQ "deal-suggestions" id EQ "dealSuggestions"></div>
+      <input type EQ "hidden" id EQ "selectedDealId">
+      <div id EQ "selectedDealLabel" style EQ "font-size COLON 12px;color COLON #3949ab;margin-top COLON 4px;"></div>
+    </div>
+    <div class EQ "modal-field">
+      <label>Tipo</label>
+      <select class EQ "input" id EQ "actType">
+        <option value EQ "Ligacao">Ligacao</option>
+        <option value EQ "Reuniao">Reuniao</option>
+        <option value EQ "Tarefa">Tarefa</option>
+        <option value EQ "Prazo">Prazo</option>
+        <option value EQ "Email">E-mail</option>
+        <option value EQ "Outro">Outro</option>
+      </select>
+    </div>
+    <div class EQ "modal-field">
+      <label>Assunto</label>
+      <input type EQ "text" class EQ "input" id EQ "actSubject" placeholder EQ "Ex COLON  Ligar para confirmar avaliacao">
+    </div>
+    <div class EQ "modal-field">
+      <label>Data e hora</label>
+      <input type EQ "datetime-local" class EQ "input" id EQ "actDueAt">
+    </div>
+    <div class EQ "modal-field">
+      <label>Responsavel</label>
+      <select class EQ "input" id EQ "actUser"></select>
+    </div>
+    <div class EQ "modal-field">
+      <label>Duracao (min, opcional)</label>
+      <input type EQ "number" class EQ "input" id EQ "actDuration" placeholder EQ "30">
+    </div>
+    <div class EQ "modal-field">
+      <label>Nota (opcional)</label>
+      <textarea class EQ "input" id EQ "actNote" rows EQ "3"></textarea>
+    </div>
+    <div style EQ "display COLON flex;gap COLON 8px;justify-content COLON flex-end;margin-top COLON 18px;">
+      <button class EQ "btn" id EQ "cancelActivityBtn">Cancelar</button>
+      <button class EQ "btn btn-primary" id EQ "saveActivityBtn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script src EQ "app.js"></script>
+<script>
+let usersCache  EQ  [];
+let dealSearchTimer  EQ  null;
+
+function fmtTime(iso) {
+  const d  EQ  new Date(iso);
+  return d.toLocaleString('pt-BR', { day COLON  '2-digit', month COLON  '2-digit', hour COLON  '2-digit', minute COLON  '2-digit' });
+}
+
+function groupLabel(dueAt) {
+  const now  EQ  new Date();
+  const due  EQ  new Date(dueAt);
+  const startOfToday  EQ  new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfTomorrow  EQ  new Date(startOfToday.getTime() + 86400000);
+  const startOfNext7  EQ  new Date(startOfToday.getTime() + 7 * 86400000);
+  if (due < startOfToday) return 'Atrasadas';
+  if (due < startOfTomorrow) return 'Hoje';
+  if (due < new Date(startOfTomorrow.getTime() + 86400000)) return 'Amanha';
+  if (due < startOfNext7) return 'Esta semana';
+  return 'Depois';
+}
+
+async function loadUsers() {
+  const data  EQ  await api('/api/crm/ui/users');
+  usersCache  EQ  data.users || [];
+  const userFilter  EQ  document.getElementById('userFilter');
+  const actUser  EQ  document.getElementById('actUser');
+  usersCache.forEach(u  EQ > {
+    const opt1  EQ  document.createElement('option'); opt1.value  EQ  u.id; opt1.textContent  EQ  u.name;
+    userFilter.appendChild(opt1);
+    const opt2  EQ  document.createElement('option'); opt2.value  EQ  u.id; opt2.textContent  EQ  u.name;
+    actUser.appendChild(opt2);
+  });
+}
+
+async function loadAgenda() {
+  const container  EQ  document.getElementById('agendaContainer');
+  const totalLabel  EQ  document.getElementById('totalLabel');
+  totalLabel.textContent  EQ  'Carregando...';
+  container.innerHTML  EQ  '';
+  const userId  EQ  document.getElementById('userFilter').value;
+  const includeDone  EQ  document.getElementById('includeDone').checked;
+  try {
+    let url  EQ  '/api/crm/ui/agenda?includeDone EQ ' + includeDone;
+    if (userId) url + EQ  '&userId EQ ' + encodeURIComponent(userId);
+    const data  EQ  await api(url);
+    const activities  EQ  data.activities || [];
+    totalLabel.textContent  EQ  activities.length + ' atividade(s)';
+    if (!activities.length) {
+      container.innerHTML  EQ  '<p style EQ "color COLON #888;padding COLON 16px 0;">Nenhuma atividade agendada.</p>';
+      return;
+    }
+    const groups  EQ  {};
+    const order  EQ  ['Atrasadas', 'Hoje', 'Amanha', 'Esta semana', 'Depois'];
+    activities.forEach(a  EQ > {
+      const g  EQ  groupLabel(a.due_at);
+      if (!groups[g]) groups[g]  EQ  [];
+      groups[g].push(a);
+    });
+    let html  EQ  '';
+    order.forEach(g  EQ > {
+      if (!groups[g] || !groups[g].length) return;
+      html + EQ  `<div class EQ "agenda-group"><h3>${g}</h3>`;
+      groups[g].forEach(a  EQ > {
+        const overdue  EQ  g  EQ  EQ  EQ  'Atrasadas' ? 'overdue'  COLON  '';
+        html + EQ  `
+          <div class EQ "agenda-item ${overdue}" data-id EQ "${a.id}">
+            <input type EQ "checkbox" class EQ "chk act-done-chk" data-id EQ "${a.id}" ${a.done ? 'checked'  COLON  ''}>
+            <div class EQ "time">${fmtTime(a.due_at)}</div>
+            <span class EQ "type-badge">${a.type || '-'}</span>
+            <div class EQ "info" ${a.deal_id ? `onclick EQ "window.location.href EQ 'detail.html?id EQ ${a.deal_id}'" style EQ "cursor COLON pointer;"`  COLON  ''}>
+              <div class EQ "subj">${a.subject || a.content || '(sem assunto)'}</div>
+              <div class EQ "meta">${a.patient_name || a.deal_title || ''}${a.user_name ? ' - ' + a.user_name  COLON  ''}</div>
+            </div>
+          </div>
+        `;
+      });
+      html + EQ  '</div>';
+    });
+    container.innerHTML  EQ  html;
+    document.querySelectorAll('.act-done-chk').forEach(chk  EQ > {
+      chk.addEventListener('click', async (e)  EQ > {
+        e.stopPropagation();
+        const id  EQ  chk.getAttribute('data-id');
+        try {
+          await api('/api/crm/activities/' + id, { method COLON  'PATCH', body COLON  JSON.stringify({ done COLON  chk.checked }) });
+          loadAgenda();
+        } catch (err) { showToast ? showToast(err.message, 'error')  COLON  alert(err.message); }
+      });
+    });
+  } catch (e) {
+    totalLabel.textContent  EQ  'Erro ao carregar COLON  ' + e.message;
+  }
+}
+
+function openModal() {
+  document.getElementById('activityModal').classList.add('open');
+  document.getElementById('dealSearchInput').value  EQ  '';
+  document.getElementById('selectedDealId').value  EQ  '';
+  document.getElementById('selectedDealLabel').textContent  EQ  '';
+  document.getElementById('actSubject').value  EQ  '';
+  document.getElementById('actDueAt').value  EQ  '';
+  document.getElementById('actDuration').value  EQ  '';
+  document.getElementById('actNote').value  EQ  '';
+}
+function closeModal() {
+  document.getElementById('activityModal').classList.remove('open');
+}
+
+document.getElementById('newActivityBtn').addEventListener('click', openModal);
+document.getElementById('cancelActivityBtn').addEventListener('click', closeModal);
+document.getElementById('activityModal').addEventListener('click', (e)  EQ > {
+  if (e.target.id  EQ  EQ  EQ  'activityModal') closeModal();
+});
+
+document.getElementById('dealSearchInput').addEventListener('input', (e)  EQ > {
+  clearTimeout(dealSearchTimer);
+  const q  EQ  e.target.value.trim();
+  const box  EQ  document.getElementById('dealSuggestions');
+  if (!q) { box.classList.remove('open'); return; }
+  dealSearchTimer  EQ  setTimeout(async ()  EQ > {
+    try {
+      const data  EQ  await api('/api/crm/ui/deals?search EQ ' + encodeURIComponent(q) + '&pageSize EQ 8');
+      const deals  EQ  data.deals || data.rows || [];
+      if (!deals.length) { box.innerHTML  EQ  '<div style EQ "color COLON #888;">Nenhum resultado</div>'; box.classList.add('open'); return; }
+      box.innerHTML  EQ  deals.map(d  EQ > `<div data-id EQ "${d.id}" data-label EQ "${(d.patient_name || d.title || '')} - ${d.title || ''}">${d.patient_name || '-'} - ${d.title || ''} (${d.patient_phone || ''})</div>`).join('');
+      box.classList.add('open');
+      box.querySelectorAll('div[data-id]').forEach(el  EQ > {
+        el.addEventListener('click', ()  EQ > {
+          document.getElementById('selectedDealId').value  EQ  el.getAttribute('data-id');
+          document.getElementById('selectedDealLabel').textContent  EQ  'Selecionado COLON  ' + el.getAttribute('data-label');
+          document.getElementById('dealSearchInput').value  EQ  el.getAttribute('data-label');
+          box.classList.remove('open');
+        });
+      });
+    } catch (err) { /* ignore */ }
+  }, 300);
+});
+
+document.getElementById('saveActivityBtn').addEventListener('click', async ()  EQ > {
+  const dealId  EQ  document.getElementById('selectedDealId').value;
+  const subject  EQ  document.getElementById('actSubject').value.trim();
+  const dueAtLocal  EQ  document.getElementById('actDueAt').value;
+  if (!subject) { alert('Informe o assunto'); return; }
+  if (!dueAtLocal) { alert('Informe data e hora'); return; }
+  const dueAtUtc  EQ  new Date(dueAtLocal).toISOString().slice(0, 19).replace('T', ' ');
+  try {
+    await api('/api/crm/activities', {
+      method COLON  'POST',
+      body COLON  JSON.stringify({
+        dealId COLON  dealId || null,
+        type COLON  document.getElementById('actType').value,
+        subject,
+        content COLON  document.getElementById('actNote').value || subject,
+        dueAt COLON  dueAtUtc,
+        assignedUserId COLON  document.getElementById('actUser').value || null,
+        duration COLON  document.getElementById('actDuration').value || null
+      })
+    });
+    closeModal();
+    loadAgenda();
+  } catch (err) { alert(err.message); }
+});
+
+(async ()  EQ > {
+  await loadUsers();
+  document.getElementById('userFilter').addEventListener('change', loadAgenda);
+  document.getElementById('includeDone').addEventListener('change', loadAgenda);
+  document.getElementById('refreshBtn').addEventListener('click', loadAgenda);
+  loadAgenda();
+})();
+</script>
+</body>
+</html>

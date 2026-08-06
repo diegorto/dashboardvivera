@@ -1,0 +1,2094 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Dashboard</title>
+<link rel="stylesheet" href="app.css">
+<style>
+.dash-wrap{display:flex;gap:0;}
+.dash-nav{width:200px;flex-shrink:0;padding-right:16px;border-right:1px solid #e5e7eb;}
+.dash-nav-group{margin-bottom:18px;}
+.dash-nav-group h4{font-size:11px;text-transform:uppercase;color:#9ca3af;letter-spacing:.05em;margin:0 0 8px;}
+.dash-nav a{display:block;padding:7px 10px;border-radius:8px;color:#374151;text-decoration:none;font-size:13px;margin-bottom:2px;}
+.dash-nav a.active{background:#eef2ff;color:#4f46e5;font-weight:600;}
+.dash-nav a:hover{background:#f3f4f6;}
+.dash-nav a.disabled{color:#c7c7c7;cursor:default;}
+.dash-content{flex:1;padding-left:20px;min-width:0;}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px;}
+.kpi-src{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}.kpi-src-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#4b5563;background:#f3f4f6;border-radius:10px;padding:2px 6px;line-height:1.3;white-space:nowrap}.kpi-src-chip svg{flex:none}
+.kpi-card{border:1px solid #e5e7eb;border-radius:12px;padding:16px;}
+.kpi-card .lbl{font-size:11px;text-transform:uppercase;color:#9ca3af;letter-spacing:.04em;margin-bottom:6px;}
+.kpi-card .val{font-size:26px;font-weight:700;color:#111827;}
+.kpi-card .sub{font-size:12px;color:#6b7280;margin-top:4px;}
+.date-range-sel{padding:6px 10px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;}
+.dash-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+@media (max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.dash-wrap{flex-direction:column;}.dash-nav{width:100%;border-right:none;border-bottom:1px solid #e5e7eb;padding-bottom:12px;margin-bottom:12px;}}
+.dash-nav{display:none;}
+.dash-content{padding-left:0;}
+</style>
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <a class="sb-sub" href="dashboard.html#publico">Publico</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+<div class="topbar">
+<div class="topbar-left">
+<div class="brand">
+<div class="name">VIVERA</div>
+<div class="sub">CRM Orofacial Avancada</div>
+</div>
+</div>
+<div class="topbar-right">
+<button class="btn" onclick="logout()">Sair</button>
+</div>
+</div>
+<div class="page" style="max-width:none;">
+<div class="dash-wrap">
+<div class="dash-nav">
+<div class="dash-nav-group">
+<h4>Intelligence</h4>
+<a href="#" data-tab="executive" class="active">Executive Dashboard</a>
+<a href="#" data-tab="crmintel">CRM Intelligence</a>
+<a href="#" data-tab="tintim">Auditoria Tintim</a>
+</div>
+<div class="dash-nav-group">
+<h4>Media</h4>
+<a href="#" data-tab="googleads">Google Ads</a>
+<a href="#" data-tab="metaads">Meta Ads</a>
+<a href="#" data-tab="campaigns">Campaigns</a>
+<a href="#" data-tab="creatives">Creatives</a>
+<a href="#" data-tab="publico">Publico</a>
+</div>
+<div class="dash-nav-group">
+<h4>Operations</h4>
+<a href="#" data-tab="agenda">Agenda</a>
+<a href="#" data-tab="professionals">Professionals</a>
+<a href="#" data-tab="sdrs">SDRs</a>
+<a href="#" data-tab="whatsapp">WhatsApp Analytics</a>
+</div>
+</div>
+<div class="dash-content">
+<div class="dash-header">
+<h1 class="page-title" id="tabTitle" style="margin:0;">Executive Dashboard</h1>
+<span style="display:inline-flex;align-items:center;gap:8px;"><select class="date-range-sel" id="rangeSel"><option value="today">Hoje</option><option value="yesterday">Ontem</option><option value="week">Esta semana</option><option value="lastweek">Semana passada</option><option value="month" selected>Este mes</option><option value="lastmonth">Mes passado</option><option value="custom">Personalizado</option></select><span id="customRangeWrap" style="display:none;align-items:center;gap:6px;"><input type="date" id="customFrom" class="input" style="padding:6px;font-size:13px;"><span style="font-size:12px;color:#666;">ate</span><input type="date" id="customTo" class="input" style="padding:6px;font-size:13px;"><button class="btn btn-primary" id="customApplyBtn" style="padding:6px 10px;font-size:13px;">Aplicar</button></span></span><script>(function(){ function pad(n){return String(n).padStart(2,'0');} var now=new Date(); var todayStr=pad(now.getDate())+'/'+pad(now.getMonth()+1)+'/'+now.getFullYear(); var y=new Date(now.getTime()-86400000); var yestStr=pad(y.getDate())+'/'+pad(y.getMonth()+1)+'/'+y.getFullYear(); var selEl=document.getElementById('rangeSel'); if(selEl){ var oT=selEl.querySelector('option[value="today"]'); var oY=selEl.querySelector('option[value="yesterday"]'); if(oT) oT.textContent='Hoje ('+todayStr+')'; if(oY) oY.textContent='Ontem ('+yestStr+')'; } })();</script>
+</div>
+<div id="tabBody"><p class="muted">Carregando...</p></div>
+</div>
+</div>
+</div>
+<script src="app.js"></script>
+<script>
+function fmtMoney(v){ v=Number(v||0); return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+function fmtPct(v){ return (Number(v||0)).toFixed(1) + '%'; }
+function rangeDates(sel){
+  const now = new Date();
+  let from, to;
+  if (sel === 'today') { from = now; to = now; }
+  else if (sel === 'yesterday') { const y = new Date(now.getTime() - 86400000); from = y; to = y; }
+  else if (sel === 'week') { const day = now.getDay(); const diff = (day === 0 ? -6 : 1 - day); from = new Date(now); from.setDate(now.getDate() + diff); to = now; }
+  else if (sel === 'lastweek') { const day = now.getDay(); const diff = (day === 0 ? -6 : 1 - day); const thisMonday = new Date(now); thisMonday.setDate(now.getDate() + diff); from = new Date(thisMonday); from.setDate(thisMonday.getDate() - 7); to = new Date(thisMonday); to.setDate(thisMonday.getDate() - 1); }
+  else if (sel === 'month') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if (sel === 'custom') { const cf = document.getElementById('customFrom'); const ct = document.getElementById('customTo'); const fv = cf && cf.value; const tv = ct && ct.value; if (fv && tv) { return { from: fv, to: tv }; } from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  else { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  const iso = d => { var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+day; };
+  return { from: iso(from), to: iso(to) };
+}
+
+async function loadExecutive(){
+  const body = document.getElementById('tabBody');
+  body.innerHTML = '<p class="muted">Carregando...</p>';
+  const { from, to } = rangeDates(document.getElementById('rangeSel').value);
+  const d = await api('/api/crm/ui/dashboard/executive?from=' + from + '&to=' + to);
+  const ex = await api('/api/crm/ui/dashboard/executive-extra?from=' + from + '&to=' + to).catch(function(){ return { success:false }; });
+  const exSource = (ex && ex.bySource) || [];
+    function kpiSrcIcon(fonte){
+      var f = String(fonte||'').toLowerCase();
+      if (f.indexOf('instagram') > -1) {
+        return '<svg width="10" height="10" viewBox="0 0 24 24" style="vertical-align:-1px"><defs><linearGradient id="igg" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#FFDD55"/><stop offset="50%" stop-color="#E1306C"/><stop offset="100%" stop-color="#833AB4"/></linearGradient></defs><rect x="1" y="1" width="22" height="22" rx="6" fill="url(#igg)"/><rect x="7" y="7" width="10" height="10" rx="3" fill="none" stroke="#fff" stroke-width="1.8"/><circle cx="17.3" cy="6.7" r="1.2" fill="#fff"/></svg>';
+      }
+      if (f.indexOf('google') > -1) {
+        return '<svg width="10" height="10" viewBox="0 0 24 24" style="vertical-align:-1px"><path fill="#4285F4" d="M22.5 12.2c0-.8-.1-1.5-.2-2.2H12v4.2h5.9c-.3 1.4-1 2.5-2.2 3.3v2.7h3.6c2.1-1.9 3.2-4.7 3.2-8z"/><path fill="#34A853" d="M12 23c2.9 0 5.4-1 7.2-2.6l-3.6-2.7c-1 .7-2.2 1.1-3.6 1.1-2.8 0-5.1-1.9-6-4.4H2.3v2.8C4.1 20.6 7.8 23 12 23z"/><path fill="#FBBC05" d="M6 14.4c-.2-.7-.3-1.4-.3-2.2s.1-1.5.3-2.2V7.2H2.3C1.5 8.7 1 10.3 1 12s.5 3.3 1.3 4.8L6 14.4z"/><path fill="#EA4335" d="M12 5.4c1.6 0 3 .5 4.1 1.6l3.1-3.1C17.4 2.1 14.9 1 12 1 7.8 1 4.1 3.4 2.3 7.2L6 9.8c.9-2.5 3.2-4.4 6-4.4z"/></svg>';
+      }
+      if (f.indexOf('indica') > -1) {
+        return '<span style="font-size:10px;line-height:1">🤝</span>';
+      }
+      if (f.indexOf('paciente') > -1) {
+        return '<span style="color:#e0245e;font-size:10px;line-height:1">♥</span>';
+      }
+      return '<span style="width:6px;height:6px;border-radius:50%;background:#9ca3af;display:inline-block"></span>';
+    }
+    function kpiSrcBreakdown(rows, key, isMoney){
+      var items = (rows||[]).map(function(r){ return { fonte: r.fonte, val: Number(r[key]||0) }; }).filter(function(it){ return it.val > 0 && it.fonte; });
+      items.sort(function(a,b){ return b.val - a.val; });
+      items = items.slice(0,3);
+      if (!items.length) return '';
+      var chips = items.map(function(it){
+        var label = isMoney ? fmtMoney(it.val) : it.val;
+        return '<span class="kpi-src-chip">' + kpiSrcIcon(it.fonte) + '<span>' + escAttr(it.fonte) + ': ' + label + '</span></span>';
+      }).join('');
+      return '<div class="kpi-src">' + chips + '</div>';
+    }
+  const exFunnel = (ex && ex.funnel) || [];
+  const exLoss = (ex && ex.lossReasons) || [];
+  const exObjections = (ex && ex.objections) || [];
+  const exLostTotal = (ex && ex.lostTotal) || 0;
+  const exMonthly = (ex && ex.monthlyRevenue) || [];
+  const exRanking = (ex && ex.ranking) || [];
+  const exProcedure = (ex && ex.byProcedure) || [];
+
+  const exTotalLeads = exSource.reduce(function(s,x){ return s + Number(x.leads||0); }, 0) || 1;
+  const exSourceRows = exSource.filter(function(r){ return Number(r.leads||0) > 0; }).map(function(r){
+    const pct = (Number(r.leads||0) / exTotalLeads * 100).toFixed(1) + '%';
+    const conv = r.leads ? (Number(r.vendas||0) / Number(r.leads) * 100).toFixed(1) + '%' : '0%';
+    const qualifPct = r.leads ? (Number(r.qualificados||0) / Number(r.leads) * 100).toFixed(1) + '%' : '0%';
+    const qualifCell = (Number(r.qualificados||0)) + ' (' + qualifPct + ')';
+    return [r.fonte, r.leads, pct, qualifCell, conv];
+  });
+  const exSourceTableHtml = exSourceRows.length ? tableHtml(['Fonte','Leads','%','Qualif.','Conv.'], exSourceRows) : '<p class="muted">Sem dados no periodo.</p>';
+
+      const exFunnelMax = Math.max(1, ...exFunnel.map(function(f){ return Number(f.total||0); }));
+    function escAttr(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function top5Tooltip(f){
+      const t5 = f.top5 || [];
+      if (!t5.length) return 'Sem dados de criativo neste estagio';
+      return 'Top criativos neste estagio:\n' + t5.map(function(x){ return x.criativo + ': ' + x.pct + '%'; }).join('\n');
+    }
+    const exFunnelHtml = exFunnel.length ? exFunnel.map(function(f, i, arr){
+      const w = (Number(f.total||0) / exFunnelMax * 100).toFixed(1);
+      const tip = escAttr(top5Tooltip(f));
+      const totalEntrada = Number((arr[0] && arr[0].total) || 0);
+      const pctEntrada = totalEntrada ? (Number(f.total||0) / totalEntrada * 100) : 0;
+      const pctEntradaStr = pctEntrada.toFixed(1).replace(".", ",") + "%";
+      let pctPrevStr = "-";
+      if (i > 0 && f.label !== 'Ganho' && f.label !== 'Perdido') {
+        const prevTotal = Number((arr[i-1] && arr[i-1].total) || 0);
+        const pctPrev = prevTotal ? (Number(f.total||0) / prevTotal * 100) : 0;
+        pctPrevStr = pctPrev.toFixed(1).replace(".", ",") + "%";
+      }
+      const pctSuffix = " <span style=\"color:#888;font-weight:400;font-size:11px;\">(" + pctEntradaStr + " | " + pctPrevStr + ")</span>";
+      const funilArgs = JSON.stringify([f.label, from, to]);
+        const funilOnclick = ('openExecFunilDrilldown.apply(null, ' + funilArgs + ')').replace(/"/g, '&quot;');
+        return '<div style="margin-bottom:10px;cursor:pointer;" title="' + tip + '" onclick="' + funilOnclick + '">' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>' + f.label + '</span><b>' + f.total + pctSuffix + '</b></div>' +
+      '<div style="background:#f3f4f6;border-radius:6px;height:10px;overflow:hidden;"><div style="width:' + w + '%;height:100%;background:#6366f1;"></div></div>' +
+      '</div>';
+    }).join('') : '<p class="muted">Sem dados no periodo.</p>';
+
+  const exLossRows = exLoss.map(function(r){
+    const pct = exLostTotal ? (Number(r.c||0) / exLostTotal * 100).toFixed(1) + '%' : '0%';
+    return [r.motivo, r.c, pct];
+  });
+  const exLossTableHtml = exLossRows.length ? tableHtml(['Motivo','Perdidos','%'], exLossRows) : '<p class="muted">Sem perdas no periodo.</p>';
+
+  const exObjTotal = exObjections.reduce(function(s,x){ return s + Number(x.c||0); }, 0);
+  const exObjRows = exObjections.map(function(r){
+    const pct = exObjTotal ? (Number(r.c||0) / exObjTotal * 100).toFixed(1) + '%' : '0%';
+    return [r.motivo, r.c, pct];
+  });
+  const exObjTableHtml = exObjRows.length ? tableHtml(['Motivo','Qtd','%'], exObjRows) : '<p class="muted">Sem objeções no periodo.</p>';
+
+  const exMonthNames = {'01':'Jan','02':'Fev','03':'Mar','04':'Abr','05':'Mai','06':'Jun','07':'Jul','08':'Ago','09':'Set','10':'Out','11':'Nov','12':'Dez'};
+  const exRevMax = Math.max(1, ...exMonthly.map(function(m){ return Number(m.receita_pago||0) + Number(m.receita_organico||0); }));
+  const exMonthlyLegend = '<div style="display:flex;gap:14px;align-items:center;margin-bottom:8px;font-size:11px;color:#6b7280;"><span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#6366f1;display:inline-block;"></span>MKT Pago</span><span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#16a34a;display:inline-block;"></span>Organico</span></div>';
+  const exMonthlyHtml = exMonthly.length ? (exMonthlyLegend + '<div style="display:flex;align-items:flex-end;gap:10px;height:170px;">' +
+    exMonthly.map(function(m){
+      const pago = Number(m.receita_pago||0);
+      const organico = Number(m.receita_organico||0);
+      const total = pago + organico;
+      const hPago = (pago / exRevMax * 140).toFixed(0);
+      const hOrg = (organico / exRevMax * 140).toFixed(0);
+      const mm = (m.ym || '').split('-')[1] || '';
+      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">' +
+        '<div style="font-size:10px;color:#6b7280;margin-bottom:2px;white-space:nowrap;">' + fmtMoney(total).replace('R$', '') + '</div>' +
+        '<div style="width:100%;max-width:40px;display:flex;flex-direction:column;">' +
+          '<div style="width:100%;height:' + hOrg + 'px;background:#16a34a;border-radius:4px 4px 0 0;" title="Organico"></div>' +
+          '<div style="width:100%;height:' + hPago + 'px;background:#6366f1;" title="MKT Pago"></div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:#6b7280;margin-top:4px;">' + (exMonthNames[mm] || mm) + '</div>' +
+        '</div>';
+    }).join('') + '</div>') : '<p class="muted">Sem dados no periodo.</p>';
+
+    const exDonutColors = ['#6366f1','#16a34a','#f59e0b','#ec4899','#06b6d4','#8b5cf6','#ef4444','#84cc16'];
+  const exSrcRevenue = exSource.map(function(r){ return { fonte: r.fonte, receita: Number(r.receita||0) }; }).filter(function(r){ return r.receita > 0; }).sort(function(a,b){ return b.receita - a.receita; });
+  const exTotalRev = exSrcRevenue.reduce(function(s,x){ return s + x.receita; }, 0) || 1;
+  let exAcc = 0;
+  const exGradientParts = exSrcRevenue.map(function(r,i){
+    const startPct = (exAcc / exTotalRev * 100);
+    exAcc += r.receita;
+    const endPct = (exAcc / exTotalRev * 100);
+    return exDonutColors[i % exDonutColors.length] + ' ' + startPct.toFixed(2) + '% ' + endPct.toFixed(2) + '%';
+  });
+  const exDonutCss = exGradientParts.length ? exGradientParts.join(', ') : '#e5e7eb 0% 100%';
+  const exDonutLegend = exSrcRevenue.length ? exSrcRevenue.map(function(r,i){
+    const pct = (r.receita / exTotalRev * 100).toFixed(1);
+    return '<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;"><span style="width:10px;height:10px;border-radius:50%;background:' + exDonutColors[i % exDonutColors.length] + ';display:inline-block;flex-shrink:0;"></span><span>' + r.fonte + '</span><b style="margin-left:auto;">' + pct + '%</b></div>';
+  }).join('') : '<p class="muted">Sem receita no periodo.</p>';
+
+  const exRankRows = exRanking.map(function(r,i){
+    const conv = r.negocios ? (Number(r.vendas||0) / Number(r.negocios) * 100).toFixed(0) + '%' : '0%';
+    return [(i+1), r.name, fmtMoney(r.receita), conv];
+  });
+  const exRankTableHtml = exRankRows.length ? tableHtml(['#','Profissional','Receita','Conv.'], exRankRows) : '<p class="muted">Sem vendas no periodo.</p>';
+
+  const exProcMax = Math.max(1, ...exProcedure.map(function(p){ return Number(p.receita||0); }));
+  const exProcHtml = exProcedure.length ? exProcedure.map(function(p){
+    const w = (Number(p.receita||0) / exProcMax * 100).toFixed(1);
+    return '<div style="margin-bottom:8px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;"><span>' + p.proc + '</span><b>' + fmtMoney(p.receita) + '</b></div>' +
+      '<div style="background:#f3f4f6;border-radius:4px;height:8px;"><div style="width:' + w + '%;height:100%;background:#06b6d4;border-radius:4px;"></div></div>' +
+      '</div>';
+  }).join('') : '<p class="muted">Sem vendas no periodo.</p>';
+
+  const exAlerts = [];
+  if (exLossRows.length) { exAlerts.push('Principal motivo de perda: ' + exLossRows[0][0] + ' (' + exLossRows[0][2] + ' dos perdidos)'); }
+  if (exSrcRevenue.length) { exAlerts.push('Maior fonte de receita: ' + exSrcRevenue[0].fonte + ' (' + fmtMoney(exSrcRevenue[0].receita) + ')'); }
+  const exAlertsHtml = exAlerts.length ? exAlerts.map(function(a){ return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:13px;">' + a + '</div>'; }).join('') : '<p class="muted">Sem alertas no periodo.</p>';
+
+  const exTempoOk = d.tempoLeadComparecimento && d.tempoComparecimentoCompra && d.tempoLeadComparecimento.dias != null && d.tempoComparecimentoCompra.dias != null && (d.tempoLeadComparecimento.dias + d.tempoComparecimentoCompra.dias) > 0
+    let exTempoBreakdownBar = '<p class="muted" style="font-size:11px;margin-top:10px;">Dados insuficientes para o breakdown neste periodo.</p>'
+    if (exTempoOk) {
+      const exT1 = d.tempoLeadComparecimento.dias, exT3 = d.tempoComparecimentoCompra.dias
+      const exTTotal = exT1 + exT3
+      const exP1 = (exT1 / exTTotal * 100).toFixed(1)
+      const exP2 = (exT3 / exTTotal * 100).toFixed(1)
+      exTempoBreakdownBar = '<div style="margin-top:14px;">' +
+        '<div style="display:flex;height:22px;border-radius:6px;overflow:hidden;">' +
+          '<div style="width:' + exP1 + '%;background:#4f46e5;"></div>' +
+          '<div style="width:' + exP2 + '%;background:#059669;"></div>' +
+        '</div>' +
+        '<div style="display:flex;justify-content:space-between;font-size:11px;color:#6b7280;margin-top:6px;flex-wrap:wrap;gap:6px;">' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#4f46e5;border-radius:2px;margin-right:4px;"></span>Lead ate Comparecimento (' + exP1 + '%)</span>' +
+          '<span><span style="display:inline-block;width:8px;height:8px;background:#059669;border-radius:2px;margin-right:4px;"></span>Comparecimento ate Compra (' + exP2 + '%)</span>' +
+        '</div>' +
+      '</div>'
+    }
+    body.innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card" style="cursor:pointer" onclick="openLeadsDrilldown('${from}','${to}')"><div class="lbl">Leads</div><div class="val">${d.leads}</div><div class="sub">${d.duplicados||0} duplicado(s)${kpiSrcBreakdown(exSource,'leads',false)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openQualificadosDrilldown('${from}','${to}')"><div class="lbl">Qualificados</div><div class="val">${d.qualificados}</div><div class="sub">${fmtPct(d.taxaQualif)} taxa de qualif.${kpiSrcBreakdown(exSource,'qualificados',false)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openAgendadasDrilldown('${from}','${to}')"><div class="lbl">Consultas Agendadas</div><div class="val">${d.agendadas}${kpiSrcBreakdown(exSource,'agendadas',false)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openComparecidasDrilldown('${from}','${to}')"><div class="lbl">Consultas Comparecidas</div><div class="val">${d.comparecidas}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openOrcamentoDrilldown('${from}','${to}')"><div class="lbl">Orcamento</div><div class="val">${fmtMoney(d.orcamento)}${kpiSrcBreakdown(exSource,'orcamento',true)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openVendasDrilldown('${from}','${to}')"><div class="lbl">Vendas</div><div class="val">${d.vendas}${kpiSrcBreakdown(exSource,'vendas',false)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openReceitaDrilldown('${from}','${to}')"><div class="lbl">Receita</div><div class="val">${fmtMoney(d.receita)}</div><div class="sub">${d.orcamento ? fmtPct(d.receita / d.orcamento * 100) : (window.__nbsp||"-")} do orcado${kpiSrcBreakdown(exSource,'receita',false)}</div></div>
+      <div class="kpi-card" style="cursor:pointer" onclick="openTicketMedioDrilldown('${from}','${to}')"><div class="lbl">Ticket Medio</div><div class="val">${fmtMoney(d.ticketMedio)}</div></div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Evolucao diaria de leads</h3>
+      <div id="leadsChart"></div>
+    </div>
+<div class="card">
+<h3 style="margin-top:0;">Faltaram no Periodo</h3>
+<div class="kpi-card" style="cursor:pointer" onclick="openFaltaramDrilldown('${from}','${to}')"><div class="lbl">Faltaram no Periodo</div><div class="val">${fmtPct(d.faltaramPct)}</div><div class="sub">${d.faltaram} de ${d.agendadas}</div></div>
+</div>
+    <p class="muted" style="font-size:12px;margin-top:12px;">ROAS e CAC serao adicionados quando a aba de Google/Meta Ads estiver conectada aqui. Fonte: dados do CRM Vivera (nao Pipedrive).</p>
+    <div class="card">
+      <h3 style="margin-top:0;">Tempo Medio de Conversao</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;">Lead ate Comparecimento</div>
+          <div style="font-size:26px;font-weight:800;color:#4f46e5;margin-top:4px;">${d.tempoLeadComparecimento && d.tempoLeadComparecimento.dias != null ? d.tempoLeadComparecimento.dias.toFixed(1).replace(".",",") + " dias" : "-"}</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px;">n=${d.tempoLeadComparecimento ? d.tempoLeadComparecimento.n : 0}</div>
+        </div>
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;">Comparecimento ate Compra</div>
+          <div style="font-size:26px;font-weight:800;color:#059669;margin-top:4px;">${d.tempoComparecimentoCompra && d.tempoComparecimentoCompra.dias != null ? d.tempoComparecimentoCompra.dias.toFixed(1).replace(".",",") + " dias" : "-"}</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px;">n=${d.tempoComparecimentoCompra ? d.tempoComparecimentoCompra.n : 0}</div>
+        </div>
+        <div style="background:#f8fafc;border-radius:10px;padding:14px;text-align:center;">
+          <div style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.4px;">Lead ate Compra (total)</div>
+          <div style="font-size:26px;font-weight:800;color:#dc2626;margin-top:4px;">${d.tempoLeadCompra && d.tempoLeadCompra.dias != null ? d.tempoLeadCompra.dias.toFixed(1).replace(".",",") + " dias" : "-"}</div>
+          <div style="font-size:11px;color:#9ca3af;margin-top:2px;">n=${d.tempoLeadCompra ? d.tempoLeadCompra.n : 0}</div>
+        </div>
+      </div>
+      ${exTempoBreakdownBar}
+      <p class="muted" style="font-size:11px;margin-top:10px;">As 3 metricas usam a mesma base de vendas: deals com add_date, comparecimento (primeira atividade "Compareceu") e won_date preenchidos, nesta ordem cronologica. Por isso Lead ate Comparecimento + Comparecimento ate Compra = Lead ate Compra (total), sempre.</p><p class="muted" style="font-size:11px;margin-top:4px;">${d.tempoCohortN || 0} de ${d.vendas || 0} vendas no periodo (${d.vendas ? ((d.tempoCohortN||0)/d.vendas*100).toFixed(1) : "0.0"}%) tem o trajeto completo rastreado (comparecimento registrado antes do fechamento). As demais vendas nao entram nesta media por nao terem comparecimento logado.</p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Funil Executivo</h3>
+      ${exFunnelHtml}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Leads por Fonte</h3>
+      ${exSourceTableHtml}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Evolução mensal de receita</h3>
+      ${exMonthlyHtml}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div class="card">
+        <h3 style="margin-top:0;">Receita por Fonte</h3>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          <div style="width:140px;height:140px;border-radius:50%;background:conic-gradient(${exDonutCss});flex-shrink:0;"></div>
+          <div style="flex:1;min-width:150px;">${exDonutLegend}</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Ranking - Profissionais</h3>
+        ${exRankTableHtml}
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Receita por Procedimento</h3>
+      ${exProcHtml}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Objeções</h3>
+      ${exObjTableHtml}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Motivos de Perda</h3>
+      ${exLossTableHtml}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">Alertas Executivos</h3>
+      ${exAlertsHtml}
+    </div>
+
+  `;
+  renderLeadsChart(d.dailyLeads || [], d.dailyQual || []);
+}
+function renderLeadsChart(leads, qual){
+  const el = document.getElementById('leadsChart');
+  if (!el) return;
+  if (!leads.length) { el.innerHTML = '<p class="muted">Sem dados no periodo.</p>'; return; }
+  const w = 900, h = 220, pad = 30;
+  const max = Math.max(1, ...leads.map(x=>x.c));
+  const qMap = {}; qual.forEach(q => qMap[q.dia] = q.c);
+  const xStep = (w - pad*2) / Math.max(1, leads.length - 1);
+  const pts = leads.map((p,i) => [pad + i*xStep, h - pad - (p.c/max)*(h-pad*2)]);
+  const qpts = leads.map((p,i) => [pad + i*xStep, h - pad - ((qMap[p.dia]||0)/max)*(h-pad*2)]);
+  const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const qpath = qpts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+ const dots = pts.map(function(p){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#6366f1"/>'; }).join('');
+ const qdots = qpts.map(function(p){ return '<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3" fill="#16a34a"/>'; }).join('');
+  el.innerHTML = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:220px;">
+    <path d="${path}" fill="none" stroke="#6366f1" stroke-width="2"/>
+    <path d="${qpath}" fill="none" stroke="#16a34a" stroke-width="2"/>
+  ${dots}${qdots}
+ </svg>
+  <div style="font-size:12px;color:#666;margin-top:6px;"><span style="color:#6366f1;">&#9679;</span> Leads totais &nbsp; <span style="color:#16a34a;">&#9679;</span> Qualificados</div>`;
+}
+function fmtMoney(v) { return 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function brDDMM(dateStr){ var p = dateStr.split('-'); return p[2] + '/' + p[1]; }
+async function loadSdrHojeWidget(){
+var el = document.getElementById('sdrHojeWidget');
+if (!el) return;
+var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+var d = await api('/api/crm/ui/dashboard/sdr-daily?from=' + r.from + '&to=' + r.to);
+if (!d || d.success === false) { el.innerHTML = '<p class="muted">Erro ao carregar quadro Hoje.</p>'; return; }
+var hojeLabel = (d.today === d.todayTo) ? brDDMM(d.today) : (brDDMM(d.today) + ' a ' + brDDMM(d.todayTo));
+var ontemLabel = (d.yesterday === d.yesterdayTo) ? brDDMM(d.yesterday) : (brDDMM(d.yesterday) + ' a ' + brDDMM(d.yesterdayTo));
+var periodWord = (d.periodDays > 1) ? 'Periodo' : (selVal === 'yesterday' ? 'Ontem' : 'Hoje');
+function fmtVal(v, isMoney){ return isMoney ? fmtMoney(v) : v; }
+function clickable(sdrName, metricDia, dayLabel, dayVal, val){
+return '<span style="cursor:pointer;text-decoration:underline;" onclick="openSdrDailyDrilldown(\''+sdrName+'\',\''+metricDia+'\',\''+dayLabel+'\',\''+dayVal+'\')">'+val+'</span>';
+}
+function sdrCard(sdrName, accent, bgTint){
+var rowsHtml2 = d.rows.map(function(r){
+var hoje = r.hoje[sdrName.toLowerCase()];
+var ontem = r.ontem[sdrName.toLowerCase()];
+      var dupHoje = (r.dupHoje && r.dupHoje[sdrName.toLowerCase()]) || 0;
+var hit = r.meta > 0 && hoje >= r.meta;
+return '<tr style="border-bottom:1px solid #f3f4f6;">' +
+'<td style="padding:7px 6px;color:#374151;">'+r.label+'</td>' +
+'<td style="padding:7px 6px;text-align:center;font-weight:700;border-radius:6px;background:'+(hit?'#d1fae5':bgTint)+';color:'+(hit?'#065f46':'#111827')+';">'+(r.key==='leads_recebidos_dia'&&dupHoje>0?'<div style="font-size:10px;font-weight:800;color:#dc2626;line-height:1;margin-bottom:2px;">'+dupHoje+'</div>':'')+clickable(sdrName, r.key, hojeLabel, d.today, fmtVal(hoje, r.isMoney))+'</td>' +
+'<td style="padding:7px 6px;text-align:center;color:#6b7280;">'+clickable(sdrName, r.key, ontemLabel, d.yesterday, fmtVal(ontem, r.isMoney))+'</td>' +
+'<td style="padding:7px 6px;text-align:center;color:#9ca3af;">'+(r.meta ? fmtVal(r.meta, r.isMoney) : '-')+'</td>' +
+'</tr>';
+}).join('');
+return '<div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.05);">' +
+'<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">' +
+'<span style="width:10px;height:10px;border-radius:50%;background:'+accent+';display:inline-block;"></span>' +
+'<h3 style="margin:0;font-size:15px;color:#111827;">'+sdrName+'</h3>' +
+'</div>' +
+'<table style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+'<thead><tr>' +
+'<th style="text-align:left;padding:5px 6px;color:#9ca3af;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;">Metrica</th>' +
+'<th style="text-align:center;padding:5px 6px;color:#9ca3af;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;">'+periodWord+' ('+hojeLabel+')</th>' +
+'<th style="text-align:center;padding:5px 6px;color:#9ca3af;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;">('+ontemLabel+')</th>' +
+'<th style="text-align:center;padding:5px 6px;color:#9ca3af;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.03em;">Meta</th>' +
+'</tr></thead>' +
+'<tbody>'+rowsHtml2+'</tbody>' +
+'</table>' +
+'</div>';
+}
+el.innerHTML = '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;"><span style="font-size:18px;">&#128197;</span><h3 style="margin:0;font-size:16px;color:#111827;">'+(d.periodDays > 1 ? 'Periodo' : periodWord)+'</h3></div>' +
+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:20px;">' +
+sdrCard('Agda', '#ef4444', '#fee2e2') +
+sdrCard('Helenice', '#3b82f6', '#dbeafe') +
+'</div>';
+}
+var sddDaily = { ownerName:null, metric:null, day:null };
+async function openSdrDailyDrilldown(sdrName, metric, dayLabel, day){
+sddDaily = { ownerName: sdrName, metric: metric, day: day };
+document.getElementById('sddTitle').textContent = sdrName + ' - ' + dayLabel;
+document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+var summaryEl = document.getElementById('sddSummary');
+var listEl = document.getElementById('sddList');
+summaryEl.textContent = 'Carregando...';
+listEl.innerHTML = '';
+try {
+var url = '/api/crm/ui/dashboard/sdr-daily/drilldown?ownerName=' + encodeURIComponent(sdrName) + '&metric=' + metric + '&day=' + day;
+var d = await api(url);
+if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+summaryEl.textContent = d.rows.length + ' registro(s)';
+if (!d.rows.length) {
+listEl.innerHTML = '<p class="muted">Nenhum registro no periodo.</p>';
+} else {
+listEl.innerHTML = d.rows.map(function(row){
+var when = row.date ? new Date(row.date).toLocaleString('pt-BR') : '-';
+return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+'<div style="font-weight:600;">' + (row.title || ('Deal #' + row.dealId)) + '</div>' +
+'<div style="font-size:12px;color:#6b7280;">' + when + (row.value ? ' - ' + fmtMoney(row.value) : '') + '</div>' +
+(row.content ? '<div style="font-size:12px;color:#374151;margin-top:2px;">' + row.content + '</div>' : '') +
+'</div>';
+}).join('');
+}
+} catch (e) {
+summaryEl.textContent = 'Erro ao carregar.';
+}
+}
+var diretoriaState = { month: null };
+async function loadDiretoria(){
+document.getElementById('tabTitle').textContent = 'Diretoria';
+document.getElementById('tabBody').innerHTML = '<p class="muted">Carregando...</p>';
+var month = diretoriaState.month || (function(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+diretoriaState.month = month;
+var d = await api('/api/crm/ui/dashboard/diretoria?month=' + month);
+if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+renderDiretoriaTable(d);
+}
+function diretoriaChangeMonth(delta){
+var parts = diretoriaState.month.split('-').map(Number);
+var dt = new Date(parts[0], parts[1]-1+delta, 1);
+diretoriaState.month = dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0');
+loadDiretoria();
+}
+function fmtByFormat(v, format){
+if (format === 'money') return fmtMoney(v);
+if (format === 'pct') return fmtPct(v);
+return Math.round(Number(v||0));
+}
+function diretoriaRealCell(ind, p) {
+  var disp = fmtByFormat(p.real, ind.format);
+  var DD_KEYS = ['faturamento_clinica','faturamento_closer1','leads_gerados_diretor','num_comparecimento_agda','num_comparecimento_helenice'];
+  if (DD_KEYS.indexOf(ind.key) === -1) return disp;
+  var args = JSON.stringify([ind.key, ind.label, p.from, p.to]);
+  var onclickAttr = 'openDiretoriaDrilldown.apply(null, ' + args.replace(/"/g, '&quot;') + ')';
+  return '<span style="cursor:pointer;text-decoration:underline;" onclick="' + onclickAttr + '">' + disp + '</span>';
+}
+function renderDiretoriaTable(d){
+  var header = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">' +
+    '<button class="btn" onclick="diretoriaChangeMonth(-1)">&larr;</button>' +
+    '<h2 style="margin:0;font-size:16px;">' + d.month + '</h2>' +
+    '<button class="btn" onclick="diretoriaChangeMonth(1)">&rarr;</button>' +
+    '</div>';
+  var bandColors = ['#2e7d32','#388e3c','#43a047','#1b5e20','#2e7d32','#388e3c','#43a047'];
+  var headHead = '<th rowspan="2" style="background:#1b5e20;color:#fff;padding:10px 12px;text-align:left;font-size:13px;border:1px solid #145a18;min-width:220px;">Indicadores</th>' +
+    '<th rowspan="2" style="background:#1b5e20;color:#fff;padding:10px 12px;text-align:left;font-size:13px;border:1px solid #145a18;min-width:140px;">Responsável</th>';
+  d.periods.forEach(function(p, pi){
+    headHead += '<th colspan="2" style="background:'+bandColors[pi % bandColors.length]+';color:#fff;padding:8px;text-align:center;font-size:12px;border-left:2px dashed #fff;border-top:1px solid #145a18;white-space:nowrap;">' + p.label + '</th>';
+  });
+  var headSub = '';
+  d.periods.forEach(function(p, pi){
+    headSub += '<th style="background:#f3f4f6;color:#374151;padding:6px 10px;font-size:11px;border-left:2px dashed #fff;border-bottom:1px solid #e5e7eb;">Meta</th>' +
+      '<th style="background:#f3f4f6;color:#374151;padding:6px 10px;font-size:11px;border-bottom:1px solid #e5e7eb;">Realizado</th>';
+  });
+  var rowsHtml = d.indicators.map(function(ind, ri){
+    var rowBg = ri % 2 === 0 ? '#fff' : '#fafafa';
+    var cells = '<td style="padding:8px 12px;font-weight:600;background:'+rowBg+';border-bottom:1px solid #eee;white-space:normal;">' + ind.label + '</td>' +
+      '<td style="padding:8px 12px;color:#6b7280;background:'+rowBg+';border-bottom:1px solid #eee;">' + ind.responsavel + '</td>';
+    d.periods.forEach(function(colDef){
+      var p = ind.periods.find(function(pp){ return pp.periodoKey === colDef.key; }) || {periodoKey: colDef.key, meta:0, real:0};
+      var hit = p.meta > 0 && p.real >= p.meta;
+      var valColor = p.meta > 0 ? (hit ? '#15803d' : '#b91c1c') : '#374151';
+      cells += '<td style="padding:6px 10px;text-align:center;background:'+rowBg+';border-bottom:1px solid #eee;border-left:2px dashed #f1f5f9;" contenteditable="true" data-key="'+ind.key+'" data-period="'+p.periodoKey+'" data-format="'+ind.format+'" onblur="saveDiretoriaMeta(this)">' + fmtByFormat(p.meta || 0, ind.format) + '</td>' +
+        '<td style="padding:6px 10px;text-align:center;background:'+rowBg+';border-bottom:1px solid #eee;color:'+valColor+';font-weight:700;">' + diretoriaRealCell(ind, p) + '</td>';
+    });
+    return '<tr>' + cells + '</tr>';
+  }).join('');
+  var legend = '<div style="margin-top:12px;display:flex;align-items:center;gap:16px;font-size:12px;color:#374151;border:1px solid #e5e7eb;border-radius:8px;padding:10px 14px;background:#fafafa;max-width:420px;">' +
+    '<strong style="color:#111827;">Legenda:</strong>' +
+    '<span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#15803d;display:inline-block;"></span>Meta atingida</span>' +
+    '<span style="display:flex;align-items:center;gap:6px;"><span style="width:10px;height:10px;border-radius:50%;background:#b91c1c;display:inline-block;"></span>Abaixo da meta</span>' +
+    '</div>';
+  document.getElementById('tabBody').innerHTML = header +
+    '<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:10px;">' +
+    '<table style="border-collapse:collapse;font-size:13px;white-space:nowrap;width:100%;">' +
+    '<thead><tr>' + headHead + '</tr><tr>' + headSub + '</tr></thead>' +
+    '<tbody>' + rowsHtml + '</tbody></table></div>' + legend +
+    '<div style="margin-top:20px;border:1px solid #e5e7eb;border-radius:10px;padding:18px;background:#fff;"><div id="diretoriaAnnualChart">Carregando gráfico...</div></div>';
+  loadDiretoriaAnnualChart();
+}
+
+async function loadDiretoriaAnnualChart(){
+  var el = document.getElementById('diretoriaAnnualChart');
+  try {
+    var year = new Date().getFullYear();
+    if (diretoriaState.month) { year = parseInt(diretoriaState.month.split('-')[0], 10); }
+    var d = await api('/api/crm/ui/dashboard/diretoria/annual?year=' + year);
+    renderDiretoriaAnnualChart(d, el);
+  } catch(e) {
+    if (el) el.innerHTML = '<div style="color:#b91c1c;font-size:13px;">Erro ao carregar gráfico: ' + e.message + '</div>';
+  }
+}
+
+function renderDiretoriaAnnualChart(d, el){
+  var months = d.months || [];
+  var W = 900, H = 300, padL = 70, padR = 20, padT = 30, padB = 40;
+  var plotW = W - padL - padR, plotH = H - padT - padB;
+  var maxVal = 1;
+  months.forEach(function(m){ maxVal = Math.max(maxVal, m.realizado || 0, m.meta || 0); });
+  maxVal = maxVal * 1.15;
+  var n = months.length || 1;
+  var bw = plotW / n * 0.5;
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:320px;font-family:inherit;">';
+  var gridLines = 4;
+  for (var g = 0; g <= gridLines; g++) {
+    var gy = padT + plotH - (plotH * g / gridLines);
+    var gv = maxVal * g / gridLines;
+    svg += '<line x1="' + padL + '" y1="' + gy + '" x2="' + (W - padR) + '" y2="' + gy + '" stroke="#eef2f6" stroke-width="1"/>';
+    svg += '<text x="' + (padL - 8) + '" y="' + (gy + 4) + '" font-size="10" fill="#9ca3af" text-anchor="end">' + fmtByFormat(gv, 'money') + '</text>';
+  }
+  var points = [];
+  months.forEach(function(m, i){
+    var cx = padL + (plotW / n) * (i + 0.5);
+    var barH = maxVal > 0 ? (m.realizado / maxVal) * plotH : 0;
+    var by = padT + plotH - barH;
+    svg += '<rect x="' + (cx - bw/2) + '" y="' + by + '" width="' + bw + '" height="' + barH + '" fill="#43a047" rx="3"/>';
+    svg += '<text x="' + cx + '" y="' + (H - padB + 16) + '" font-size="11" fill="#6b7280" text-anchor="middle">' + m.label + '</text>';
+    var my = maxVal > 0 ? padT + plotH - (m.meta / maxVal) * plotH : padT + plotH;
+    points.push(cx + ',' + my);
+  });
+  svg += '<polyline points="' + points.join(' ') + '" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="5,4"/>';
+  months.forEach(function(m, i){
+    var cx = padL + (plotW / n) * (i + 0.5);
+    var my = maxVal > 0 ? padT + plotH - (m.meta / maxVal) * plotH : padT + plotH;
+    svg += '<circle cx="' + cx + '" cy="' + my + '" r="3.5" fill="#f59e0b"/>';
+  });
+  svg += '</svg>';
+  var legendHtml = '<div style="display:flex;align-items:center;gap:18px;font-size:12px;color:#374151;margin-bottom:8px;">' +
+    '<strong style="color:#111827;font-size:14px;">Evolução Mensal — Faturamento (Total da Clínica) — ' + d.year + '</strong></div>' +
+    '<div style="display:flex;align-items:center;gap:18px;font-size:12px;color:#374151;margin-bottom:8px;">' +
+    '<span style="display:flex;align-items:center;gap:6px;"><span style="width:12px;height:12px;background:#43a047;display:inline-block;border-radius:2px;"></span>Realizado</span>' +
+    '<span style="display:flex;align-items:center;gap:6px;"><span style="width:16px;height:2px;background:#f59e0b;display:inline-block;"></span>Meta</span>' +
+    '</div>';
+  el.innerHTML = legendHtml + svg;
+}
+async function saveDiretoriaMeta(el){
+var fmt = el.getAttribute('data-format');
+var raw = (el.textContent||'0').replace(/[^0-9.,-]/g,'');
+var value;
+if (fmt === 'money') { value = parseFloat(raw.replace(/\./g,'').replace(',','.')) || 0; }
+else { value = parseFloat(raw.replace(',','.')) || 0; }
+var indicadorKey = el.getAttribute('data-key');
+var periodoKey = el.getAttribute('data-period');
+await api('/api/crm/ui/dashboard/diretoria/meta', { method:'PATCH', body: JSON.stringify({ indicadorKey: indicadorKey, periodoKey: periodoKey, value: value }) });
+loadDiretoria();
+}
+
+var USUARIOS_CACHE = [];
+function fmtRole(r){ var m={admin:'Administrador',sdr:'SDR',closer:'Closer',recepcao:'Secretária'}; return m[r]||r; }
+async function loadUsuarios(){
+  document.getElementById('tabTitle').textContent = 'Usuarios';
+  document.getElementById('tabBody').innerHTML = '<p class="muted">Carregando...</p>';
+  try {
+    var d = await api('/api/crm/ui/admin/users');
+    USUARIOS_CACHE = d.users || [];
+    renderUsuarios();
+  } catch (e) {
+    document.getElementById('tabBody').innerHTML = '<p class="muted">' + (e.message || 'Erro ao carregar.') + '</p>';
+  }
+}
+function renderUsuarios(){
+  var html = '<div style="margin-bottom:16px;padding:12px;border:1px solid #e5e7eb;border-radius:8px;max-width:640px;">';
+  html += '<div style="font-weight:600;margin-bottom:8px;">Criar novo usuario</div>';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">';
+  html += '<input id="nuName" placeholder="Nome" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">';
+  html += '<input id="nuEmail" placeholder="email@viveracrm.local" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">';
+  html += '<select id="nuRole" style="padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;">' +
+    '<option value="sdr">SDR</option><option value="closer">Closer</option><option value="recepcao">Secretária</option><option value="admin">Administrador</option></select>';
+  html += '<button class="btn" onclick="criarUsuario()">Criar (senha temp: 123)</button>';
+  html += '</div></div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>' +
+    '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Nome</th>' +
+    '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Email</th>' +
+    '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;">Papel</th>' +
+    '<th style="text-align:center;padding:8px;border-bottom:2px solid #e5e7eb;">Ativo</th>' +
+    '<th style="text-align:center;padding:8px;border-bottom:2px solid #e5e7eb;">Precisa trocar senha</th>' +
+    '<th style="text-align:right;padding:8px;border-bottom:2px solid #e5e7eb;">Acoes</th>' +
+    '</tr></thead><tbody>';
+  USUARIOS_CACHE.forEach(function(u){
+    html += '<tr>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + u.name + (u.id===1?' (voce)':'') + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' + u.email + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">' +
+        '<select onchange="mudarPapel(' + u.id + ', this.value)" ' + (u.id===1?'disabled':'') + '>' +
+        ['admin','sdr','closer','recepcao'].map(function(r){ return '<option value="'+r+'"'+(r===u.role?' selected':'')+'>'+fmtRole(r)+'</option>'; }).join('') +
+        '</select></td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:center;">' + (u.active ? 'Sim' : 'Nao') + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:center;">' + (u.must_reset_password ? 'Sim' : 'Nao') + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #f3f4f6;text-align:right;white-space:nowrap;">' +
+        '<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="resetarSenha(' + u.id + ')">Resetar senha</button> ' +
+        (u.id!==1 ? '<button class="btn" style="font-size:11px;padding:4px 8px;" onclick="alternarAtivo(' + u.id + ',' + (u.active?0:1) + ')">' + (u.active?'Desativar':'Ativar') + '</button>' : '') +
+      '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('tabBody').innerHTML = html;
+}
+async function criarUsuario(){
+  var name = document.getElementById('nuName').value.trim();
+  var email = document.getElementById('nuEmail').value.trim();
+  var role = document.getElementById('nuRole').value;
+  if (!name || !email) { alert('Preencha nome e email'); return; }
+  try {
+    var d = await api('/api/crm/ui/admin/users', { method:'POST', body: JSON.stringify({ name: name, email: email, role: role }) });
+    alert('Usuario criado. Senha temporaria: ' + d.tempPassword + ' (ele(a) sera obrigado(a) a trocar no primeiro login)');
+    loadUsuarios();
+  } catch (e) { alert(e.message || 'Erro ao criar'); }
+}
+async function mudarPapel(id, role){
+  try {
+    await api('/api/crm/ui/admin/users/' + id, { method:'PATCH', body: JSON.stringify({ role: role }) });
+  } catch (e) { alert(e.message || 'Erro'); }
+  loadUsuarios();
+}
+async function alternarAtivo(id, active){
+  try {
+    if (!active) { await api('/api/crm/ui/admin/users/' + id, { method:'DELETE' }); }
+    else { await api('/api/crm/ui/admin/users/' + id, { method:'PATCH', body: JSON.stringify({ active: 1 }) }); }
+  } catch (e) { alert(e.message || 'Erro'); }
+  loadUsuarios();
+}
+async function resetarSenha(id){
+  if (!confirm('Resetar a senha para 123 (a pessoa sera obrigada a trocar no proximo login)?')) return;
+  try {
+    var d = await api('/api/crm/ui/admin/users/' + id + '/reset-password', { method:'POST' });
+    alert('Senha resetada para: ' + d.tempPassword);
+    loadUsuarios();
+  } catch (e) { alert(e.message || 'Erro'); }
+}
+function tableHtml(headers, rows) {
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>' + headers.map(function(x){return '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-weight:600;">'+x+'</th>'}).join('') + '</tr></thead><tbody>';
+  rows.forEach(function(r){ h += '<tr>' + r.map(function(c){return '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">'+c+'</td>'}).join('') + '</tr>'; });
+  h += '</tbody></table>';
+  return h;
+}
+async function loadSdrs() {
+ document.getElementById('tabTitle').textContent = 'SDRs';
+ var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+ var d = await api('/api/crm/ui/dashboard/sdrs?from=' + r.from + '&to=' + r.to);
+ if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+ function dc(sdrId, sdrName, metric, label, val){ return '<span style="cursor:pointer;color:#4f46e5;text-decoration:underline;" onclick="openSdrDrilldown('+sdrId+',\''+sdrName.replace(/'/g,"\\'")+'\',\''+metric+'\',\''+label.replace(/'/g,"\\'")+'\')">'+val+'</span>'; }
+ var rows = d.rows.map(function(x){ return [x.name,
+   dc(x.id, x.name, 'leads', 'Leads', x.leads),
+   dc(x.id, x.name, 'qualificados', 'Qualificados', x.qualificados),
+   dc(x.id, x.name, 'ligacoes_efetuadas', 'Ligacoes Feitas', x.ligacoes_efetuadas),
+   dc(x.id, x.name, 'ligacoes_atendidas', 'Ligacoes Atendidas', x.ligacoes_atendidas),
+   dc(x.id, x.name, 'agendamentos', 'Agendamentos', x.agendamentos),
+   dc(x.id, x.name, 'comparecimentos', 'Comparecimentos', x.comparecimentos),
+   dc(x.id, x.name, 'orcamentos_gerados', 'Orcamentos Gerados', x.orcamentos_gerados),
+   fmtMoney(x.valor_orcamentos_gerados),
+   dc(x.id, x.name, 'vendas', 'Orcamentos Fechados', x.vendas),
+   fmtMoney(x.receita)]; });
+ document.getElementById('tabBody').innerHTML = '<div id="sdrHojeWidget"><p class="muted">Carregando quadro Hoje...</p></div><div id="sdrHourCharts" style="margin-top:24px"></div><div id="sdrAiInsight" style="margin-top:24px"></div>';
+loadSdrHojeWidget();
+  loadSdrHourCharts(d.rows.map(function(x){ return x.name; }));
+  loadSdrAiInsight();
+}
+function renderHourBarChart(title, hoursArr, color){
+  var max = 1;
+  for (var i=0;i<24;i++){ if ((hoursArr[i]||0) > max) max = hoursArr[i]; }
+  var bars = '';
+  for (var h=0; h<24; h++){
+    var v = hoursArr[h] || 0;
+    var pct = Math.round((v/max)*100);
+    var barH = Math.max(2, Math.round(pct*0.9));
+    bars += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;">' +
+      '<div title="' + h + 'h: ' + v + '" style="width:100%;max-width:14px;height:' + barH + 'px;background:' + color + ';border-radius:3px 3px 0 0;"></div>' +
+      '<div style="font-size:9px;color:var(--ink-500);">' + (h % 3 === 0 ? h : '') + '</div>' +
+      '</div>';
+  }
+  return '<div class="card" style="padding:16px;margin-bottom:16px;">' +
+    '<div style="font-weight:600;margin-bottom:10px;">' + title + '</div>' +
+    '<div style="display:flex;align-items:flex-end;gap:2px;height:120px;">' + bars + '</div>' +
+    '</div>';
+}
+
+function buildHourMap(rows, sdrNames){
+  var byOwner = {};
+  (sdrNames||[]).forEach(function(name){ byOwner[name] = new Array(24).fill(0); });
+  var total = new Array(24).fill(0);
+  (rows||[]).forEach(function(row){
+    var owner = row.ownerName || 'Sem SDR';
+    if (!byOwner[owner]) byOwner[owner] = new Array(24).fill(0);
+    var h = Number(row.hourBr);
+    var c = Number(row.cnt) || 0;
+    byOwner[owner][h] = (byOwner[owner][h] || 0) + c;
+    total[h] += c;
+  });
+  return { byOwner: byOwner, total: total };
+}
+
+async function loadSdrHourCharts(sdrNames){
+  var el = document.getElementById('sdrHourCharts');
+  if (!el) return;
+  el.innerHTML = '<p class="muted">Carregando graficos de horario...</p>';
+  try {
+    var selVal = document.getElementById('rangeSel').value;
+    var r = rangeDates(selVal);
+    var qs = 'from=' + r.from + '&to=' + r.to;
+    var wa = await api('/api/crm/ui/dashboard/sdrs/whatsapp-hours?' + qs);
+    var calls = await api('/api/crm/ui/dashboard/sdrs/calls-hours?' + qs);
+    var waData = buildHourMap(wa && wa.rows, sdrNames);
+    var callData = buildHourMap(calls && calls.rows, sdrNames);
+    var html = '<h3 style="margin:24px 0 8px;">Horarios em que os leads mais respondem no WhatsApp</h3>';
+    Object.keys(waData.byOwner).forEach(function(owner){
+      html += renderHourBarChart(owner, waData.byOwner[owner], '#4f46e5');
+    });
+    html += renderHourBarChart('Total da clinica (todas as SDRs)', waData.total, '#0ea5e9');
+    html += '<h3 style="margin:24px 0 8px;">Horarios em que mais atendem ligacoes</h3>';
+    Object.keys(callData.byOwner).forEach(function(owner){
+      html += renderHourBarChart(owner, callData.byOwner[owner], '#10b981');
+    });
+    html += renderHourBarChart('Total da clinica (todas as SDRs)', callData.total, '#f59e0b');
+    el.innerHTML = html;
+  } catch (e) {
+    console.error('loadSdrHourCharts error', e);
+    el.innerHTML = '<p class="muted">Erro ao carregar graficos de horario.</p>';
+  }
+}
+
+async function loadSdrAiInsight(){
+  var el = document.getElementById('sdrAiInsight');
+  if (!el) return;
+  el.innerHTML = '<div class="card" style="padding:16px;"><p class="muted">Gerando análise estratégica com IA...</p></div>';
+  try {
+    var selVal = document.getElementById('rangeSel').value;
+    var r = rangeDates(selVal);
+    var qs = 'from=' + r.from + '&to=' + r.to;
+    var resp = await api('/api/crm/ui/dashboard/sdrs/ai-insight?' + qs);
+    if (!resp || resp.success === false) {
+      el.innerHTML = '<div class="card" style="padding:16px;"><p class="muted">Não foi possível gerar a análise agora.</p></div>';
+      return;
+    }
+    var paragraphs = String(resp.insight || '').split(/\n+/).filter(function(p){ return p.trim().length; });
+    var bodyHtml = paragraphs.map(function(p){
+      var esc = p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return '<p style="margin:0 0 12px;line-height:1.55;color:var(--ink-700);">' + esc + '</p>';
+    }).join('');
+    var stats = resp.stats || {};
+    var an = stats.analysis || {};
+    var tot = an.totals || {};
+    var metaBits = [];
+    if (typeof stats.daysOfHistory === 'number') metaBits.push(stats.daysOfHistory + ' dias de histórico de WhatsApp');
+    if (typeof tot.conversations === 'number') metaBits.push(tot.conversations + ' conversas');
+    if (typeof tot.inboundMessages === 'number') metaBits.push(tot.inboundMessages + ' mensagens de leads');
+    var metaHtml = metaBits.length ? '<div style="margin-top:10px;font-size:12px;color:var(--ink-500);">Base da análise: ' + metaBits.join(' · ') + '</div>' : '';
+var cacheHtml = '<div style="margin-top:4px;font-size:11px;color:var(--ink-400);">' + (resp.cached ? 'Analise em cache' + (resp.generatedAt ? ' - gerada em ' + new Date(resp.generatedAt).toLocaleString('pt-BR') : '') : 'Analise gerada agora' + (resp.forced ? ' (refeita manualmente)' : '')) + '</div>';
+el.innerHTML = '<div class="card" style="padding:20px;">' +
+'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;"><div style="font-weight:600;">Leitura estratégica (IA)</div><button class="btn" style="padding:4px 10px;" onclick="openSdrInsightRefazerModal()">Refazer</button></div>' +
+bodyHtml + metaHtml + cacheHtml +
+'</div>' +
+'<div class="modal-overlay" id="sdrInsightRefazerOverlay" style="display:none;">' +
+'<div class="modal-box" style="width:420px;max-width:92vw;">' +
+'<div style="font-weight:600;margin-bottom:12px;">Refazer análise</div>' +
+'<p style="margin:0 0 16px;color:var(--ink-700);">Tem certeza que é necessário refazer? Isso irá consumir tokens pagos.</p>' +
+'<div style="display:flex;justify-content:flex-end;gap:8px;">' +
+'<button class="btn" onclick="closeSdrInsightRefazerModal()">Não, melhor cancelar</button>' +
+'<button class="btn btn-danger" onclick="confirmSdrInsightRefazer()">Sim, tenho certeza</button>' +
+'</div>' +
+'</div>' +
+'</div>';
+  } catch (e) {
+    console.error('loadSdrAiInsight error', e);
+    el.innerHTML = '<div class="card" style="padding:16px;"><p class="muted">Erro ao carregar a análise.</p></div>';
+  }
+}
+
+function openSdrInsightRefazerModal(){
+  var ov = document.getElementById('sdrInsightRefazerOverlay');
+  if (ov) ov.style.display = 'flex';
+}
+function closeSdrInsightRefazerModal(){
+  var ov = document.getElementById('sdrInsightRefazerOverlay');
+  if (ov) ov.style.display = 'none';
+}
+async function confirmSdrInsightRefazer(){
+  closeSdrInsightRefazerModal();
+  var el = document.getElementById('sdrAiInsight');
+  if (el) el.innerHTML = '<div class="card" style="padding:16px;"><p class="muted">Refazendo análise (consumindo tokens)...</p></div>';
+  try {
+    var selVal = document.getElementById('rangeSel').value;
+    var r = rangeDates(selVal);
+    var qs = 'from=' + r.from + '&to=' + r.to;
+    await api('/api/crm/ui/dashboard/sdrs/ai-insight/refazer?' + qs, { method: 'POST' });
+  } catch (e) {
+    console.error('confirmSdrInsightRefazer error', e);
+  }
+  loadSdrAiInsight();
+}
+async function loadProfessionals() {
+  document.getElementById('tabTitle').textContent = 'Profissionais';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/professionals?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var rows = d.rows.map(function(x){ return [x.name, x.negocios, x.vendas, fmtMoney(x.receita)]; });
+  document.getElementById('tabBody').innerHTML = tableHtml(['Profissional','Negocios','Vendas','Receita'], rows);
+}
+async function loadCampaigns() {
+  document.getElementById('tabTitle').textContent = 'Campanhas';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/campaigns?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var rows = d.rows.map(function(x){ return [x.campanha, clickableCampaigns(x.campanha, 'leads', r.from, r.to, x.leads), clickableCampaigns(x.campanha, 'vendas', r.from, r.to, x.vendas), clickableCampaigns(x.campanha, 'receita', r.from, r.to, fmtMoney(x.receita))]; });
+  document.getElementById('tabBody').innerHTML = tableHtml(['Campanha','Leads','Vendas','Receita'], rows);
+}
+async function loadCreatives() {
+  document.getElementById('tabTitle').textContent = 'Criativos';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/creatives?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var rows = d.rows.map(function(x){ return [x.criativoDisplay || x.criativo, x.campanha || '-', clickableCreatives(x.criativo, 'leads', r.from, r.to, x.leads), clickableCreatives(x.criativo, 'vendas', r.from, r.to, x.vendas), clickableCreatives(x.criativo, 'receita', r.from, r.to, fmtMoney(x.receita)), x.link ? ('<a href="'+x.link+'" target="_blank" rel="noopener">Ver anúncio</a>') : '-']; });
+  document.getElementById('tabBody').innerHTML = tableHtml(['Criativo/Keyword','Campanha','Leads','Vendas','Receita','Link'], rows);
+}
+
+async function publicoExportCsv(url) {
+  try {
+    var token = (typeof getToken === 'function') ? getToken() : localStorage.getItem('crm_token');
+    var headers = {};
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var r = await fetch(url, { headers: headers });
+    if (!r.ok) { alert('Erro ao exportar CSV (' + r.status + ').'); return; }
+    var blob = await r.blob();
+    var filename = (url.split('/').pop() || 'export.csv').split('?')[0];
+    var objUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(objUrl); }, 5000);
+  } catch (e) {
+    alert('Erro ao exportar CSV.');
+    console.error('publicoExportCsv error', e);
+  }
+}
+async function loadPublico() {
+  document.getElementById('tabTitle').textContent = 'Publico';
+  document.getElementById('tabBody').innerHTML = '<p class="muted">Carregando...</p>';
+
+  try {
+    var exc = await api('/api/crm/ui/dashboard/publico/exclusao');
+    var inc = await api('/api/crm/ui/dashboard/publico/inclusao');
+    if (!exc || exc.success === false || !inc || inc.success === false) {
+      document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>';
+      return;
+    }
+
+    window.__publicoExclusaoRows = exc.rows || [];
+    window.__publicoExclusaoCriteria = exc.criteria || [];
+    window.__publicoInclusaoRows = inc.rows || [];
+    window.__publicoInclusaoCriteria = inc.criteria || [];
+    if (!window.__publicoView) window.__publicoView = 'exclusao';
+
+    publicoInstallHeaderToggle();
+
+    document.getElementById('tabBody').innerHTML = '<div id="publicoViewContainer"></div>';
+    publicoRenderActiveView();
+  } catch (e) {
+    console.error('loadPublico error', e);
+    document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>';
+  }
+}
+
+function publicoEscapeHtml(s) { return (s || '').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function publicoInstallHeaderToggle() {
+  var rangeSelEl = document.getElementById('rangeSel');
+  var rangeWrap = rangeSelEl ? rangeSelEl.parentElement : null;
+  if (rangeWrap) {
+    window.__publicoRangeWrapEl = rangeWrap;
+    rangeWrap.style.display = 'none';
+  }
+  if (!document.getElementById('publicoHeaderToggle')) {
+    var toggleSpan = document.createElement('span');
+    toggleSpan.id = 'publicoHeaderToggle';
+    toggleSpan.innerHTML =
+      '<button id="publicoToggleExclusao" class="btn" onclick="publicoSwitchView(\'exclusao\')">Publico de Exclusao</button> ' +
+      '<button id="publicoToggleInclusao" class="btn" onclick="publicoSwitchView(\'inclusao\')">Publico de Inclusao</button>';
+    if (rangeWrap && rangeWrap.parentElement) {
+      rangeWrap.parentElement.insertBefore(toggleSpan, rangeWrap);
+    } else {
+      var titleEl = document.getElementById('tabTitle');
+      if (titleEl && titleEl.parentElement) titleEl.parentElement.appendChild(toggleSpan);
+    }
+  }
+  if (!window.__publicoHashRestoreInstalled) {
+    window.__publicoHashRestoreInstalled = true;
+    window.addEventListener('hashchange', function () {
+      if (location.hash !== '#publico') {
+        if (window.__publicoRangeWrapEl) window.__publicoRangeWrapEl.style.display = '';
+        var t = document.getElementById('publicoHeaderToggle');
+        if (t) t.remove();
+      }
+    });
+  }
+}
+
+function publicoSwitchView(view) {
+  window.__publicoView = view;
+  publicoRenderActiveView();
+}
+
+function publicoRenderActiveView() {
+  var excBtn = document.getElementById('publicoToggleExclusao');
+  var incBtn = document.getElementById('publicoToggleInclusao');
+  if (excBtn) excBtn.style.textDecoration = (window.__publicoView === 'exclusao') ? 'underline' : 'none';
+  if (incBtn) incBtn.style.textDecoration = (window.__publicoView === 'inclusao') ? 'underline' : 'none';
+  if (excBtn) excBtn.style.opacity = (window.__publicoView === 'exclusao') ? '1' : '0.6';
+  if (incBtn) incBtn.style.opacity = (window.__publicoView === 'inclusao') ? '1' : '0.6';
+
+  var container = document.getElementById('publicoViewContainer');
+  if (!container) return;
+
+  if (window.__publicoView === 'inclusao') {
+    container.innerHTML =
+      '<div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">' +
+          '<h3 style="margin:0;">Publico de Inclusao (<span id="publicoInclusaoCount">' + window.__publicoInclusaoRows.length + '</span>)</h3>' +
+          '<button class="btn" onclick="publicoExportCsv(publicoInclusaoCsvUrl())">Exportar CSV</button>' +
+        '</div>' +
+        '<p class="muted" style="font-size:12px;">Pessoas que compareceram, fecharam (Ganho), estao qualificadas ou em negociacao, em qualquer funil. Selecione um ou mais criterios.</p>' +
+        '<div style="margin-bottom:12px;">' + publicoInclusaoCheckboxesHtml() +
+          ' <button class="btn" style="margin-left:8px;" onclick="publicoSetAllInclusaoCriterios(true)">Marcar todos</button>' +
+          ' <button class="btn" onclick="publicoSetAllInclusaoCriterios(false)">Desmarcar todos</button>' +
+        '</div>' +
+        '<div id="publicoInclusaoTable"></div>' +
+      '</div>';
+    publicoRefreshInclusao();
+  } else {
+    container.innerHTML =
+      '<div>' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">' +
+          '<h3 style="margin:0;">Publico de Exclusao (<span id="publicoExclusaoCount">' + window.__publicoExclusaoRows.length + '</span>)</h3>' +
+          '<button class="btn" onclick="publicoExportCsv(publicoExclusaoCsvUrl())">Exportar CSV</button>' +
+        '</div>' +
+        '<p class="muted" style="font-size:12px;">Leads perdidos do funil Inbound. Selecione um ou mais criterios abaixo para montar a lista de exclusao.</p>' +
+        '<div style="margin-bottom:12px;">' + publicoExclusaoCheckboxesHtml() +
+          ' <button class="btn" style="margin-left:8px;" onclick="publicoSetAllCriterios(true)">Marcar todos</button>' +
+          ' <button class="btn" onclick="publicoSetAllCriterios(false)">Desmarcar todos</button>' +
+        '</div>' +
+        '<div id="publicoExclusaoTable"></div>' +
+      '</div>';
+    publicoRefreshExclusao();
+  }
+}
+
+function publicoExclusaoCheckboxesHtml() {
+  return (window.__publicoExclusaoCriteria || []).map(function(c){
+    return '<label style="margin-right:16px;display:inline-flex;align-items:center;gap:4px;font-size:13px;">' +
+      '<input type="checkbox" class="publico-criterio-chk" value="' + c.key + '" checked onchange="publicoRefreshExclusao()"> ' + publicoEscapeHtml(c.label) +
+      '</label>';
+  }).join('');
+}
+
+function publicoInclusaoCheckboxesHtml() {
+  return (window.__publicoInclusaoCriteria || []).map(function(c){
+    return '<label style="margin-right:16px;display:inline-flex;align-items:center;gap:4px;font-size:13px;">' +
+      '<input type="checkbox" class="publico-inclusao-criterio-chk" value="' + c.key + '" checked onchange="publicoRefreshInclusao()"> ' + publicoEscapeHtml(c.label) +
+      '</label>';
+  }).join('');
+}
+
+function publicoSelectedCriterios() {
+  return Array.from(document.querySelectorAll('.publico-criterio-chk:checked')).map(function(el){ return el.value; });
+}
+
+function publicoSelectedInclusaoCriterios() {
+  return Array.from(document.querySelectorAll('.publico-inclusao-criterio-chk:checked')).map(function(el){ return el.value; });
+}
+
+function publicoExclusaoCsvUrl() {
+  var sel = publicoSelectedCriterios();
+  var qs = sel.length ? ('?criterios=' + encodeURIComponent(sel.join(','))) : '?criterios=__none__';
+  return '/api/crm/ui/dashboard/publico/exclusao.csv' + qs;
+}
+
+function publicoInclusaoCsvUrl() {
+  var sel = publicoSelectedInclusaoCriterios();
+  var qs = sel.length ? ('?criterios=' + encodeURIComponent(sel.join(','))) : '?criterios=__none__';
+  return '/api/crm/ui/dashboard/publico/inclusao.csv' + qs;
+}
+
+function publicoRowsToTable(rows) {
+  var tableRows = rows.map(function(r){
+    return [publicoEscapeHtml(r.name), publicoEscapeHtml(r.phone), publicoEscapeHtml(r.email) || '-', publicoEscapeHtml(r.reasons)];
+  });
+  return tableHtml(['Nome','Telefone','Email','Motivo'], tableRows);
+}
+
+function publicoRefreshExclusao() {
+  var sel = publicoSelectedCriterios();
+  var all = window.__publicoExclusaoRows || [];
+  var filtered = sel.length ? all.filter(function(r){
+    if (!r.criterios) return false;
+    return sel.some(function(k){ return r.criterios[k]; });
+  }) : [];
+  var countEl = document.getElementById('publicoExclusaoCount');
+  if (countEl) countEl.textContent = filtered.length;
+  var tableEl = document.getElementById('publicoExclusaoTable');
+  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered);
+}
+
+function publicoRefreshInclusao() {
+  var sel = publicoSelectedInclusaoCriterios();
+  var all = window.__publicoInclusaoRows || [];
+  var filtered = sel.length ? all.filter(function(r){
+    if (!r.criterios) return false;
+    return sel.some(function(k){ return r.criterios[k]; });
+  }) : [];
+  var countEl = document.getElementById('publicoInclusaoCount');
+  if (countEl) countEl.textContent = filtered.length;
+  var tableEl = document.getElementById('publicoInclusaoTable');
+  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered);
+}
+
+function publicoSetAllCriterios(checked) {
+  document.querySelectorAll('.publico-criterio-chk').forEach(function(el){ el.checked = checked; });
+  publicoRefreshExclusao();
+}
+
+function publicoSetAllInclusaoCriterios(checked) {
+  document.querySelectorAll('.publico-inclusao-criterio-chk').forEach(function(el){ el.checked = checked; });
+  publicoRefreshInclusao();
+}
+
+async function loadAgenda() {
+  document.getElementById('tabTitle').textContent = 'Agenda';
+  var d = await api('/api/crm/ui/dashboard/agenda');
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var kpis = '<div class="kpi-grid">' +
+    '<div class="kpi-card"><div class="lbl">Hoje</div><div class="val">' + d.hoje + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Atrasadas</div><div class="val">' + d.atrasadas + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Proximos 7 dias</div><div class="val">' + d.proximos7 + '</div></div>' +
+    '</div>';
+  var rows = d.proximas.map(function(x){ return [x.type || '-', x.person_name || x.deal_title || '-', x.user_name || '-', x.due_at ? new Date(x.due_at).toLocaleString('pt-BR') : '-']; });
+  document.getElementById('tabBody').innerHTML = kpis + '<div style="margin-top:16px;"><h3 style="font-size:14px;margin-bottom:8px;">Proximas atividades</h3>' + tableHtml(['Tipo','Quem','Responsavel','Quando'], rows) + '</div>';
+}
+async function loadTintim() {
+  document.getElementById('tabTitle').textContent = 'Auditoria Tintim';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/tintim?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var kpis = '<div class="kpi-grid">' +
+    '<div class="kpi-card"><div class="lbl">Eventos recebidos</div><div class="val">' + d.total + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Casados com negocio</div><div class="val">' + d.matched + '</div><div class="sub">' + d.matchRate.toFixed(1) + '%</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Sem match</div><div class="val">' + d.unmatched + '</div></div>' +
+    '</div>';
+  var rows = d.recentes.map(function(x){ return [x.event_type || '-', x.phone || '-', x.deal_id || '(sem match)', new Date(x.received_at).toLocaleString('pt-BR')]; });
+  document.getElementById('tabBody').innerHTML = kpis +
+    '<div style="margin-top:16px;"><h3 style="font-size:14px;margin-bottom:8px;">Eventos recentes</h3>' + tableHtml(['Tipo','Telefone','Deal ID','Recebido'], rows) + '</div>' +
+    '<div style="margin-top:24px;"><h3 style="font-size:14px;margin-bottom:8px;">Leads no Tintim sem registro no CRM</h3><div id="tintimLeadsSemCrm">Carregando...</div></div>' +
+    '<div style="margin-top:24px;"><h3 style="font-size:14px;margin-bottom:8px;">Negocios no CRM sem rastreio confirmado</h3><div id="tintimSemRastreio">Carregando...</div></div>';
+  loadTintimLeadsSemCrm();
+  loadTintimSemRastreio();
+}
+
+async function loadTintimLeadsSemCrm() {
+  var el = document.getElementById('tintimLeadsSemCrm');
+  var d = await api('/api/crm/ui/dashboard/tintim/leads-sem-crm');
+  if (!d || d.success === false) { el.innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  if (!d.leads.length) { el.innerHTML = '<p class="muted">Nenhum lead pendente. Total: ' + d.total + '</p>'; return; }
+  var rowsHtml = d.leads.map(function(l){
+    var safePhone = String(l.phone).replace(/'/g, "\\'");
+    return '<tr><td>' + (l.name || '(sem nome)') + '</td><td>' + l.phone + '</td><td>' + (l.source || '-') + '</td>' +
+      '<td>' + new Date(l.firstSeen).toLocaleString('pt-BR') + '</td>' +
+      '<td><button class="btn btn-sm" onclick="importarTintimLead(\'' + safePhone + '\', this)">Importar para o CRM</button></td></tr>';
+  }).join('');
+  el.innerHTML = '<p class="muted" style="margin-bottom:8px;">Total: ' + d.total + (d.total > d.leads.length ? ' (mostrando ' + d.leads.length + ' mais recentes)' : '') + '</p>' +
+    '<table class="tbl"><thead><tr><th>Nome</th><th>Telefone</th><th>Origem (Tintim)</th><th>1a interacao</th><th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+}
+
+async function importarTintimLead(phone, btn) {
+  btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Importando...';
+  try {
+    var r = await api('/api/crm/ui/dashboard/tintim/importar', { method: 'POST', body: JSON.stringify({ phone: phone }) });
+    if (r && r.success) {
+      btn.textContent = 'Importado!';
+      var row = btn.closest('tr'); if (row) row.style.opacity = '0.5';
+      setTimeout(function(){ loadTintimLeadsSemCrm(); }, 800);
+    } else {
+      btn.disabled = false; btn.textContent = orig;
+      alert('Erro ao importar: ' + (r && r.error || 'desconhecido'));
+    }
+  } catch (e) { btn.disabled = false; btn.textContent = orig; alert('Erro ao importar'); }
+}
+
+async function loadTintimSemRastreio() {
+  var el = document.getElementById('tintimSemRastreio');
+  var d = await api('/api/crm/ui/dashboard/tintim/sem-rastreio');
+  if (!d || d.success === false) { el.innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  if (!d.deals.length) { el.innerHTML = '<p class="muted">Nenhum negocio sem rastreio. Total: ' + d.total + '</p>'; return; }
+  var rowsHtml = d.deals.map(function(x){
+    var badge = '<span style="background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:10px;font-size:11px;">sem rastreio</span>';
+    return '<tr><td><a href="detail.html?id=' + x.id + '" style="color:#4f46e5;text-decoration:none;">' + (x.pname || x.title) + '</a></td>' +
+      '<td>' + (x.phone || '-') + '</td><td>' + (x.origem || '-') + '</td>' +
+      '<td>' + new Date(x.created_at).toLocaleDateString('pt-BR') + '</td><td>' + badge + '</td></tr>';
+  }).join('');
+  el.innerHTML = '<p class="muted" style="margin-bottom:8px;">Total: ' + d.total + (d.total > d.deals.length ? ' (mostrando ' + d.deals.length + ' mais recentes)' : '') + '</p>' +
+    '<table class="tbl"><thead><tr><th>Paciente</th><th>Telefone</th><th>Origem</th><th>Data de entrada</th><th></th></tr></thead><tbody>' + rowsHtml + '</tbody></table>';
+}
+
+async function loadCrmIntel() {
+  document.getElementById('tabTitle').textContent = 'CRM Intelligence';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/crmintel?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  var funilRows = d.funil.map(function(x){ return [x.label, x.c]; });
+  var rottingRows = d.rotting.map(function(x){ var nm = String(x.title || ('#'+x.id)).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]; }); return ['<a href="detail.html?id=' + x.id + '" style="color:#4f46e5;text-decoration:none;">' + nm + '</a>', x.stage, x.dias + ' dias']; });
+  var perdasRows = d.perdas.map(function(x){ return [x.motivo, x.c]; });
+  document.getElementById('tabBody').innerHTML =
+    '<h3 style="font-size:14px;margin-bottom:8px;">Funil (negocios abertos por etapa)</h3>' + tableHtml(['Etapa','Negocios'], funilRows) +
+    '<div style="margin-top:20px;"><h3 style="font-size:14px;margin-bottom:8px;">Parados ha mais tempo</h3>' + tableHtml(['Negocio','Etapa','Tempo parado'], rottingRows) + '</div>' +
+    '<div style="margin-top:20px;"><h3 style="font-size:14px;margin-bottom:8px;">Motivos de perda</h3>' + tableHtml(['Motivo','Qtd'], perdasRows) + '</div>';
+}
+
+var metaAdsCache = null;
+var metaAdsRange = null;
+var metaAdsSort = { key: null, dir: 'desc' };
+function metaAdsTh(label, key) {
+  var arrow = metaAdsSort.key === key ? (metaAdsSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  return '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-weight:600;cursor:pointer;user-select:none;" onclick="sortMetaAds(&quot;' + key + '&quot;)">' + label + arrow + '</th>';
+}
+function metaAdsKeyVal(x, key) {
+  if (key === 'roas') return x.spend > 0 ? (x.receita / x.spend) : null;
+  return x[key];
+}
+function metaAdsComparator(a, b) {
+  var k = metaAdsSort.key, dir = metaAdsSort.dir === 'asc' ? 1 : -1;
+  var av = metaAdsKeyVal(a, k), bv = metaAdsKeyVal(b, k);
+  if (typeof av === 'string' || typeof bv === 'string') {
+    av = (av === null || av === undefined) ? '' : String(av).toLowerCase();
+    bv = (bv === null || bv === undefined) ? '' : String(bv).toLowerCase();
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  }
+  if (av === null || av === undefined) av = -Infinity;
+  if (bv === null || bv === undefined) bv = -Infinity;
+  if (av < bv) return -1 * dir;
+  if (av > bv) return 1 * dir;
+  return 0;
+}
+function sortMetaAds(key) {
+  if (!metaAdsCache) return;
+  if (metaAdsSort.key === key) { metaAdsSort.dir = metaAdsSort.dir === 'asc' ? 'desc' : 'asc'; }
+  else { metaAdsSort.key = key; metaAdsSort.dir = 'desc'; }
+  renderMetaAdsTable();
+}
+async function loadMetaAds() {
+  document.getElementById('tabTitle').textContent = 'Meta Ads';
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/metaads?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  metaAdsCache = d;
+  metaAdsRange = r;
+  renderMetaAdsTable();
+}
+function renderMetaAdsTable() {
+  var d = metaAdsCache; var r = metaAdsRange;
+  if (!d) return;
+  var kpis = '<div class="kpi-grid">' +
+    '<div class="kpi-card"><div class="lbl">Investimento</div><div class="val">' + fmtMoney(d.totalSpend) + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Leads (CRM)</div><div class="val">' + d.totalLeads + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Vendas (CRM)</div><div class="val">' + d.totalVendas + '</div></div>' +
+    '<div class="kpi-card"><div class="lbl">Receita (CRM)</div><div class="val">' + fmtMoney(d.totalReceita) + '</div></div>' +
+    '</div>';
+  var campanhas = (d.campanhas || []).slice();
+  if (metaAdsSort.key) { campanhas.sort(metaAdsComparator); }
+  var rows = campanhas.map(function(x) {
+    return [x.campanha, fmtMoney(x.spend), x.impressions, x.clicks, clickableMetaAds(x.campanha, 'leads', r.from, r.to, x.leads), clickableMetaAds(x.campanha, 'vendas', r.from, r.to, x.vendas), clickableMetaAds(x.campanha, 'receita', r.from, r.to, fmtMoney(x.receita)), (x.spend > 0 ? (x.receita / x.spend).toFixed(2) + 'x' : '-'), x.cpl ? fmtMoney(x.cpl) : '-'];
+  });
+  var theadHtml = '<tr>' + metaAdsTh('Campanha','campanha') + metaAdsTh('Investimento','spend') + metaAdsTh('Impressoes','impressions') + metaAdsTh('Cliques','clicks') + metaAdsTh('Leads','leads') + metaAdsTh('Vendas','vendas') + metaAdsTh('Receita','receita') + metaAdsTh('ROAS','roas') + metaAdsTh('CPL','cpl') + '</tr>';
+  var tableHtmlStr = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead>' + theadHtml + '</thead><tbody>';
+  rows.forEach(function(r2){ tableHtmlStr += '<tr>' + r2.map(function(c){return '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">'+c+'</td>'}).join('') + '</tr>'; });
+  tableHtmlStr += '</tbody></table>';
+  document.getElementById('tabBody').innerHTML = kpis + tableHtmlStr;
+}
+var gAdsCache = null;
+var gAdsRange = null;
+var gAdsSort = { key: null, dir: 'desc' };
+function gAdsTh(label, key) {
+  var arrow = gAdsSort.key === key ? (gAdsSort.dir === 'asc' ? ' ▲' : ' ▼') : '';
+  return '<th style="text-align:left;padding:8px;border-bottom:2px solid #e5e7eb;color:#6b7280;font-weight:600;cursor:pointer;user-select:none;" onclick="sortGAds(&quot;' + key + '&quot;)">' + label + arrow + '</th>';
+}
+function gAdsKeyVal(x, key) {
+  if (key === 'roas') return x.spend > 0 ? (x.receita / x.spend) : null;
+  return x[key];
+}
+function gAdsComparator(a, b) {
+  var k = gAdsSort.key, dir = gAdsSort.dir === 'asc' ? 1 : -1;
+  var av = gAdsKeyVal(a, k), bv = gAdsKeyVal(b, k);
+  if (typeof av === 'string' || typeof bv === 'string') {
+    av = (av === null || av === undefined) ? '' : String(av).toLowerCase();
+    bv = (bv === null || bv === undefined) ? '' : String(bv).toLowerCase();
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  }
+  if (av === null || av === undefined) av = -Infinity;
+  if (bv === null || bv === undefined) bv = -Infinity;
+  if (av < bv) return -1 * dir;
+  if (av > bv) return 1 * dir;
+  return 0;
+}
+function sortGAds(key) {
+  if (!gAdsCache) return;
+  if (gAdsSort.key === key) { gAdsSort.dir = gAdsSort.dir === 'asc' ? 'desc' : 'asc'; }
+  else { gAdsSort.key = key; gAdsSort.dir = 'desc'; }
+  renderGoogleAdsTable();
+}
+async function loadGoogleAds() {
+document.getElementById('tabTitle').textContent = 'Google Ads';
+var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+var d = await api('/api/crm/ui/dashboard/googleads?from=' + r.from + '&to=' + r.to);
+if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+gAdsCache = d;
+gAdsRange = r;
+renderGoogleAdsTable();
+}
+function clickableCampaigns(campanha, metric, from, to, val) {
+  var safe = String(campanha).replace(/'/g, "\\'");
+  return '<span style="cursor:pointer;text-decoration:underline;" onclick="openCampaignsDrilldown(\'' + safe + '\',\'' + metric + '\',\'' + from + '\',\'' + to + '\')">' + val + '</span>';
+}
+async function openCampaignsDrilldown(campanha, metric, from, to) {
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  var metricLabel = metric === 'leads' ? 'Leads' : (metric === 'vendas' ? 'Vendas' : 'Receita');
+  document.getElementById('sddTitle').textContent = campanha + ' - ' + metricLabel;
+  document.getElementById('sddSummary').innerHTML = 'Carregando...';
+  document.getElementById('sddList').innerHTML = '';
+  try {
+    var d = await api('/api/crm/ui/dashboard/campaigns/drilldown?campanha=' + encodeURIComponent(campanha) + '&metric=' + metric + '&from=' + from + '&to=' + to);
+    if (!d || d.success === false) { document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.'; return; }
+    var deals = d.deals || [];
+    document.getElementById('sddSummary').innerHTML = deals.length + ' negocio(s)';
+    document.getElementById('sddList').innerHTML = deals.map(function(row) {
+      var when = row.add_date ? new Date(row.add_date).toLocaleString('pt-BR') : '-';
+      var statusLabel = row.status === 'won' ? 'Ganho' : (row.status === 'lost' ? 'Perdido' : 'Aberto');
+      var valTxt = row.value && Number(row.value) > 0 ? ' - ' + fmtMoney(row.value) : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;"><a href="detail.html?id=' + row.id + '" target="_blank" style="color:#111827;text-decoration:none;">' + (row.title || ('Deal #' + row.id)) + '</a></div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + ' - ' + statusLabel + valTxt + '</div>' +
+        '</div>';
+    }).join('') || '<p class="muted">Nenhum negocio encontrado.</p>';
+  } catch (e) {
+    document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.';
+  }
+}
+function clickableCreatives(criativo, metric, from, to, val) {
+  var safe = String(criativo).replace(/'/g, "\\'");
+  return '<span style="cursor:pointer;text-decoration:underline;" onclick="openCreativesDrilldown(\'' + safe + '\',\'' + metric + '\',\'' + from + '\',\'' + to + '\')">' + val + '</span>';
+}
+async function openCreativesDrilldown(criativo, metric, from, to) {
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  var metricLabel = metric === 'leads' ? 'Leads' : (metric === 'vendas' ? 'Vendas' : 'Receita');
+  document.getElementById('sddTitle').textContent = criativo + ' - ' + metricLabel;
+  document.getElementById('sddSummary').innerHTML = 'Carregando...';
+  document.getElementById('sddList').innerHTML = '';
+  try {
+    var d = await api('/api/crm/ui/dashboard/creatives/drilldown?criativo=' + encodeURIComponent(criativo) + '&metric=' + metric + '&from=' + from + '&to=' + to);
+    if (!d || d.success === false) { document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.'; return; }
+    var deals = d.deals || [];
+    document.getElementById('sddSummary').innerHTML = deals.length + ' negocio(s)';
+    document.getElementById('sddList').innerHTML = deals.map(function(row) {
+      var when = row.add_date ? new Date(row.add_date).toLocaleString('pt-BR') : '-';
+      var statusLabel = row.status === 'won' ? 'Ganho' : (row.status === 'lost' ? 'Perdido' : 'Aberto');
+      var valTxt = row.value && Number(row.value) > 0 ? ' - ' + fmtMoney(row.value) : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;"><a href="detail.html?id=' + row.id + '" target="_blank" style="color:#111827;text-decoration:none;">' + (row.title || ('Deal #' + row.id)) + '</a></div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + ' - ' + statusLabel + valTxt + '</div>' +
+        '</div>';
+    }).join('') || '<p class="muted">Nenhum negocio encontrado.</p>';
+  } catch (e) {
+    document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.';
+  }
+}
+function clickableMetaAds(campanha, metric, from, to, val) {
+  var safe = String(campanha).replace(/'/g, "\\'");
+  return '<span style="cursor:pointer;text-decoration:underline;" onclick="openMetaAdsDrilldown(\'' + safe + '\',\'' + metric + '\',\'' + from + '\',\'' + to + '\')">' + val + '</span>';
+}
+async function openMetaAdsDrilldown(campanha, metric, from, to) {
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  var metricLabel = metric === 'leads' ? 'Leads' : (metric === 'vendas' ? 'Vendas' : 'Receita');
+  document.getElementById('sddTitle').textContent = campanha + ' - ' + metricLabel;
+  document.getElementById('sddSummary').innerHTML = 'Carregando...';
+  document.getElementById('sddList').innerHTML = '';
+  try {
+    var d = await api('/api/crm/ui/dashboard/metaads/drilldown?campanha=' + encodeURIComponent(campanha) + '&metric=' + metric + '&from=' + from + '&to=' + to);
+    if (!d || d.success === false) { document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.'; return; }
+    var deals = d.deals || [];
+    document.getElementById('sddSummary').innerHTML = deals.length + ' negocio(s)';
+    document.getElementById('sddList').innerHTML = deals.map(function(row) {
+      var when = row.add_date ? new Date(row.add_date).toLocaleString('pt-BR') : '-';
+      var statusLabel = row.status === 'won' ? 'Ganho' : (row.status === 'lost' ? 'Perdido' : 'Aberto');
+      var valTxt = row.value && Number(row.value) > 0 ? ' - ' + fmtMoney(row.value) : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;"><a href="detail.html?id=' + row.id + '" target="_blank" style="color:#111827;text-decoration:none;">' + (row.title || ('Deal #' + row.id)) + '</a></div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + ' - ' + statusLabel + valTxt + '</div>' +
+        '</div>';
+    }).join('') || '<p class="muted">Nenhum negocio encontrado.</p>';
+  } catch (e) {
+    document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.';
+  }
+}
+function clickableGAds(campanha, metric, from, to, val) {
+var safe = String(campanha).replace(/'/g, "\\'");
+return '<span style="cursor:pointer;text-decoration:underline;" onclick="openGAdsDrilldown(\'' + safe + '\', \'' + metric + '\', \'' + from + '\', \'' + to + '\')">' + val + '</span>';
+}
+function renderGoogleAdsTable() {
+var d = gAdsCache; var r = gAdsRange;
+if (!d) return;
+var updated = d.updatedAt ? new Date(d.updatedAt).toLocaleString('pt-BR') : '-';
+var kpis = '<div class="kpi-grid">' +
+'<div class="kpi-card"><div class="lbl">Investimento</div><div class="val">' + fmtMoney(d.totalSpend) + '</div><div class="sub">Atualizado ' + updated + '</div></div>' +
+'<div class="kpi-card"><div class="lbl">Leads (CRM)</div><div class="val">' + d.totalLeads + '</div></div>' +
+'<div class="kpi-card"><div class="lbl">Vendas (CRM)</div><div class="val">' + d.totalVendas + '</div></div>' +
+'<div class="kpi-card"><div class="lbl">Receita (CRM)</div><div class="val">' + fmtMoney(d.totalReceita) + '</div></div>' +
+'</div>';
+var prevCb = document.getElementById('gAdsActiveOnly');
+var onlyActive = prevCb ? prevCb.checked : false;
+var checkboxHtml = '<div style="margin:12px 0;"><label style="font-size:13px;cursor:pointer;"><input type="checkbox" id="gAdsActiveOnly" onchange="renderGoogleAdsTable()"' + (onlyActive ? ' checked' : '') + '> Mostrar apenas campanhas ativas</label></div>';
+var campanhas = (d.campanhas || []).filter(function(x) { return !onlyActive || x.status === 'ENABLED'; });
+  if (gAdsSort.key) { campanhas.sort(gAdsComparator); }
+var rows = campanhas.map(function(x) {
+    var roasVal = x.spend > 0 ? (x.receita / x.spend).toFixed(2) + 'x' : '-';
+return [x.campanha, x.status, fmtMoney(x.spend), x.impressions, x.clicks, x.conversions,
+clickableGAds(x.campanha, 'leads', r.from, r.to, x.leads),
+clickableGAds(x.campanha, 'vendas', r.from, r.to, x.vendas),
+    roasVal,
+clickableGAds(x.campanha, 'receita', r.from, r.to, fmtMoney(x.receita))];
+});
+  var theadHtml = '<tr>' + gAdsTh('Campanha','campanha') + gAdsTh('Status','status') + gAdsTh('Investimento','spend') + gAdsTh('Impressoes','impressions') + gAdsTh('Cliques','clicks') + gAdsTh('Conversoes Google','conversions') + gAdsTh('Leads CRM','leads') + gAdsTh('Vendas CRM','vendas') + gAdsTh('ROAS','roas') + gAdsTh('Receita CRM','receita') + '</tr>';
+  var tableHtmlStr = '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead>' + theadHtml + '</thead><tbody>';
+  rows.forEach(function(r2){ tableHtmlStr += '<tr>' + r2.map(function(c){return '<td style="padding:8px;border-bottom:1px solid #f3f4f6;">'+c+'</td>'}).join('') + '</tr>'; });
+  tableHtmlStr += '</tbody></table>';
+  document.getElementById('tabBody').innerHTML = kpis + checkboxHtml + tableHtmlStr;
+}
+async function openGAdsDrilldown(campanha, metric, from, to) {
+document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+var metricLabel = metric === 'leads' ? 'Leads' : (metric === 'vendas' ? 'Vendas' : 'Receita');
+document.getElementById('sddTitle').textContent = campanha + ' - ' + metricLabel;
+document.getElementById('sddSummary').innerHTML = 'Carregando...';
+document.getElementById('sddList').innerHTML = '';
+try {
+var d = await api('/api/crm/ui/dashboard/googleads/drilldown?campanha=' + encodeURIComponent(campanha) + '&metric=' + metric + '&from=' + from + '&to=' + to);
+if (!d || d.success === false) { document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.'; return; }
+var deals = d.deals || [];
+document.getElementById('sddSummary').innerHTML = deals.length + ' negocio(s)';
+document.getElementById('sddList').innerHTML = deals.map(function(row) {
+var when = row.add_date ? new Date(row.add_date).toLocaleString('pt-BR') : '-';
+var statusLabel = row.status === 'won' ? 'Ganho' : (row.status === 'lost' ? 'Perdido' : 'Aberto');
+var valTxt = row.value && Number(row.value) > 0 ? ' - ' + fmtMoney(row.value) : '';
+return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+'<div style="font-weight:600;"><a href="detail.html?id=' + row.id + '" target="_blank" style="color:#111827;text-decoration:none;">' + (row.title || ('Deal #' + row.id)) + '</a></div>' +
+'<div style="font-size:12px;color:#6b7280;">' + when + ' - ' + statusLabel + valTxt + '</div>' +
+'</div>';
+}).join('') || '<p class="muted">Nenhum negocio encontrado.</p>';
+} catch (e) {
+document.getElementById('sddSummary').innerHTML = 'Erro ao carregar.';
+}
+}
+
+function showPlaceholder(title){
+  document.getElementById('tabTitle').textContent = title;
+  document.getElementById('tabBody').innerHTML = '<p class="muted">Em construcao - essa aba ainda sera migrada para dados do CRM.</p>';
+}
+const TAB_TITLES = { crmintel:'CRM Intelligence', tintim:'Auditoria Tintim', mktpago:'MKT PAGO', googleads:'Google Ads', metaads:'Meta Ads', campaigns:'Campaigns', creatives:'Creatives', publico:'Publico', agenda:'Agenda', professionals:'Professionals', sdrs:'SDRs', whatsapp:'WhatsApp Analytics', diretoria:'Diretoria', usuarios:'Usuarios' };
+document.querySelectorAll('.dash-nav a').forEach(a => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.dash-nav a').forEach(x => x.classList.remove('active'));
+    a.classList.add('active');
+    const tab = a.dataset.tab;
+    if (tab === 'executive') { document.getElementById('tabTitle').textContent = 'Executive Dashboard'; loadExecutive(); }
+    else { showPlaceholder(TAB_TITLES[tab] || tab); }
+  });
+});
+function dispatchRangeReload(){
+  var tab = (location.hash||'').replace('#','');
+  activateTab(tab);
+}
+document.getElementById('rangeSel').addEventListener('change', function(){
+  var wrap = document.getElementById('customRangeWrap');
+  if (this.value === 'custom') {
+    if (wrap) wrap.style.display = 'inline-flex';
+  } else {
+    if (wrap) wrap.style.display = 'none';
+    dispatchRangeReload();
+  }
+});
+var _customApplyBtn = document.getElementById('customApplyBtn');
+if (_customApplyBtn) { _customApplyBtn.addEventListener('click', function(){
+  var cf = document.getElementById('customFrom');
+  var ct = document.getElementById('customTo');
+  if (!cf.value || !ct.value) { return; }
+  dispatchRangeReload();
+}); }
+var __prevTab = (typeof __prevTab === 'undefined') ? null : __prevTab;
+function activateTab(t){
+var tab = t || 'executive';
+var __enteringFresh = (__prevTab !== tab);
+__prevTab = tab;
+  var __rsSelEl = document.getElementById('rangeSel'); if (__rsSelEl && __rsSelEl.parentElement) { __rsSelEl.parentElement.style.display = (tab === 'diretoria') ? 'none' : ''; }
+document.querySelectorAll('#crmSidebar a').forEach(function(a){
+var href = a.getAttribute('href') || '';
+var hp = href.indexOf('#') !== -1 ? href.split('#')[1] : null;
+if (hp === tab) a.classList.add('active'); else a.classList.remove('active');
+});
+if (tab === 'executive') {
+document.getElementById('tabTitle').textContent = 'Executive Dashboard';
+loadExecutive();
+} else if (tab === 'sdrs') { if (__enteringFresh) { var __rsEl = document.getElementById('rangeSel'); if (__rsEl) { __rsEl.value = 'today'; } } loadSdrs();
+} else if (tab === 'professionals') { loadProfessionals();
+} else if (tab === 'campaigns') { loadCampaigns();
+} else if (tab === 'creatives') { loadCreatives();
+} else if (tab === 'publico') { loadPublico();
+} else if (tab === 'agenda') { loadAgenda();
+} else if (tab === 'tintim') { loadTintim();
+} else if (tab === 'crmintel') { loadCrmIntel();
+} else if (tab === 'metaads') { loadMetaAds();
+} else if (tab === 'googleads') { loadGoogleAds(); } else if (tab === 'mktpago') { loadMktPago();
+} else if (tab === 'usuarios') { loadUsuarios();
+} else if (tab === 'diretoria') { loadDiretoria();
+} else if (TAB_TITLES[tab]) {
+showPlaceholder(TAB_TITLES[tab]);
+} else {
+loadExecutive();
+}
+}
+window.addEventListener('hashchange', function(){ activateTab((location.hash||'').replace('#','')); });
+activateTab((location.hash||'').replace('#',''));
+</script>
+<div class="modal-overlay" id="sdrDrilldownOverlay" style="display:none;">
+<div class="modal-box" style="width:640px;max-width:92vw;">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;" id="sddTitle">Detalhe</h2><button class="btn" style="padding:4px 10px;" onclick="closeSdrDrilldown()">Fechar</button></div>
+<div id="sddSummary" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+<div id="sddList" style="max-height:420px;overflow-y:auto;"></div>
+</div>
+</div>
+<div class="modal-overlay" id="diretoriaDrilldownOverlay" style="display:none;">
+  <div class="modal-box" style="width:640px;max-width:92vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;" id="dddTitle">Detalhe</h2><button class="btn" style="padding:4px 10px;" onclick="closeDiretoriaDrilldown()">Fechar</button></div>
+    <div id="dddSummary" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <div id="dddList" style="max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+<script>
+function openDiretoriaDrilldown(indKey, label, from, to){
+  document.getElementById('dddTitle').textContent = label;
+  document.getElementById('diretoriaDrilldownOverlay').style.display = 'flex';
+  loadDiretoriaDrilldown(indKey, from, to);
+}
+function closeDiretoriaDrilldown(){
+  document.getElementById('diretoriaDrilldownOverlay').style.display = 'none';
+}
+async function loadDiretoriaDrilldown(indKey, from, to){
+  var summaryEl = document.getElementById('dddSummary');
+  var listEl = document.getElementById('dddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/diretoria/drilldown?indicador=' + encodeURIComponent(indKey) + '&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    if (d.noDrilldown) { summaryEl.textContent = ''; listEl.innerHTML = '<p class="muted">Detalhamento nao disponivel para este indicador.</p>'; return; }
+    summaryEl.textContent = d.rows.length + ' registro(s)';
+    if (!d.rows.length) { listEl.innerHTML = '<p class="muted">Nenhum registro no periodo.</p>'; return; }
+    listEl.innerHTML = d.rows.map(function(row){
+      var when = row.date ? new Date(row.date).toLocaleString('pt-BR') : '-';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;">' + (row.title || ('Deal #' + row.dealId)) + '</div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + (row.value ? ' - ' + fmtMoney(row.value) : '') + '</div>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+</script>
+<div class="modal-overlay" id="execFunilDrilldownOverlay" style="display:none;">
+  <div class="modal-box" style="width:640px;max-width:92vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;" id="efdTitle">Detalhe</h2><button class="btn" style="padding:4px 10px;" onclick="closeExecFunilDrilldown()">Fechar</button></div>
+    <div id="efdSummary" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <div id="efdList" style="max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+<script>
+function openExecFunilDrilldown(label, from, to){
+  document.getElementById('efdTitle').textContent = label;
+  document.getElementById('execFunilDrilldownOverlay').style.display = 'flex';
+  loadExecFunilDrilldown(label, from, to);
+}
+function closeExecFunilDrilldown(){
+  document.getElementById('execFunilDrilldownOverlay').style.display = 'none';
+}
+async function loadExecFunilDrilldown(label, from, to){
+  var summaryEl = document.getElementById('efdSummary');
+  var listEl = document.getElementById('efdList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/executive/drilldown?indicador=' + encodeURIComponent(label) + '&from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    if (d.noDrilldown) { summaryEl.textContent = ''; listEl.innerHTML = '<p class="muted">Detalhamento nao disponivel para este indicador.</p>'; return; }
+    summaryEl.textContent = d.rows.length + ' registro(s)';
+    if (!d.rows.length) { listEl.innerHTML = '<p class="muted">Nenhum registro no periodo.</p>'; return; }
+    listEl.innerHTML = d.rows.map(function(row){
+      var when = row.date ? new Date(row.date).toLocaleString('pt-BR') : '-';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;">' + (row.title || ('Deal #' + row.dealId)) + '</div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + (row.value ? ' - ' + fmtMoney(row.value) : '') + '</div>' +
+        '</div>';
+    }).join('');
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+</script>
+
+<div class="modal-overlay" id="vendasDrilldownOverlay" style="display:none;">
+  <div class="modal-box" style="width:640px;max-width:92vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;" id="vddTitle">Vendas por Origem</h2><button class="btn" style="padding:4px 10px;" onclick="closeVendasDrilldown()">Fechar</button></div>
+    <div id="vddSummary" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <div id="vddList" style="max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+<script>
+function normOrigem(s){ return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase(); }
+function openVendasDrilldown(from, to){
+  document.getElementById('vendasDrilldownOverlay').style.display = 'flex';
+  loadVendasDrilldown(from, to);
+}
+function closeVendasDrilldown(){
+  document.getElementById('vendasDrilldownOverlay').style.display = 'none';
+}
+async function loadVendasDrilldown(from, to){
+  var summaryEl = document.getElementById('vddSummary');
+  var listEl = document.getElementById('vddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/executive/vendas-drilldown?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    var groups = d.groups || [];
+    var rows = d.rows || [];
+    if (!rows.length) { summaryEl.innerHTML = ''; listEl.innerHTML = '<p class="muted">Nenhuma venda no periodo.</p>'; return; }
+    var totalVendas = groups.reduce(function(s,g){ return s + Number(g.vendas||0); }, 0);
+    var totalReceita = groups.reduce(function(s,g){ return s + Number(g.receita||0); }, 0);
+    var groupRows = groups.map(function(g){ return [g.origem, String(g.vendas), fmtMoney(g.receita)]; });
+    groupRows.push(['Total', String(totalVendas), fmtMoney(totalReceita)]);
+    summaryEl.innerHTML = tableHtml(['Origem','Vendas','Valor'], groupRows);
+    var byOrigem = {};
+    rows.forEach(function(row){
+      var key = normOrigem(row.origem || 'Sem origem');
+      (byOrigem[key] = byOrigem[key] || []).push(row);
+    });
+    var order = groups.map(function(g){ return g.origem; });
+    listEl.innerHTML = order.map(function(origem){
+      var list = byOrigem[normOrigem(origem)] || [];
+      var itemsHtml = list.map(function(row){
+        var when = row.date ? new Date(row.date).toLocaleString('pt-BR') : '-';
+        return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+          '<div style="font-weight:600;">' + (row.title || ('Deal #' + row.dealId)) + '</div>' +
+          '<div style="font-size:12px;color:#6b7280;">' + when + (row.value ? ' - ' + fmtMoney(row.value) : '') + '</div>' +
+          '</div>';
+      }).join('');
+      return '<h3 style="margin:16px 0 6px;font-size:14px;">' + origem + ' (' + list.length + ')</h3>' + itemsHtml;
+    }).join('');
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+</script>
+<div class="modal-overlay" id="mktPagoDrilldownOverlay" style="display:none;">
+  <div class="modal-box" style="width:640px;max-width:92vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;" id="mktPagoDDTitle">Detalhe</h2><button class="btn" style="padding:4px 10px;" onclick="closeMktPagoDrilldown()">Fechar</button></div>
+    <div id="mktPagoDDSummary" style="font-size:13px;color:#666;margin-bottom:10px;"></div>
+    <div id="mktPagoDDList" style="max-height:420px;overflow-y:auto;"></div>
+  </div>
+</div>
+<script>
+var mktPagoCache = null;
+var mktPagoRange = null;
+async function loadMktPago() {
+  document.getElementById('tabTitle').textContent = 'MKT PAGO';
+  var selVal = document.getElementById('rangeSel').value;
+  var r = rangeDates(selVal);
+  var d = await api('/api/crm/ui/dashboard/mktpago?from=' + r.from + '&to=' + r.to);
+  if (!d || d.success === false) { document.getElementById('tabBody').innerHTML = '<p class="muted">Erro ao carregar.</p>'; return; }
+  (d.rows || []).forEach(function(row) {
+        row.respondedPct = row.leads ? (row.responded / row.leads * 100) : null;
+        row.neverRespondedPct = row.leads ? (row.neverResponded / row.leads * 100) : null;
+        row.respondedThenStoppedPct = row.leads ? (row.respondedThenStopped / row.leads * 100) : null;
+        row.qualifiedPct = row.leads ? (row.qualified / row.leads * 100) : null;
+      });
+      mktPagoCache = d;
+  mktPagoRange = r;
+  renderMktPagoTable();
+}
+function mktPagoCell(row, metric, value) {
+  var safeC = String(row.criativo).replace(/'/g, "\\'");
+  var safeCa = String(row.campanha).replace(/'/g, "\\'");
+  return '<span style="cursor:pointer;text-decoration:underline;" onclick="openMktPagoDrilldown(\'' + safeC + '\', \'' + safeCa + '\', \'' + metric + '\')">' + value + '</span>';
+}
+var mktPagoSort = { key: null, dir: 'desc' };
+function mktPagoPct(leads, value) {
+if (!leads) return ' <span style="color:#999;">(-)</span>';
+var pct = (value / leads * 100);
+var pctStr = pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+return ' <span style="color:#888;font-size:12px;">(' + pctStr + '%)</span>';
+}
+function mktPagoPctCell(pct) {
+  if (pct === null || pct === undefined || isNaN(pct)) return '<span style="color:#999;">-</span>';
+  return pct.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+}
+function mktPagoSum(rows, key) {
+  return rows.reduce(function(acc, r) { var v = r[key]; return acc + (typeof v === 'number' && !isNaN(v) ? v : 0); }, 0);
+}
+function mktPagoMean(rows, key) {
+  var vals = rows.map(function(r) { return r[key]; }).filter(function(v) { return typeof v === 'number' && !isNaN(v); });
+  if (!vals.length) return null;
+  return vals.reduce(function(a, b) { return a + b; }, 0) / vals.length;
+}
+function mktPagoSummaryCell(avg, total, isMoney) {
+  var fmtNum = function(v) { return v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); };
+  var avgStr = (avg === null || avg === undefined || isNaN(avg)) ? '-' : (isMoney ? fmtMoney(avg) : fmtNum(avg));
+  var totalStr = (total === null || total === undefined || isNaN(total)) ? '-' : (isMoney ? fmtMoney(total) : Math.round(total).toLocaleString('pt-BR'));
+  return '<div style="font-size:11px;color:#666;">Média: ' + avgStr + '</div><div style="font-weight:600;">Total: ' + totalStr + '</div>';
+}
+function mktPagoTh(label, key, extra) {
+var arrow = mktPagoSort.key === key ? (mktPagoSort.dir === 'asc' ? ' \u25B2' : ' \u25BC') : '';
+return '<th style="cursor:pointer;user-select:none;" onclick="sortMktPago(&quot;' + key + '&quot;)">' + label + (extra || '') + arrow + '</th>';
+}
+function mktPagoComparator(a, b) {
+var k = mktPagoSort.key, dir = mktPagoSort.dir === 'asc' ? 1 : -1;
+var av = a[k], bv = b[k];
+if (av === null || av === undefined) av = -Infinity;
+if (bv === null || bv === undefined) bv = -Infinity;
+if (av < bv) return -1 * dir;
+if (av > bv) return 1 * dir;
+return 0;
+}
+function sortMktPago(key) {
+if (!mktPagoCache) return;
+if (mktPagoSort.key === key) {
+mktPagoSort.dir = mktPagoSort.dir === 'asc' ? 'desc' : 'asc';
+} else {
+mktPagoSort.key = key;
+mktPagoSort.dir = 'desc';
+}
+renderMktPagoTable();
+}
+function renderMktPagoTable() {
+  var d = mktPagoCache;
+  if (!d) return;
+  var rows = (d.rows || []).slice(); if (mktPagoSort.key) { rows.sort(mktPagoComparator); }
+  var mktPagoSummaryRow = '';
+  if (rows.length) {
+    mktPagoSummaryRow = '<tr style="background:#f5f7fa;font-weight:500;">' +
+      '<td colspan="3">Resumo (' + rows.length + ' campanhas)</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'leads'), mktPagoSum(rows,'leads')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'responded'), mktPagoSum(rows,'responded')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'respondedPct'), null) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'neverResponded'), mktPagoSum(rows,'neverResponded')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'neverRespondedPct'), null) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'respondedThenStopped'), mktPagoSum(rows,'respondedThenStopped')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'respondedThenStoppedPct'), null) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'qualified'), mktPagoSum(rows,'qualified')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'qualifiedPct'), null) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'avgScore'), null) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'noScore'), mktPagoSum(rows,'noScore')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'wonCount'), mktPagoSum(rows,'wonCount')) + '</td>' +
+      '<td>' + mktPagoSummaryCell(mktPagoMean(rows,'wonValue'), mktPagoSum(rows,'wonValue'), true) + '</td>' +
+      '</tr>';
+  }
+  var html = '<div class="panel" style="margin-bottom:16px;">' +
+    '<table class="tbl"><thead><tr>' +
+    '<th>Criativo</th><th>Campanha</th>' + mktPagoTh('Status da Campanha','campaignStatus') + mktPagoTh('Leads','leads') +
+    mktPagoTh('Responderam','responded',' <span title="Responderam em algum momento apos nossa primeira mensagem" style="cursor:help;color:#999;">(i)</span>') +
+    mktPagoTh('Responderam %','respondedPct') +
+    mktPagoTh('Nunca Responderam','neverResponded') +
+    mktPagoTh('Nunca Responderam %','neverRespondedPct') +
+    mktPagoTh('Responderam e Pararam','respondedThenStopped',' <span title="Tiveram pelo menos 1 resposta do paciente, mas sem nenhuma mensagem nova ha mais de 7 dias" style="cursor:help;color:#999;">(i)</span>') +
+    mktPagoTh('Responderam e Pararam %','respondedThenStoppedPct') +
+    mktPagoTh('Qualificados','qualified') +
+    mktPagoTh('Qualificados %','qualifiedPct') +
+    mktPagoTh('Score Medio','avgScore') + mktPagoTh('Sem Score','noScore') +
+    mktPagoTh('Fechamentos','wonCount',' <span title="Negocios ganhos (status=won) atribuidos a esta campanha, no periodo filtrado" style="cursor:help;color:#999;">(i)</span>') +
+    mktPagoTh('Valor Fechamento (R$)','wonValue') +
+    '</tr></thead><tbody>' + mktPagoSummaryRow;
+  if (!rows.length) {
+    html += '<tr><td colspan="16" class="muted">Nenhum lead no periodo.</td></tr>';
+  } else {
+    rows.forEach(function(row) {
+      html += '<tr>' +
+        '<td>' + escapeHtml(row.criativo) + '</td>' +
+        '<td>' + escapeHtml(row.campanha) + '</td>' +
+        '<td>' + escapeHtml(row.campaignStatus || '-') + '</td>' +
+        '<td>' + mktPagoCell(row, 'leads', row.leads) + '</td>' +
+        '<td>' + mktPagoCell(row, 'responded', row.responded) + '</td>' +
+        '<td>' + mktPagoPctCell(row.respondedPct) + '</td>' +
+        '<td>' + mktPagoCell(row, 'neverResponded', row.neverResponded) + '</td>' +
+        '<td>' + mktPagoPctCell(row.neverRespondedPct) + '</td>' +
+        '<td>' + mktPagoCell(row, 'respondedThenStopped', row.respondedThenStopped) + '</td>' +
+        '<td>' + mktPagoPctCell(row.respondedThenStoppedPct) + '</td>' +
+        '<td>' + mktPagoCell(row, 'qualified', row.qualified) + '</td>' +
+        '<td>' + mktPagoPctCell(row.qualifiedPct) + '</td>' +
+        '<td>' + (row.avgScore !== null && row.avgScore !== undefined ? row.avgScore : '-') + '</td>' +
+        '<td>' + mktPagoCell(row, 'noScore', row.noScore) + '</td>' +
+        '<td>' + (row.wonCount || 0) + '</td>' +
+        '<td>' + fmtMoney(row.wonValue || 0) + '</td>' +
+      '</tr>';
+    });
+  }
+  html += '</tbody></table></div>';
+  document.getElementById('tabBody').innerHTML = html;
+}
+function openMktPagoDrilldown(criativo, campanha, metric) {
+  var labels = { leads: 'Leads', responded: 'Responderam', neverResponded: 'Nunca Responderam', respondedThenStopped: 'Responderam e Pararam', qualified: 'Qualificados', noScore: 'Sem Score' };
+  document.getElementById('mktPagoDDTitle').textContent = (labels[metric] || metric) + ' - ' + criativo;
+  document.getElementById('mktPagoDrilldownOverlay').style.display = 'flex';
+  loadMktPagoDrilldown(criativo, campanha, metric);
+}
+function closeMktPagoDrilldown() {
+  document.getElementById('mktPagoDrilldownOverlay').style.display = 'none';
+}
+async function loadMktPagoDrilldown(criativo, campanha, metric) {
+  var summaryEl = document.getElementById('mktPagoDDSummary');
+  var listEl = document.getElementById('mktPagoDDList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var r = mktPagoRange;
+    var url = '/api/crm/ui/dashboard/mktpago/drilldown?criativo=' + encodeURIComponent(criativo) + '&campanha=' + encodeURIComponent(campanha) + '&metric=' + metric + '&from=' + r.from + '&to=' + r.to;
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' registro(s)';
+    if (!d.rows.length) { listEl.innerHTML = '<p class="muted">Nenhum registro.</p>'; return; }
+    listEl.innerHTML = d.rows.map(function(row) {
+      var when = row.date ? new Date(row.date).toLocaleString('pt-BR') : '-';
+      var scoreTag = row.leadScore ? ' <span style="background:#fee2e2;color:#b91c1c;font-size:11px;padding:2px 6px;border-radius:4px;">score ' + row.leadScore + '</span>' : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">' +
+        '<div style="font-weight:600;"><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;">' + (row.title || ('Deal #' + row.dealId)) + '</a>' + scoreTag + '</div>' +
+        '<div style="font-size:12px;color:#6b7280;">' + when + (row.value ? ' - ' + fmtMoney(row.value) : '') + '</div>' +
+      '</div>';
+    }).join('');
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+</script>
+
+<script>
+var sddState = { ownerName:null, metric:null };
+function openSdrDrilldown(sdrId, sdrName, metric, label){
+  sddState = { ownerName: sdrName, metric: metric };
+  document.getElementById('sddTitle').textContent = sdrName + ' - ' + label;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadSdrDrilldown();
+}
+function closeSdrDrilldown(){
+  document.getElementById('sdrDrilldownOverlay').style.display = 'none';
+}
+async function loadSdrDrilldown(){
+  var selVal = document.getElementById('rangeSel').value; var r = rangeDates(selVal);
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/sdrs/drilldown?ownerName=' + encodeURIComponent(sddState.ownerName) + '&metric=' + sddState.metric + '&from=' + r.from + '&to=' + r.to;
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' registro(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhum registro no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        var dt = row.date ? new Date(row.date).toLocaleString('pt-BR') : '';
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (row.patientName||'') + '</a><br><span style="color:#888;font-size:12px;">' + (row.phone||'') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + dt + '</div>' +
+          '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+var leadsDrilldownState = { from: null, to: null };
+function openLeadsDrilldown(from, to){
+  leadsDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Leads - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadLeadsDrilldown();
+}
+async function loadLeadsDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/leads/drilldown?from=' + encodeURIComponent(leadsDrilldownState.from) + '&to=' + encodeURIComponent(leadsDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' lead(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhum lead no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (row.patientName||'Sem nome') + '</a><br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + (row.addDateBr||'') + '</div>' +
+          '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+
+var qualificadosDrilldownState = { from: null, to: null };
+function openQualificadosDrilldown(from, to){
+  qualificadosDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Qualificados - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadQualificadosDrilldown();
+}
+async function loadQualificadosDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/qualificados/drilldown?from=' + encodeURIComponent(qualificadosDrilldownState.from) + '&to=' + encodeURIComponent(qualificadosDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' negocio(s) qualificado(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhum negocio qualificado no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (row.patientName||'Sem nome') + '</a><br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + (row.addDateBr||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+
+var receitaDrilldownState = { from: null, to: null };
+function openReceitaDrilldown(from, to){
+  receitaDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Receita - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadReceitaDrilldown();
+}
+async function loadReceitaDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/receita/drilldown?from=' + encodeURIComponent(receitaDrilldownState.from) + '&to=' + encodeURIComponent(receitaDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    var totalValue = d.rows.reduce(function(s,r){ return s + Number(r.value||0); }, 0);
+    summaryEl.textContent = d.rows.length + ' negocio(s) - ' + fmtMoney(totalValue);
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhum negocio ganho no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (row.patientName||'Sem nome') + '</a><br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + fmtMoney(row.value) + '<br>' + (row.addDateBr||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+
+var orcamentoDrilldownState = { from: null, to: null };
+function openOrcamentoDrilldown(from, to){
+orcamentoDrilldownState = { from: from, to: to };
+document.getElementById('sddTitle').textContent = 'Orcamento - ' + from + ' a ' + to;
+document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+loadOrcamentoDrilldown();
+}
+async function loadOrcamentoDrilldown(){
+var summaryEl = document.getElementById('sddSummary');
+var listEl = document.getElementById('sddList');
+summaryEl.textContent = 'Carregando...';
+listEl.innerHTML = '';
+try {
+var url = '/api/crm/ui/dashboard/orcamento/drilldown?from=' + encodeURIComponent(orcamentoDrilldownState.from) + '&to=' + encodeURIComponent(orcamentoDrilldownState.to);
+var d = await api(url);
+if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+var totalValue = d.rows.reduce(function(s,r){ return s + Number(r.value||0); }, 0);
+summaryEl.textContent = d.rows.length + ' orcamento(s) - ' + fmtMoney(totalValue);
+if (!d.rows.length) {
+listEl.innerHTML = '<p class="muted">Nenhum orcamento gerado no periodo.</p>';
+} else {
+listEl.innerHTML = d.rows.map(function(row){
+return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+'<div><a href="detail.html?id=' + row.dealId + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (row.patientName||'Sem nome') + '</a><br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+'<div style="text-align:right;font-size:12px;color:#666;">' + fmtMoney(row.value) + '<br>' + (row.addDateBr||'') + '</div>' +
+'</div>';
+}).join('');
+}
+} catch (e) {
+summaryEl.textContent = 'Erro ao carregar.';
+}
+}
+function openTicketMedioDrilldown(from, to){
+receitaDrilldownState = { from: from, to: to };
+document.getElementById('sddTitle').textContent = 'Ticket Medio - ' + from + ' a ' + to;
+document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+loadReceitaDrilldown();
+}
+var agendadasDrilldownState = { from: null, to: null };
+function openAgendadasDrilldown(from, to){
+  agendadasDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Consultas Agendadas - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadAgendadasDrilldown();
+}
+async function loadAgendadasDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/agendadas/drilldown?from=' + encodeURIComponent(agendadasDrilldownState.from) + '&to=' + encodeURIComponent(agendadasDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' consulta(s) agendada(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhuma consulta agendada no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div>' + (row.patientName||'Sem nome') + '<br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + (row.addDateBr||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+
+var comparecidasDrilldownState = { from: null, to: null };
+function openComparecidasDrilldown(from, to){
+  comparecidasDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Consultas Comparecidas - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadComparecidasDrilldown();
+}
+async function loadComparecidasDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/comparecidas/drilldown?from=' + encodeURIComponent(comparecidasDrilldownState.from) + '&to=' + encodeURIComponent(comparecidasDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' consulta(s) comparecida(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhuma consulta comparecida no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div>' + (row.patientName||'Sem nome') + '<br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + (row.addDateBr||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+
+var faltaramDrilldownState = { from: null, to: null };
+function openFaltaramDrilldown(from, to){
+  faltaramDrilldownState = { from: from, to: to };
+  document.getElementById('sddTitle').textContent = 'Faltaram no Periodo - ' + from + ' a ' + to;
+  document.getElementById('sdrDrilldownOverlay').style.display = 'flex';
+  loadFaltaramDrilldown();
+}
+async function loadFaltaramDrilldown(){
+  var summaryEl = document.getElementById('sddSummary');
+  var listEl = document.getElementById('sddList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var url = '/api/crm/ui/dashboard/faltaram/drilldown?from=' + encodeURIComponent(faltaramDrilldownState.from) + '&to=' + encodeURIComponent(faltaramDrilldownState.to);
+    var d = await api(url);
+    if (!d || d.success === false) throw new Error((d && d.error) || 'erro');
+    summaryEl.textContent = d.rows.length + ' falta(s)';
+    if (!d.rows.length) {
+      listEl.innerHTML = '<p class="muted">Nenhuma falta no periodo.</p>';
+    } else {
+      listEl.innerHTML = d.rows.map(function(row){
+        return '<div style="padding:9px 4px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div>' + (row.patientName||'Sem nome') + '<br><span style="color:#888;font-size:12px;">' + (row.origem||'Sem origem') + ' &middot; ' + (row.ownerName||'Sem SDR') + '</span></div>' +
+          '<div style="text-align:right;font-size:12px;color:#666;">' + (row.addDateBr||'') + '</div>' +
+        '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+  }
+}
+</script>
+</body>
+</html>

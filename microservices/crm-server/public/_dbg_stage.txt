@@ -1,0 +1,44 @@
+app.patch('/api/crm/deals/ COLON id/stage', auth, async (req, res)  EQ > {
+  const conn  EQ  await pool.getConnection()
+  try {
+    const dealId  EQ  parseInt(req.params.id)
+    const { stageId }  EQ  req.body || {}
+    const [[deal]]  EQ  await conn.query('SELECT id, stage_id, patient_id FROM deals WHERE id  EQ  ?', [dealId])
+    if (!deal) return res.status(404).json({ success COLON  false, error COLON  'Negócio não encontrado' })
+    if (deal.stage_id  EQ  EQ  EQ  stageId) return res.json({ success COLON  true })
+    const [[stage]]  EQ  await conn.query('SELECT id, label, pipeline_id FROM stages WHERE id  EQ  ?', [stageId])
+    if (!stage) return res.status(404).json({ success COLON  false, error COLON  'Etapa não encontrada' })
+    await conn.beginTransaction()
+    await conn.query('UPDATE deals SET stage_id  EQ  ?, pipeline_id  EQ  ?, stage_entered_at  EQ  NOW() WHERE id  EQ  ?', [stageId, stage.pipeline_id, dealId])
+    await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by_user_id) VALUES (?, ?, ?, ?)', [dealId, deal.stage_id, stageId, req.user.id])
+    await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "stage_change", ?)',
+      [dealId, deal.patient_id, req.user.id, `Movido para "${stage.label}"`])
+    const [[mapRow]]  EQ  await conn.query('SELECT activity_type FROM stage_activity_map WHERE stage_id  EQ  ?', [stageId])
+    const actType  EQ  mapRow ? mapRow.activity_type  COLON  ('Passagem de Etapa COLON  ' + stage.label)
+    await conn.query("INSERT INTO activities (deal_id, patient_id, user_id, type, content, subject, status, done_at) VALUES (?, ?, ?, ?, ?, ?, 'Concluído', NOW())", [dealId, deal.patient_id, null, actType, actType + ' (automação registrada pelo sistema)', actType])
+    await conn.commit()
+    res.json({ success COLON  true })
+  } catch (e) {
+    await conn.rollback()
+    console.error('move stage error', e)
+    res.status(500).json({ success COLON  false, error COLON  'Erro ao mover negócio' })
+  } finally {
+    conn.release()
+  }
+})
+
+app.get('/api/crm/professionals', auth, async (req, res)  EQ > { try { const [rows]  EQ  await pool.query('SELECT id, name FROM professionals WHERE active  EQ  1 ORDER BY name'); res.json(rows); } catch (err) { res.status(500).json({ error COLON  err.message }); } });app.get('/api/crm/deals/ COLON id/professional', auth, async (req, res)  EQ > { try { const [rows]  EQ  await pool.query('SELECT p.id, p.name FROM deals d JOIN professionals p ON p.id  EQ  d.professional_id WHERE d.id  EQ  ?', [req.params.id]); res.json(rows[0] || {}); } catch (err) { res.status(500).json({ error COLON  err.message }); } });app.patch('/api/crm/deals/ COLON id', auth, async (req, res, next)  EQ > { if (req.body && Object.keys(req.body).length  EQ  EQ  EQ  1 && Object.prototype.hasOwnProperty.call(req.body, 'professional_id')) { try { await pool.query('UPDATE deals SET professional_id  EQ  ? WHERE id  EQ  ?', [req.body.professional_id, req.params.id]); return res.json({ ok COLON  true }); } catch (err) { return res.status(500).json({ error COLON  err.message }); } } next(); });
+app.patch('/api/crm/deals/ COLON id', auth, async (req, res)  EQ > {
+  const conn  EQ  await pool.getConnection()
+  try {
+    const dealId  EQ  parseInt(req.params.id)
+    const { status, lossReason, value, procedimento, title, origem, campanha, conjunto, criativo, plataforma, palavra_chave, tags }  EQ  req.body || {}
+    const [[deal]]  EQ  await conn.query('SELECT * FROM deals WHERE id  EQ  ?', [dealId])
+    if (!deal) return res.status(404).json({ success COLON  false, error COLON  'Negócio não encontrado' })
+    await conn.beginTransaction()
+    if (title ! EQ  EQ  undefined) await conn.query('UPDATE deals SET title  EQ  ? WHERE id  EQ  ?', [title, dealId])
+    if (value ! EQ  EQ  undefined) await conn.query('UPDATE deals SET value  EQ  ? WHERE id  EQ  ?', [value, dealId])
+    if (procedimento ! EQ  EQ  undefined) await conn.query('UPDATE deals SET procedure_name  EQ  ? WHERE id  EQ  ?', [procedimento, dealId])
+    if (origem ! EQ  EQ  undefined) await conn.query('UPDATE deals SET origem  EQ  ? WHERE id  EQ  ?', [origem, dealId])
+    if (campanha ! EQ  EQ  undefined) await conn.query('UPDATE deals SET campanha  EQ  ? WHERE id  EQ  ?', [campanha, dealId])
+    if (conjunto ! EQ  EQ  undefined) await conn.query('UPDATE deals SET conjunto  EQ  ? WHERE id  EQ  ?', [conjunto, dealId])

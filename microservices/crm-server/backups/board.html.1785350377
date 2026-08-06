@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Kanban</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link active" href="board.html">Kanban</a>
+      <a class="nav-link" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link" href="agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="user-chip" id="userChip"></span>
+    <select class="input" id="sdrFilter" style="width:auto;margin-right:8px;"><option value="">Todos os SDRs</option><option value="Agda">Agda</option><option value="Helenice">Helenice</option><option value="__unassigned__">Sem atribuicao</option></select>
+    <button class="btn" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="page" style="max-width:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;"><h1 class="page-title">Funil de Vendas</h1><button class="btn btn-primary" onclick="openNewDealModal()">+ Criar Negocio</button></div>
+  <p class="page-sub" id="pipelineSub">Carregando...</p>
+
+  <div style="display:flex;align-items:center;gap:12px;"><div class="pipeline-tabs" id="pipelineTabs" style="flex:1;"></div><button class="btn" id="wonDealsBtn" style="background:#16a34a;color:#fff;border:none;white-space:nowrap;font-weight:600;" onclick="openWonDealsModal()">Negócios Ganhos</button> <button class="btn" id="lostDealsBtn" style="background:#dc2626;color:#fff;border:none;white-space:nowrap;font-weight:600;margin-left:8px;" onclick="openLostDealsModal()">Negocios Perdidos</button></div>
+
+  <div class="toolbar">
+    <input class="input input-search" id="searchInput" type="text" placeholder="Buscar por nome, telefone, e-mail ou negocio...">
+  </div>
+
+  <div class="board-wrap" id="boardWrap"></div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  requireAuth();
+  const user = getUser();
+  document.getElementById('userChip').textContent = user ? user.name : '';
+
+  const state = {
+    sdr: '',
+    pipelineSlug: qs('pipeline') || (user && user.role === 'recepcao' ? 'recepcao' : 'inbound'),
+    data: null,
+    search: '',
+  };
+
+  function cardMatchesSearch(deal) {
+    if (state.sdr === '__unassigned__') { if ((deal.owner_name || '') !== '') return false; } else if (state.sdr && (deal.owner_name || '') !== state.sdr) return false;
+    if (!state.search) return true;
+    const s = state.search.toLowerCase();
+    return (deal.patient_name || '').toLowerCase().includes(s) ||
+           (deal.title || '').toLowerCase().includes(s) ||
+           (deal.patient_phone || '').toLowerCase().includes(s) ||
+           (deal.patient_email || '').toLowerCase().includes(s);
+  }
+
+  function renderPipelineTabs() {
+    const el = document.getElementById('pipelineTabs');
+    el.innerHTML = state.data.pipelines.map(p => `
+      <div class="pipeline-tab ${p.slug === state.data.pipeline.slug ? 'active' : ''}" data-slug="${p.slug}">${escapeHtml(p.name)}</div>
+    `).join('');
+    el.querySelectorAll('.pipeline-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        state.pipelineSlug = tab.dataset.slug;
+        const url = new URL(window.location.href);
+        url.searchParams.set('pipeline', state.pipelineSlug);
+        window.history.replaceState({}, '', url);
+        loadBoard();
+      });
+    });
+  }
+
+  function ownerColorClass(name) {
+    const n = (name || '').toLowerCase();
+    if (n.indexOf('helenice') !== -1) return 'board-card-owner-helenice';
+    if (n.indexOf('agda') !== -1) return 'board-card-owner-agda'; if (n.indexOf('hellen') !== -1) return 'board-card-owner-hellen';
+    return '';
+  }
+  function formatLastReply(iso) {
+        if (!iso) return 'nunca respondeu';
+        const d = new Date(iso);
+        return 'Respondeu: ' + d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      }
+
+      function formatElapsed(dateStr) {
+    if (!dateStr) return '';
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+    if (diffHours < 24) {
+      const h = Math.max(0, diffHours);
+      return h + ' hora' + (h === 1 ? '' : 's');
+    }
+    const d = Math.floor(diffMs / 86400000);
+    return d + ' dia' + (d === 1 ? '' : 's');
+  }
+  function cardHtml(deal, col) {
+    const rotting = col.rottingDays > 0 && deal.days_in_stage >= col.rottingDays;
+    return `
+      <div class="board-card ${ownerColorClass(deal.owner_name)} ${deal.reopened_lost_lead ? 'board-card-reopened' : ''}" style="${deal.reopened_lost_lead ? '' : (deal.duplicate_alert ? 'border:3px solid #9333ea;background:#f5f0ff;' : '')}" title="${deal.reopened_lost_lead ? 'Lead perdido que clicou novamente em campanha - retornou apos negocio anterior perdido. Confira o resumo na timeline.' : (deal.duplicate_alert ? 'Possivel duplicado - ja existe outro negocio aberto para este telefone. Revisar manualmente.' : '')}" draggable="true" data-deal-id="${deal.id}" data-stage-id="${deal.stage_id}">
+        <div class="board-card-title">${escapeHtml(deal.title)}</div>
+          ${(deal.labels||[]).some(l=>l.name==='CHECKED')?'<span style="display:inline-block;background:#16a34a;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin:2px 0;">CHECKED</span>':''}
+        ${deal.duplicate_alert ? '<span style="display:inline-block;background:#9333ea;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:8px;margin:2px 0;">⚠ POSSIVEL DUPLICADO</span>' : ''}
+        ${deal.reopened_lost_lead ? '<span style="display:inline-block;background:#fff;color:#b91c1c;font-size:10px;font-weight:800;padding:1px 6px;border-radius:8px;margin:2px 0;">LEAD PERDIDO QUE CLICOU NOVAMENTE EM CAMPANHA</span>' : ''}
+        <div class="board-card-patient">${escapeHtml(deal.patient_name)}${deal.patient_phone ? ' &middot; ' + escapeHtml(deal.patient_phone) : ''}</div>
+        ${deal.owner_name ? '<div class="board-card-owner">' + escapeHtml(deal.owner_name) + '</div>' : ''}
+        <div class="board-card-last-reply" style="font-size:11px;color:#888;margin-bottom:2px;">${formatLastReply(deal.last_inbound_at)}</div>
+        <div class="board-card-total-days" style="font-size:11px;color:#888;margin-bottom:2px;">há ${formatElapsed(deal.add_date)}</div>
+          <div class="board-card-foot">
+          <span class="board-card-value">${fmtMoney(deal.value)}</span>
+          <span class="${rotting ? 'board-card-rotting' : ''}">${formatElapsed(deal.stage_entered_at || deal.add_date)}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderColumns() {
+    const wrap = document.getElementById('boardWrap');
+    wrap.innerHTML = state.data.columns.map(col => `
+      <div class="board-col" data-stage-id="${col.id}">
+        <div class="board-col-head">
+          <div class="board-col-title">
+            <span>${escapeHtml(col.label)}</span>
+            <span class="board-col-count">${col.deals.length}</span>
+          </div>
+          <div class="board-col-value">${fmtMoney(col.totalValue)}</div>
+        </div>
+        <div class="board-col-body" data-stage-id="${col.id}">
+          ${col.deals.filter(cardMatchesSearch).map(d => cardHtml(d, col)).join('')}
+        </div>
+      </div>
+    `).join('');
+
+    wrap.querySelectorAll('.board-card').forEach(card => {
+      card.addEventListener('click', () => {
+        window.location.href = 'detail.html?id=' + card.dataset.dealId;
+      });
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', card.dataset.dealId);
+        card.classList.add('dragging');
+      });
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+    });
+
+    wrap.querySelectorAll('.board-col-body').forEach(colBody => {
+      colBody.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        colBody.closest('.board-col').classList.add('drag-over');
+      });
+      colBody.addEventListener('dragleave', () => {
+        colBody.closest('.board-col').classList.remove('drag-over');
+      });
+      colBody.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        colBody.closest('.board-col').classList.remove('drag-over');
+        const dealId = e.dataTransfer.getData('text/plain');
+        const targetStageId = parseInt(colBody.dataset.stageId, 10);
+        try {
+          await api('/api/crm/deals/' + dealId + '/stage', {
+            method: 'PATCH',
+            body: JSON.stringify({ stageId: targetStageId })
+          });
+          showToast('Negocio movido.', 'success');
+          await loadBoard();
+        } catch (err) {
+          showToast(err.message, 'error');
+        }
+      });
+    });
+  }
+
+  async function loadBoard() {
+    try {
+      const data = await api('/api/crm/board?pipeline=' + encodeURIComponent(state.pipelineSlug));
+      state.data = data;
+      document.getElementById('pipelineSub').textContent = data.pipeline.name;
+      renderPipelineTabs();
+      renderColumns();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    state.search = e.target.value.trim();
+    if (state.data) renderColumns();
+  });
+  document.getElementById('sdrFilter').addEventListener('change', (e) => {
+    state.sdr = e.target.value;
+    if (state.data) renderColumns();
+  });
+
+  loadBoard();
+
+function openNewDealModal(){
+    ndSelectedPatient = null;
+    document.getElementById('ndMode').value = 'existing';
+    document.getElementById('ndExistingSearch').value = '';
+    document.getElementById('ndExistingResults').innerHTML = '';
+    document.getElementById('ndExistingResults').classList.remove('open');
+    document.getElementById('ndSelectedInfo').textContent = '';
+    document.getElementById('ndNewName').value = '';
+    document.getElementById('ndNewPhone').value = '';
+    document.getElementById('ndNewCountry').value = '55';
+    document.getElementById('ndTitle').value = '';
+    document.getElementById('ndValue').value = '';
+    document.getElementById('ndPipeline').value = 'recepcao'; ndSelectedReferrer = null; document.getElementById('ndRefType').value = 'dia_a_dia'; document.getElementById('ndRefCampanhaSelect').value = ''; document.getElementById('ndRefCampanhaNew').value = ''; document.getElementById('ndRefCampanhaNew').style.display = 'none'; document.getElementById('ndRefCampanhaType').value = 'empresarial'; document.getElementById('ndReferrerSearch').value = ''; document.getElementById('ndReferrerResults').innerHTML = ''; document.getElementById('ndReferrerResults').classList.remove('open'); document.getElementById('ndReferrerInfo').textContent = ''; toggleIndicacaoFields();
+    toggleNdMode();
+    ndHidePhoneWarning();
+ndSetupPhoneCheck();
+document.getElementById('newDealOverlay').style.display = 'flex';
+  }
+  function closeNewDealModal(){ document.getElementById('newDealOverlay').style.display = 'none'; }
+function toggleIndicacaoFields(){
+  var pv = document.getElementById('ndPipeline').value;
+  var block = document.getElementById('ndIndicacaoBlock');
+  if (pv === 'indicacao') { block.style.display = 'block'; loadCampanhaOptions(); toggleRefType(); }
+  else { block.style.display = 'none'; }
+}
+function toggleRefType(){
+  var t = document.getElementById('ndRefType').value;
+  document.getElementById('ndRefCampanhaBlock').style.display = t === 'campanha' ? 'block' : 'none';
+  toggleRefPersonBlock();
+}
+function toggleRefPersonBlock(){
+  var t = document.getElementById('ndRefType').value;
+  var campType = document.getElementById('ndRefCampanhaType').value;
+  var show = t === 'dia_a_dia' || (t === 'campanha' && campType === 'pessoa');
+  document.getElementById('ndRefPersonBlock').style.display = show ? 'block' : 'none';
+  document.getElementById('ndRefPersonLabel').textContent = t === 'dia_a_dia' ? 'Quem indicou? (buscar paciente)' : 'Quem indicou essa pessoa? (buscar paciente, para premiar depois)';
+}
+function toggleNewCampanhaInput(){
+  var v = document.getElementById('ndRefCampanhaSelect').value;
+  document.getElementById('ndRefCampanhaNew').style.display = v === '__new__' ? 'block' : 'none';
+}
+async function loadCampanhaOptions(){
+  try {
+    var data = await api('/api/crm/ui/meta');
+    var sel = document.getElementById('ndRefCampanhaSelect');
+    var campanhas = data.campanhas || [];
+    var opts = ['<option value="">Selecione...</option>'].concat(campanhas.map(function(c){ return '<option value="' + escapeHtml(c.label) + '">' + escapeHtml(c.label) + '</option>'; })).concat(['<option value="__new__">+ Criar nova campanha</option>']);
+    sel.innerHTML = opts.join('');
+  } catch (e) { console.error('loadCampanhaOptions', e); }
+}
+document.addEventListener('DOMContentLoaded', function(){
+  var inp = document.getElementById('ndReferrerSearch');
+  if (inp) inp.addEventListener('input', function(){
+    clearTimeout(ndReferrerSearchTimer);
+    var q = inp.value.trim();
+    ndReferrerSearchTimer = setTimeout(async function(){
+      var box = document.getElementById('ndReferrerResults');
+      if (!q) { box.classList.remove('open'); return; }
+      var data = await api('/api/crm/patients?search=' + encodeURIComponent(q));
+      var list = (data.patients || []).slice(0, 15);
+      box.innerHTML = list.map(function(p){ return '<div data-id="' + p.id + '" data-name="' + escapeHtml(p.name) + '" data-phone="' + escapeHtml(p.phone||'') + '" onclick="selectNdReferrerFromEl(this)">' + escapeHtml(p.name) + (p.phone ? ' - ' + escapeHtml(p.phone) : '') + '</div>'; }).join('') || '<div class="muted" style="padding:8px;">Nenhum resultado</div>';
+      box.classList.add('open');
+    }, 300);
+  });
+});
+function selectNdReferrerFromEl(el){ selectNdReferrer(el.dataset.id, el.dataset.name, el.dataset.phone); }
+function selectNdReferrer(id, name, phone){
+  ndSelectedReferrer = { id: id, name: name, phone: phone };
+  document.getElementById('ndReferrerSearch').value = name;
+  document.getElementById('ndReferrerResults').classList.remove('open');
+  document.getElementById('ndReferrerInfo').textContent = 'Selecionado: ' + name;
+}
+
+  function toggleNdMode(){
+    const mode = document.getElementById('ndMode').value;
+    document.getElementById('ndExistingBlock').style.display = mode === 'existing' ? 'block' : 'none';
+    document.getElementById('ndNewBlock').style.display = mode === 'new' ? 'block' : 'none';
+if (mode !== 'new') { ndHidePhoneWarning(); }
+  }
+  let ndSearchTimer = null; let ndReferrerSearchTimer = null; let ndSelectedReferrer = null;
+  document.addEventListener('DOMContentLoaded', function(){
+    const inp = document.getElementById('ndExistingSearch');
+    if (inp) inp.addEventListener('input', function(){
+      clearTimeout(ndSearchTimer);
+      const q = inp.value.trim();
+      ndSearchTimer = setTimeout(async function(){
+        const box = document.getElementById('ndExistingResults');
+        if (!q) { box.classList.remove('open'); return; }
+        const data = await api('/api/crm/patients?search=' + encodeURIComponent(q));
+        const list = (data.patients || []).slice(0, 15);
+        box.innerHTML = list.map(function(p){
+          return '<div data-id="' + p.id + '" data-name="' + escapeHtml(p.name) + '" data-phone="' + escapeHtml(p.phone||'') + '" onclick="selectNdPatientFromEl(this)">' + escapeHtml(p.name) + ' - ' + escapeHtml(p.phone || 'sem telefone') + '</div>';
+        }).join('') || '<div class="muted" style="padding:8px;">Nenhum resultado</div>';
+        box.classList.add('open');
+      }, 300);
+    });
+  });
+  function selectNdPatientFromEl(el){
+    selectNdPatient(el.dataset.id, el.dataset.name, el.dataset.phone);
+  }
+  function selectNdPatient(id, name, phone){
+    ndSelectedPatient = { id: id, name: name, phone: phone };
+    document.getElementById('ndExistingSearch').value = name;
+    document.getElementById('ndSelectedInfo').textContent = 'Selecionado: ' + name + (phone ? ' (' + phone + ')' : ' (sem telefone cadastrado)');
+    document.getElementById('ndExistingResults').classList.remove('open');
+  }
+  var ndPhoneCheckTimer = null;
+var ndPhoneCheckLastQueried = '';
+function ndSetupPhoneCheck(){
+  var phoneInput = document.getElementById('ndNewPhone');
+  if (!phoneInput || phoneInput.dataset.phoneCheckBound) return;
+  phoneInput.dataset.phoneCheckBound = '1';
+  phoneInput.addEventListener('blur', function(){ ndCheckPhoneDuplicate(); });
+  phoneInput.addEventListener('input', function(){
+    ndHidePhoneWarning();
+    clearTimeout(ndPhoneCheckTimer);
+    ndPhoneCheckTimer = setTimeout(function(){ ndCheckPhoneDuplicate(); }, 700);
+  });
+}
+async function ndCheckPhoneDuplicate(){
+  var modeEl = document.getElementById('ndMode');
+  if (!modeEl || modeEl.value !== 'new') return;
+  var countryEl = document.getElementById('ndNewCountry');
+  var country = countryEl ? countryEl.value : '55';
+  var digits = document.getElementById('ndNewPhone').value.replace(/\D/g, '');
+  if (!digits || digits.length < 8) { ndHidePhoneWarning(); return; }
+  var phone = '+' + country + digits;
+  if (phone === ndPhoneCheckLastQueried) return;
+  ndPhoneCheckLastQueried = phone;
+  try {
+    var resp = await api('/api/crm/ui/check-phone?phone=' + encodeURIComponent(phone));
+    if (resp && resp.success && resp.exists) {
+      ndShowPhoneWarning(resp);
+    } else {
+      ndHidePhoneWarning();
+    }
+  } catch (e) {
+    console.error('check-phone falhou', e);
+  }
+}
+function ndHidePhoneWarning(){
+  var el = document.getElementById('ndPhoneWarning');
+  if (el) el.style.display = 'none';
+}
+function ndDismissPhoneWarning(){
+  ndHidePhoneWarning();
+}
+function ndOpenExistingDeal(dealId){
+  if (!dealId) return;
+  window.open('detail.html?id=' + dealId, '_blank');
+}
+function ndShowPhoneWarning(resp){
+  var phoneInput = document.getElementById('ndNewPhone');
+  if (!phoneInput) return;
+  var el = document.getElementById('ndPhoneWarning');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ndPhoneWarning';
+    var fieldWrap = phoneInput.closest('.modal-field') || phoneInput.parentElement;
+    if (fieldWrap && fieldWrap.parentElement) {
+      fieldWrap.parentElement.insertBefore(el, fieldWrap.nextSibling);
+    } else {
+      phoneInput.insertAdjacentElement('afterend', el);
+    }
+  }
+  var deals = resp.deals || [];
+  var first = deals[0] || {};
+  var nome = first.patientName || (resp.patients && resp.patients[0] && resp.patients[0].name) || 'paciente';
+  var etapa = first.stage || '-';
+  var statusLabel = first.status === 'open' ? 'aberto' : (first.status === 'closed' ? 'fechado' : (first.status || '-'));
+  var dealId = first.id;
+  el.style.cssText = 'margin-top:8px;padding:10px 12px;background:#fff3cd;border:1px solid #ffe08a;border-radius:8px;font-size:13px;color:#664d03;';
+  el.innerHTML = '<div style="margin-bottom:8px;"><strong>Lead ja existe</strong> (' + escapeHtml(nome) + ', etapa atual: ' + escapeHtml(etapa) + ', ' + escapeHtml(statusLabel) + '). Quer conferir antes ou cadastrar um novo negocio mesmo assim?</div><div style="display:flex;gap:8px;"><button type="button" class="btn" onclick="ndOpenExistingDeal(' + Number(dealId) + ')">Ver cadastro existente</button><button type="button" class="btn" onclick="ndDismissPhoneWarning()">Cadastrar novo negocio mesmo assim</button></div>';
+  el.style.display = 'block';
+}
+async function submitNewDeal(){
+    const mode = document.getElementById('ndMode').value;
+    let patientName, phone;
+    if (mode === 'existing') {
+      if (!ndSelectedPatient) { showToast('Selecione uma pessoa existente.', 'error'); return; }
+      if (!ndSelectedPatient.phone) { showToast('Essa pessoa nao tem telefone cadastrado. Edite o cadastro dela ou use Nova pessoa.', 'error'); return; }
+      patientName = ndSelectedPatient.name;
+      phone = ndSelectedPatient.phone;
+    } else {
+      patientName = document.getElementById('ndNewName').value.trim();
+      var ndCountry = document.getElementById('ndNewCountry').value;
+      var ndPhoneDigits = document.getElementById('ndNewPhone').value.replace(/\D/g, '');
+      if (!patientName) { showToast('Informe o nome.', 'error'); return; }
+      if (!ndPhoneDigits) { showToast('Telefone e obrigatorio.', 'error'); return; }
+      if (ndCountry === '55' && ndPhoneDigits.length !== 11) { showToast('Telefone deve ter DDD + 9 digitos (11 numeros).', 'error'); return; }
+      phone = '+' + ndCountry + ndPhoneDigits;
+    }
+    const title = document.getElementById('ndTitle').value.trim();
+    const value = document.getElementById('ndValue').value;
+    try {
+      const pipelineVal = document.getElementById('ndPipeline').value;
+      var ndCampanhaToSend = null, ndCampaignTypeToSend = null, ndReferrerIdToSend = null;
+      if (pipelineVal === 'indicacao') {
+        var refType = document.getElementById('ndRefType').value;
+        if (refType === 'campanha') {
+          var campSel = document.getElementById('ndRefCampanhaSelect').value;
+          if (campSel === '__new__') {
+            var newLabel = document.getElementById('ndRefCampanhaNew').value.trim();
+            if (!newLabel) { showToast('Informe o nome da nova campanha.', 'error'); return; }
+            var created = await api('/api/crm/ui/campaign-options', { method: 'POST', body: JSON.stringify({ label: newLabel }) });
+            campSel = created.campaign.label;
+          }
+          if (!campSel) { showToast('Selecione a campanha.', 'error'); return; }
+          ndCampanhaToSend = campSel;
+          ndCampaignTypeToSend = document.getElementById('ndRefCampanhaType').value;
+          if (ndCampaignTypeToSend === 'pessoa') {
+            if (!ndSelectedReferrer) { showToast('Selecione quem indicou.', 'error'); return; }
+            ndReferrerIdToSend = ndSelectedReferrer.id;
+          }
+        } else {
+          if (!ndSelectedReferrer) { showToast('Selecione quem indicou (indicacao do dia a dia).', 'error'); return; }
+          ndReferrerIdToSend = ndSelectedReferrer.id;
+        }
+      }
+      await api('/api/crm/deals', { method: 'POST', body: JSON.stringify({ patientName: patientName, phone: phone, title: title || patientName, value: value ? Number(value) : 0, pipeline: pipelineVal, campanha: ndCampanhaToSend, campaignType: ndCampaignTypeToSend, referrerPatientId: ndReferrerIdToSend }) });
+      showToast('Negocio criado.', 'success');
+      closeNewDealModal();
+      loadBoard();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+</script>
+<div class="modal-overlay" id="newDealOverlay" style="display:none;"><div class="modal-box"><h2>Novo Negocio</h2><div class="modal-field"><label>Tipo</label><select class="input" id="ndMode" onchange="toggleNdMode()"><option value="existing">Pessoa existente</option><option value="new">Nova pessoa</option></select></div><div id="ndExistingBlock"><div class="modal-field" style="position:relative;"><label>Buscar pessoa (nome ou telefone)</label><input class="input" id="ndExistingSearch" placeholder="Digite para buscar..." autocomplete="off"><div class="deal-suggestions" id="ndExistingResults"></div></div><div class="muted" id="ndSelectedInfo" style="margin-bottom:10px;font-size:13px;"></div></div><div id="ndNewBlock" style="display:none;"><div class="modal-field"><label>Nome</label><input class="input" id="ndNewName"></div><div class="modal-field"><label>Telefone (obrigatorio)</label><div style="display:flex;gap:6px;"><select class="input" id="ndNewCountry" style="flex:0 0 130px;"><option value="55" selected>Brasil +55</option><option value="1">EUA/Canada +1</option><option value="351">Portugal +351</option><option value="598">Uruguai +598</option><option value="54">Argentina +54</option></select><input class="input" id="ndNewPhone" placeholder="DDD + numero" style="flex:1;"></div></div></div><div class="modal-field"><label>Funil</label><select class="input" id="ndPipeline" onchange="toggleIndicacaoFields()"><option value="recepcao" selected>Recepcao</option><option value="inbound">Inbound</option><option value="base-leads">Base de Leads</option><option value="indicacao">Indicacao</option><option value="rmkt">RMKT</option></select></div><div class="modal-field" id="ndIndicacaoBlock" style="display:none;border:1px solid #333;border-radius:8px;padding:10px;margin-top:6px;"><label>Tipo de indicacao</label><select class="input" id="ndRefType" onchange="toggleRefType()"><option value="dia_a_dia" selected>Indicacao do dia a dia</option><option value="campanha">Campanha especifica</option></select><div id="ndRefCampanhaBlock" style="display:none;margin-top:8px;"><label>Campanha</label><select class="input" id="ndRefCampanhaSelect" onchange="toggleNewCampanhaInput()"><option value="">Selecione...</option><option value="__new__">+ Criar nova campanha</option></select><input class="input" id="ndRefCampanhaNew" placeholder="Nome da nova campanha" style="display:none;margin-top:6px;width:100%;"><label style="margin-top:8px;display:block;">Tipo de campanha</label><select class="input" id="ndRefCampanhaType" onchange="toggleRefPersonBlock()"><option value="empresarial">Parceria empresarial (evento com empresa parceira)</option><option value="pessoa">Pessoa indica pessoa (ex: campanha dia das maes)</option></select></div><div id="ndRefPersonBlock" style="margin-top:8px;"><label id="ndRefPersonLabel">Quem indicou? (buscar paciente)</label><input class="input" id="ndReferrerSearch" placeholder="Digite o nome do paciente..." autocomplete="off"><div id="ndReferrerResults" class="deal-suggestions"></div><div id="ndReferrerInfo" class="muted" style="margin-top:4px;"></div></div></div><div class="modal-field"><label>Titulo do negocio (opcional)</label><input class="input" id="ndTitle"></div><div class="modal-field"><label>Valor (opcional)</label><input class="input" id="ndValue" type="number"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;"><button class="btn" onclick="closeNewDealModal()">Cancelar</button><button class="btn btn-primary" onclick="submitNewDeal()">Criar Negocio</button></div></div></div>
+<div class="modal-overlay" id="wonDealsOverlay" style="display:none;">
+<div class="modal-box" style="width:720px;max-width:92vw;">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;">Negócios Ganhos</h2><button class="btn" style="padding:4px 10px;" onclick="closeWonDealsModal()">Fechar</button></div>
+<div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+<select class="input" id="wdRangeSel" style="width:auto;">
+<option value="today" selected>Hoje</option>
+<option value="yesterday">Ontem</option>
+<option value="week">Esta semana</option>
+<option value="lastweek">Semana passada</option>
+<option value="month">Este mes</option>
+<option value="lastmonth">Mes passado</option>
+<option value="custom">Personalizado</option>
+</select>
+<span id="wdCustomWrap" style="display:none;align-items:center;gap:6px;">
+<input type="date" id="wdFrom" class="input" style="padding:6px;font-size:13px;">
+<span style="font-size:12px;color:#666;">ate</span>
+<input type="date" id="wdTo" class="input" style="padding:6px;font-size:13px;">
+<button class="btn btn-primary" id="wdApplyBtn" style="padding:6px 10px;font-size:13px;">Aplicar</button>
+</span>
+</div>
+<div id="wdSummary" style="font-weight:600;font-size:16px;margin-bottom:10px;">Carregando...</div>
+<div id="wdList" style="max-height:400px;overflow-y:auto;"></div>
+</div>
+</div>
+</div>
+<script>
+function wdRangeDatesFor(sel, fromId, toId){
+  var now = new Date();
+  var from, to;
+  if (sel === 'today') { from = now; to = now; }
+  else if (sel === 'yesterday') { var y = new Date(now.getTime() - 86400000); from = y; to = y; }
+  else if (sel === 'week') { var day = now.getDay(); var diff = (day === 0 ? -6 : 1 - day); from = new Date(now); from.setDate(now.getDate() + diff); to = now; }
+  else if (sel === 'lastweek') { var day2 = now.getDay(); var diff2 = (day2 === 0 ? -6 : 1 - day2); var thisMonday = new Date(now); thisMonday.setDate(now.getDate() + diff2); from = new Date(thisMonday); from.setDate(thisMonday.getDate() - 7); to = new Date(thisMonday); to.setDate(thisMonday.getDate() - 1); }
+  else if (sel === 'month') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if (sel === 'custom') { var cf = document.getElementById(fromId); var ct = document.getElementById(toId); if (cf.value && ct.value) { return { from: cf.value, to: ct.value }; } from = now; to = now; }
+  else { from = now; to = now; }
+  var iso = function(d){ return d.toISOString().slice(0,10); };
+  return { from: iso(from), to: iso(to) };
+}
+function wdRangeDates(sel){
+  var now = new Date();
+  var from, to;
+  if (sel === 'today') { from = now; to = now; }
+  else if (sel === 'yesterday') { var y = new Date(now.getTime() - 86400000); from = y; to = y; }
+  else if (sel === 'week') { var day = now.getDay(); var diff = (day === 0 ? -6 : 1 - day); from = new Date(now); from.setDate(now.getDate() + diff); to = now; }
+  else if (sel === 'lastweek') { var day2 = now.getDay(); var diff2 = (day2 === 0 ? -6 : 1 - day2); var thisMonday = new Date(now); thisMonday.setDate(now.getDate() + diff2); from = new Date(thisMonday); from.setDate(thisMonday.getDate() - 7); to = new Date(thisMonday); to.setDate(thisMonday.getDate() - 1); }
+  else if (sel === 'month') { from = new Date(now.getFullYear(), now.getMonth(), 1); to = new Date(now.getFullYear(), now.getMonth()+1, 0); }
+  else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
+  else if (sel === 'custom') { var cf = document.getElementById('wdFrom'); var ct = document.getElementById('wdTo'); if (cf.value && ct.value) { return { from: cf.value, to: ct.value }; } from = now; to = now; }
+  else { from = now; to = now; }
+  var iso = function(d){ return d.toISOString().slice(0,10); };
+  return { from: iso(from), to: iso(to) };
+}
+function openWonDealsModal(){
+  document.getElementById('wonDealsOverlay').style.display = 'flex';
+  document.getElementById('wdRangeSel').value = 'today';
+  document.getElementById('wdCustomWrap').style.display = 'none';
+  loadWonDeals();
+}
+function closeWonDealsModal(){
+  document.getElementById('wonDealsOverlay').style.display = 'none';
+}
+function fmtMoney(v){
+  return 'R$ ' + Number(v||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+async function loadWonDeals(){
+  var sel = document.getElementById('wdRangeSel').value;
+  var r = wdRangeDates(sel);
+  var summaryEl = document.getElementById('wdSummary');
+  var listEl = document.getElementById('wdList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var data = await api('/api/crm/deals/won-list?from=' + r.from + '&to=' + r.to);
+    if (!data || !data.success) throw new Error((data && data.error) || "erro");
+    summaryEl.textContent = data.count + ' negocio(s) ganho(s) - ' + fmtMoney(data.total);
+    if (!data.deals.length) {
+      listEl.innerHTML = '<p style="color:#888;">Nenhum negocio ganho no periodo.</p>';
+    } else {
+      listEl.innerHTML = data.deals.map(function(d){
+        return '<div style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + d.id + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (d.patient_name||'') + '</a> <span style="background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;margin-left:4px;">' + (d.professional_name||'sem profissional registrado') + '</span><br><span style="color:#666;font-size:13px;">' + (d.procedure_name||d.title||'') + ' - ' + (d.owner_name||'') + '</span></div>' +
+          '<div style="text-align:right;"><strong>' + fmtMoney(d.value) + '</strong><br><span style="color:#888;font-size:12px;">' + (d.won_date ? new Date(d.won_date).toLocaleDateString('pt-BR') : '') + '</span></div>' +
+          '</div>';
+      }).join('');
+            var byProf = {};
+            data.deals.forEach(function(d){
+              var key = d.professional_name || 'sem profissional registrado';
+              if (!byProf[key]) byProf[key] = { count: 0, total: 0 };
+              byProf[key].count += 1;
+              byProf[key].total += Number(d.value || 0);
+            });
+            var rankRows = Object.keys(byProf).map(function(k){ return { name: k, count: byProf[k].count, total: byProf[k].total }; });
+            rankRows.sort(function(a, b){ return b.total - a.total; });
+            var rankHtml = '<div style="margin-top:16px;padding-top:12px;border-top:2px solid #e5e7eb;">' +
+              '<div style="font-weight:700;margin-bottom:8px;">Ranking por profissional</div>' +
+              rankRows.map(function(r, i){
+                return '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;">' +
+                  '<span>' + (i+1) + '. ' + r.name + ' <span style="color:#888;font-size:12px;">(' + r.count + ' negocio' + (r.count === 1 ? '' : 's') + ')</span></span>' +
+                  '<strong>' + fmtMoney(r.total) + '</strong>' +
+                '</div>';
+              }).join('') +
+            '</div>';
+            listEl.innerHTML += rankHtml;
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+    showToast(e.message, 'error');
+  }
+}
+document.getElementById('wdRangeSel').addEventListener('change', function(){
+  var wrap = document.getElementById('wdCustomWrap');
+  if (this.value === 'custom') { wrap.style.display = 'inline-flex'; }
+  else { wrap.style.display = 'none'; loadWonDeals(); }
+});
+document.getElementById('wdApplyBtn').addEventListener('click', function(){
+  var cf = document.getElementById('wdFrom'); var ct = document.getElementById('wdTo');
+  if (!cf.value || !ct.value) return;
+  loadWonDeals();
+});
+</script>
+<div class="modal-overlay" id="lostDealsOverlay" style="display:none;">
+<div class="modal-box" style="width:720px;max-width:92vw;">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;"><h2 style="margin:0;">Negocios Perdidos</h2><button class="btn" style="padding:4px 10px;" onclick="closeLostDealsModal()">Fechar</button></div>
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;">
+<select class="input" id="ldRangeSel" style="width:auto;">
+<option value="today" selected>Hoje</option>
+<option value="yesterday">Ontem</option>
+<option value="week">Esta semana</option>
+<option value="lastweek">Semana passada</option>
+<option value="month">Este mes</option>
+<option value="lastmonth">Mes passado</option>
+<option value="custom">Personalizado</option>
+</select>
+<span id="ldCustomWrap" style="display:none;align-items:center;gap:6px;">
+<input type="date" id="ldFrom" class="input" style="padding:6px;font-size:13px;">
+<span style="font-size:12px;color:#666;">ate</span>
+<input type="date" id="ldTo" class="input" style="padding:6px;font-size:13px;">
+<button class="btn btn-primary" id="ldApplyBtn" style="padding:6px 10px;font-size:13px;">Aplicar</button>
+</span>
+</div>
+<div id="ldSummary" style="font-weight:600;font-size:16px;margin-bottom:10px;">Carregando...</div>
+<div id="ldList" style="max-height:400px;overflow-y:auto;"></div>
+</div>
+</div>
+<script>
+function openLostDealsModal(){
+  document.getElementById('lostDealsOverlay').style.display = 'flex';
+  document.getElementById('ldRangeSel').value = 'today';
+  document.getElementById('ldCustomWrap').style.display = 'none';
+  loadLostDeals();
+}
+function closeLostDealsModal(){
+  document.getElementById('lostDealsOverlay').style.display = 'none';
+}
+async function loadLostDeals(){
+  var sel = document.getElementById('ldRangeSel').value;
+  var r = wdRangeDatesFor(sel, 'ldFrom', 'ldTo');
+  var summaryEl = document.getElementById('ldSummary');
+  var listEl = document.getElementById('ldList');
+  summaryEl.textContent = 'Carregando...';
+  listEl.innerHTML = '';
+  try {
+    var data = await api('/api/crm/deals/lost-list?from=' + r.from + '&to=' + r.to);
+    if (!data || !data.success) throw new Error((data && data.error) || "erro");
+    summaryEl.textContent = data.count + ' negocio(s) perdido(s) - ' + fmtMoney(data.total);
+    if (!data.deals.length) {
+      listEl.innerHTML = '<p style="color:#888;">Nenhum negocio perdido no periodo.</p>';
+    } else {
+      listEl.innerHTML = data.deals.map(function(d){
+        return '<div style="padding:10px;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;">' +
+          '<div><a href="detail.html?id=' + d.id + '" target="_blank" style="color:#4f46e5;text-decoration:none;font-weight:600;">' + (d.patient_name||'') + '</a><br><span style="color:#666;font-size:13px;">' + (d.procedure_name||d.title||'') + ' - ' + (d.owner_name||'') + '</span><br>' + (d.loss_reason ? '<span style="color:#dc2626;font-size:12px;">' + d.loss_reason + '</span>' : '<span style="display:inline-flex;gap:4px;align-items:center;margin-top:2px;"><input type="text" placeholder="Adicionar motivo..." id="lr-' + d.id + '" style="font-size:12px;padding:3px 6px;border:1px solid #ddd;border-radius:4px;width:160px;"><button class="btn" style="padding:3px 8px;font-size:11px;" onclick="saveLossReason(' + d.id + ')">Salvar</button></span>') + '</div>' +
+          '<div style="text-align:right;"><strong>' + fmtMoney(d.value) + '</strong><br><span style="color:#888;font-size:12px;">' + (d.lost_date ? new Date(d.lost_date).toLocaleDateString('pt-BR') : '') + '</span></div>' +
+          '</div>';
+      }).join('');
+    }
+  } catch (e) {
+    summaryEl.textContent = 'Erro ao carregar.';
+    showToast(e.message, 'error');
+  }
+}
+document.getElementById('ldRangeSel').addEventListener('change', function(){
+  var wrap = document.getElementById('ldCustomWrap');
+  if (this.value === 'custom') { wrap.style.display = 'inline-flex'; }
+  else { wrap.style.display = 'none'; loadLostDeals(); }
+});
+document.getElementById('ldApplyBtn').addEventListener('click', function(){
+  var cf = document.getElementById('ldFrom'); var ct = document.getElementById('ldTo');
+  if (!cf.value || !ct.value) return;
+  loadLostDeals();
+});
+</script>
+<script>
+async function saveLossReason(dealId){
+  var input = document.getElementById('lr-' + dealId);
+  if (!input) return;
+  var val = input.value.trim();
+  if (!val) { showToast('Digite um motivo.', 'error'); return; }
+  try {
+    await api('/api/crm/deals/' + dealId, { method: 'PATCH', body: JSON.stringify({ lossReason: val }) });
+    showToast('Motivo salvo.', 'success');
+    loadLostDeals();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+</script>
+</body>
+</html>

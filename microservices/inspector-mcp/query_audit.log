@@ -1,0 +1,7 @@
+{"ts":"2026-08-03T13:03:25.637Z","ip":"127.0.0.1","rejected":true,"reason":"Unknown system variable 'MAX_EXECUTION_TIME'","sql":"SELECT COUNT(*) as total FROM deals"}
+{"ts":"2026-08-03T13:04:05.177Z","ip":"127.0.0.1","rejected":false,"sql":"SELECT COUNT(*) as total FROM deals","rowCount":1}
+{"ts":"2026-08-03T13:04:12.595Z","ip":"127.0.0.1","rejected":false,"sql":"SELECT COUNT(*) as total FROM deals","rowCount":1}
+{"ts":"2026-08-03T13:04:29.282Z","ip":"127.0.0.1","rejected":false,"sql":"SELECT id, created_at FROM whatsapp_messages ORDER BY id DESC LIMIT 5","rowCount":5}
+{"ts":"2026-08-03T13:04:43.044Z","ip":"127.0.0.1","rejected":true,"reason":"only SELECT statements are allowed","sql":"DELETE FROM deals"}
+{"ts":"2026-08-03T13:04:43.058Z","ip":"127.0.0.1","rejected":true,"reason":"multiple statements not allowed","sql":"SELECT 1; DROP TABLE deals"}
+{"ts":"2026-08-03T14:29:43.816Z","ip":"127.0.0.1","rejected":false,"sql":"SELECT 1","rowCount":1}

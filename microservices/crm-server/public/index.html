@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link active" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+      <a class="nav-link" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link" href="agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="user-chip" id="userChip"></span>
+    <button class="btn" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;"><h1 class="page-title">Pacientes &amp; Negocios</h1><button class="btn btn-primary" onclick="openNewDealModal()">+ Novo Negocio</button></div>
+  <p class="page-sub" id="totalLabel">Carregando...</p>
+
+  <div class="card">
+    <div class="toolbar">
+      <input class="input input-search" id="searchInput" type="text" placeholder="Buscar por nome, telefone, e-mail ou negocio...">
+      <select class="input" id="statusFilter">
+        <option value="">Todos os status</option>
+        <option value="open">Aberto</option>
+        <option value="won">Ganho</option>
+        <option value="lost">Perdido</option>
+      </select>
+      <select class="input" id="activityFilter">
+        <option value="">Todas atividades</option>
+        <option value="Agendou">Agendou</option>
+        <option value="Compareceu">Compareceu</option>
+        <option value="Faltou">Faltou</option>
+        <option value="Cancelou/Desmarcou">Cancelou/Desmarcou</option>
+      </select>
+      <select class="input" id="pipelineFilter">
+        <option value="">Todos os funis</option>
+      </select>
+      <select class="input" id="ownerFilter">
+        <option value="">Todos os donos</option>
+        </select>
+        <select class="input" id="origemFilter">
+          <option value="">Todas as origens</option>
+      </select>
+        <select class="input" id="situacaoFilter">
+          <option value="">Todas as situacoes</option>
+      </select>
+    </div>
+    <div id="bulkBar" style="display:none;align-items:center;gap:8px;padding:8px 0;">
+      <span id="bulkCount" style="font-weight:600;"></span>
+      <button class="btn" onclick="openBulkModal('owner')">Trocar dono</button>
+      <button class="btn" onclick="openBulkModal('pipeline')">Trocar funil</button>
+      <button class="btn" onclick="openBulkModal('stage')">Trocar etapa</button>
+      <button class="btn btn-danger" onclick="confirmBulkDeleteDeals()">Excluir deal</button>
+        <button class="btn" onclick="clearDealSelection()">Limpar selecao</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:28px;"><input type="checkbox" id="selectAllChk"></th>
+          <th>Paciente</th>
+          <th>Contato</th>
+          <th>Negocio</th>
+          <th>Valor</th>
+          <th>Status</th>
+          <th>Etapa</th>
+          <th>Funil</th>
+          <th>Dono</th>
+          <th>Origem</th>
+          <th>Data</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+      </tbody>
+    </table>
+    <div id="emptyState" class="empty" style="display:none;">Nenhum resultado encontrado.</div>
+    <div id="patientsOnlySection" style="display:none;margin-top:16px;border-top:1px solid #eee;padding-top:12px;">
+      <div class="muted" style="margin-bottom:8px;font-size:13px;">Pessoas encontradas sem negocio aberto:</div>
+      <div id="patientsOnlyList"></div>
+    </div>
+
+    <div class="pagination">
+      <span id="pageLabel"></span>
+      <div class="controls">
+        <button class="btn" id="prevBtn">&larr; Anterior</button>
+        <button class="btn" id="nextBtn">Proxima &rarr;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  requireAuth();
+  const user = getUser();
+  document.getElementById('userChip').textContent = user ? user.name : '';
+
+  const state = { search: '', status: '', activityType: '', pipeline: '', owner: '', page: 1, origem: '', situacao: '', pageSize: 50, total: 0 };
+  let searchDebounce = null;
+
+  function render(deals) {
+    const tbody = document.getElementById('tableBody');
+    const empty = document.getElementById('emptyState');
+    if (!deals.length) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    tbody.innerHTML = deals.map(d => `
+      <tr onclick="window.location.href='detail.html?id=${d.id}'">
+        <td onclick="event.stopPropagation()"><input type="checkbox" class="rowChk" data-id="${d.id}" ${selectedDeals.has(String(d.id)) ? 'checked' : ''} onchange="toggleDealSelect(${d.id}, this.checked)"></td>
+        <td class="name-cell">${escapeHtml(d.patient_name)}</td>
+        <td>
+          <div>${escapeHtml(d.patient_phone) || '<span class="muted">sem telefone</span>'}</div>
+          <div class="muted">${escapeHtml(d.patient_email) || ''}</div>
+        </td>
+        <td>${escapeHtml(d.title)}</td>
+        <td>${fmtMoney(d.value)}</td>
+        <td>${statusBadge(d.status)}</td>
+        <td>${escapeHtml(d.stage_label)}</td>
+        <td class="muted">${escapeHtml(d.pipeline_name) || '-'}</td>
+        <td class="muted">${escapeHtml(d.owner_name) || '-'}</td>
+        <td class="muted">${escapeHtml(d.origem) || '-'}</td>
+        <td class="muted">${fmtDate(d.add_date)}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderPatientsOnly(patients) {
+    const section = document.getElementById('patientsOnlySection');
+    const list = document.getElementById('patientsOnlyList');
+    if (!patients || !patients.length) { section.style.display = 'none'; list.innerHTML = ''; return; }
+    section.style.display = 'block';
+    list.innerHTML = patients.map(p => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+        <div>
+          <div style="font-weight:600;">${escapeHtml(p.name)}</div>
+          <div class="muted" style="font-size:12px;">${escapeHtml(p.phone) || "sem telefone"} ${p.email ? "- " + escapeHtml(p.email) : ""}</div>
+        </div>
+        <button class="btn btn-primary" style="font-size:12px;" onclick="createDealForPatient(${p.id}, '${escapeHtml(p.name).replace(/'/g,"")}', '${escapeHtml(p.phone||"").replace(/'/g,"")}', '${escapeHtml(p.email||"").replace(/'/g,"")}'  )">+ Criar negocio</button>
+      </div>
+    `).join('');
+  }
+  async function createDealForPatient(patientId, name, phone, email) {
+    try {
+      const res = await api('/api/crm/deals', { method: 'POST', body: JSON.stringify({ patientName: name, phone: phone || null, email: email || null }) });
+      showToast('Negocio criado.', 'success');
+      window.location.href = 'detail.html?id=' + res.id;
+    } catch (err) { showToast(err.message, 'error'); }
+  }
+
+  async function load() {
+    try {
+      const params = new URLSearchParams({
+        page: state.page,
+        pageSize: state.pageSize,
+      });
+      if (state.search) params.set('search', state.search);
+      if (state.status) params.set('status', state.status);
+    if (state.activityType) params.set('activityType', state.activityType);
+    if (state.pipeline) params.set('pipeline', state.pipeline);
+    if (state.owner) params.set('owner', state.owner);
+    if (state.origem) params.set('origem', state.origem);
+    if (state.situacao) params.set('situacao', state.situacao);
+    const data = await api('/api/crm/ui/deals?' + params.toString());
+      state.total = data.total;
+      render(data.deals);
+      renderPatientsOnly(data.patientsOnly || []);
+      const totalPages = Math.max(1, Math.ceil(data.total / state.pageSize));
+      document.getElementById('totalLabel').textContent = `${data.total} negocios encontrados`;
+      document.getElementById('pageLabel').textContent = `Pagina ${data.page} de ${totalPages}`;
+      document.getElementById('prevBtn').disabled = data.page <= 1;
+      document.getElementById('nextBtn').disabled = data.page >= totalPages;
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    clearTimeout(searchDebounce);
+    searchDebounce = setTimeout(() => {
+      state.search = e.target.value.trim();
+      state.page = 1;
+      load();
+    }, 350);
+  });
+
+  document.getElementById('statusFilter').addEventListener('change', (e) => {
+    state.status = e.target.value;
+    state.page = 1;
+    load();
+  });
+
+  document.getElementById('activityFilter').addEventListener('change', (e) => {
+    state.activityType = e.target.value;
+    state.page = 1;
+    load();
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    if (state.page > 1) { state.page--; load(); }
+  });
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    state.page++; load();
+  });
+
+  var selectedDeals = new Set();
+  var pipelinesCache = [];
+  var stagesCache = [];
+  var ownersCache = [];
+  var bulkField = null;
+
+  document.getElementById('pipelineFilter').addEventListener('change', function(e){ state.pipeline = e.target.value; state.page = 1; load(); });
+  document.getElementById('ownerFilter').addEventListener('change', function(e){ state.owner = e.target.value; state.page = 1; load(); });
+  document.getElementById('origemFilter').addEventListener('change', function(e){ state.origem = e.target.value; state.page = 1; load(); });
+  document.getElementById('situacaoFilter').addEventListener('change', function(e){ state.situacao = e.target.value; state.page = 1; load(); });
+
+  async function loadFilterOptions(){
+    try {
+      var pdata = await api('/api/crm/ui/pipelines');
+      pipelinesCache = pdata.pipelines || [];
+      stagesCache = pdata.stages || [];
+      var psel = document.getElementById('pipelineFilter');
+      pipelinesCache.forEach(function(p){ var o = document.createElement('option'); o.value = p.slug; o.textContent = p.name; psel.appendChild(o); });
+      var osel = document.getElementById('ownerFilter');
+      if (user && user.role === 'sdr') {
+        var o1 = document.createElement('option'); o1.value = user.name; o1.textContent = user.name; osel.appendChild(o1);
+        osel.value = user.name; state.owner = user.name; osel.disabled = true;
+      } else {
+        var odata = await api('/api/crm/ui/deal-owners');
+        ownersCache = odata.owners || [];
+        ownersCache.forEach(function(n){ var o2 = document.createElement('option'); o2.value = n; o2.textContent = n; osel.appendChild(o2); });
+      }
+    var odata2 = await api('/api/crm/ui/deal-origins');
+      var origensCache = odata2.origins || [];
+      var origSel = document.getElementById('origemFilter');
+      origensCache.forEach(function(n){ var o3 = document.createElement('option'); o3.value = n; o3.textContent = n; origSel.appendChild(o3); });
+    var sdata = await api('/api/crm/ui/deal-situacoes');
+      var situacoesCache = sdata.situacoes || [];
+      var situacaoSel = document.getElementById('situacaoFilter');
+      situacoesCache.forEach(function(n){ var o4 = document.createElement('option'); o4.value = n; o4.textContent = n; situacaoSel.appendChild(o4); });
+    } catch (e) { console.error('loadFilterOptions error', e); }
+  }
+
+  function toggleDealSelect(id, checked){
+    if (checked) selectedDeals.add(String(id)); else selectedDeals.delete(String(id));
+    updateBulkBar();
+  }
+
+  function updateBulkBar(){
+    var bar = document.getElementById('bulkBar');
+    var count = document.getElementById('bulkCount');
+    if (selectedDeals.size > 0) { bar.style.display = 'flex'; count.textContent = selectedDeals.size + ' selecionado(s)'; }
+    else { bar.style.display = 'none'; }
+  }
+
+  document.getElementById('selectAllChk').addEventListener('change', function(e){
+    var boxes = document.querySelectorAll('.rowChk');
+    boxes.forEach(function(b){ b.checked = e.target.checked; if (e.target.checked) selectedDeals.add(b.dataset.id); else selectedDeals.delete(b.dataset.id); });
+    updateBulkBar();
+  });
+
+  function clearDealSelection(){
+    selectedDeals.clear();
+    document.querySelectorAll('.rowChk').forEach(function(b){ b.checked = false; });
+    var all = document.getElementById('selectAllChk'); if (all) all.checked = false;
+    updateBulkBar();
+  }
+
+  function openBulkModal(field){
+    if (selectedDeals.size === 0) return;
+    bulkField = field;
+    var sel = document.getElementById('bulkModalSelect');
+    sel.innerHTML = '';
+    var titleEl = document.getElementById('bulkModalTitle');
+    if (field === 'owner') {
+      titleEl.textContent = 'Trocar dono (' + selectedDeals.size + ' negocio(s))';
+      api('/api/crm/meta').then(function(d){
+        (d.users || []).forEach(function(u){ var o = document.createElement('option'); o.value = u.id; o.textContent = u.name; sel.appendChild(o); });
+      });
+    } else if (field === 'pipeline') {
+      titleEl.textContent = 'Trocar funil (' + selectedDeals.size + ' negocio(s))';
+      pipelinesCache.forEach(function(p){ var o = document.createElement('option'); o.value = p.slug; o.textContent = p.name; sel.appendChild(o); });
+    } else if (field === 'stage') {
+      titleEl.textContent = 'Trocar etapa (' + selectedDeals.size + ' negocio(s))';
+      stagesCache.forEach(function(s){ var o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+    }
+    document.getElementById('bulkModal').style.display = 'flex';
+  }
+  function closeBulkModal(){ document.getElementById('bulkModal').style.display = 'none'; }
+
+  async function confirmBulkModal(){
+    var sel = document.getElementById('bulkModalSelect');
+    var value = sel.value;
+    var label = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : value;
+    var fieldLabel = bulkField === 'owner' ? 'dono' : (bulkField === 'pipeline' ? 'funil' : 'etapa');
+    if (!confirm('Tem certeza que quer alterar o ' + fieldLabel + ' de ' + selectedDeals.size + ' negocio(s) para ' + label + '?')) return;
+    try {
+      var resp = await api('/api/crm/deals/bulk-update', { method: 'POST', body: JSON.stringify({ dealIds: Array.from(selectedDeals), field: bulkField, value: value }) });
+      showToast(resp.updated + ' negocio(s) atualizados', 'success');
+      closeBulkModal();
+      clearDealSelection();
+      load();
+    } catch (e) { showToast(e.message, 'error'); }
+  }
+
+  async function confirmBulkDeleteDeals(){
+    var n = selectedDeals.size;
+    if (n === 0) return;
+    if (!confirm('Excluir ' + n + ' negocio(s) selecionado(s)? Essa acao nao pode ser desfeita.')) return;
+    var ids = Array.from(selectedDeals);
+    var ok = 0, fail = 0;
+    for (var i = 0; i < ids.length; i++) {
+      try { await api('/api/crm/deals/' + ids[i], { method: 'DELETE' }); ok++; }
+      catch (e) { fail++; }
+    }
+    showToast(ok + ' negocio(s) excluido(s)' + (fail ? ', ' + fail + ' falharam' : ''), fail ? 'error' : 'success');
+    clearDealSelection();
+    load();
+  }
+
+  loadFilterOptions();
+
+  load(); let ndSelectedPatient = null;
+  function openNewDealModal(){
+    ndSelectedPatient = null;
+    document.getElementById('ndMode').value = 'existing';
+    document.getElementById('ndExistingSearch').value = '';
+    document.getElementById('ndExistingResults').innerHTML = '';
+    document.getElementById('ndExistingResults').classList.remove('open');
+    document.getElementById('ndSelectedInfo').textContent = '';
+    document.getElementById('ndNewName').value = '';
+    document.getElementById('ndNewPhone').value = '';
+    document.getElementById('ndNewCountry').value = '55';
+    document.getElementById('ndTitle').value = '';
+    document.getElementById('ndValue').value = '';
+    document.getElementById('ndPipeline').value = 'recepcao';
+    toggleNdMode();
+    document.getElementById('newDealOverlay').style.display = 'flex';
+  }
+  function closeNewDealModal(){ document.getElementById('newDealOverlay').style.display = 'none'; }
+  function toggleNdMode(){
+    const mode = document.getElementById('ndMode').value;
+    document.getElementById('ndExistingBlock').style.display = mode === 'existing' ? 'block' : 'none';
+    document.getElementById('ndNewBlock').style.display = mode === 'new' ? 'block' : 'none';
+  }
+  let ndSearchTimer = null;
+  document.addEventListener('DOMContentLoaded', function(){
+    const inp = document.getElementById('ndExistingSearch');
+    if (inp) inp.addEventListener('input', function(){
+      clearTimeout(ndSearchTimer);
+      const q = inp.value.trim();
+      ndSearchTimer = setTimeout(async function(){
+        const box = document.getElementById('ndExistingResults');
+        if (!q) { box.classList.remove('open'); return; }
+        const data = await api('/api/crm/patients?search=' + encodeURIComponent(q));
+        const list = (data.patients || []).slice(0, 15);
+        box.innerHTML = list.map(function(p){
+          return '<div data-id="' + p.id + '" data-name="' + escapeHtml(p.name) + '" data-phone="' + escapeHtml(p.phone||'') + '" onclick="selectNdPatientFromEl(this)">' + escapeHtml(p.name) + ' - ' + escapeHtml(p.phone || 'sem telefone') + '</div>';
+        }).join('') || '<div class="muted" style="padding:8px;">Nenhum resultado</div>';
+        box.classList.add('open');
+      }, 300);
+    });
+  });
+  function selectNdPatientFromEl(el){
+    selectNdPatient(el.dataset.id, el.dataset.name, el.dataset.phone);
+  }
+  function selectNdPatient(id, name, phone){
+    ndSelectedPatient = { id: id, name: name, phone: phone };
+    document.getElementById('ndExistingSearch').value = name;
+    document.getElementById('ndSelectedInfo').textContent = 'Selecionado: ' + name + (phone ? ' (' + phone + ')' : ' (sem telefone cadastrado)');
+    document.getElementById('ndExistingResults').classList.remove('open');
+  }
+  async function submitNewDeal(){
+    const mode = document.getElementById('ndMode').value;
+    let patientName, phone;
+    if (mode === 'existing') {
+      if (!ndSelectedPatient) { showToast('Selecione uma pessoa existente.', 'error'); return; }
+      if (!ndSelectedPatient.phone) { showToast('Essa pessoa nao tem telefone cadastrado. Edite o cadastro dela ou use Nova pessoa.', 'error'); return; }
+      patientName = ndSelectedPatient.name;
+      phone = ndSelectedPatient.phone;
+    } else {
+      patientName = document.getElementById('ndNewName').value.trim();
+      var ndCountry = document.getElementById('ndNewCountry').value;
+      var ndPhoneDigits = document.getElementById('ndNewPhone').value.replace(/\D/g, '');
+      if (!patientName) { showToast('Informe o nome.', 'error'); return; }
+      if (!ndPhoneDigits) { showToast('Telefone e obrigatorio.', 'error'); return; }
+      if (ndCountry === '55' && ndPhoneDigits.length !== 11) { showToast('Telefone deve ter DDD + 9 digitos (11 numeros).', 'error'); return; }
+      phone = '+' + ndCountry + ndPhoneDigits;
+    }
+    const title = document.getElementById('ndTitle').value.trim();
+    const value = document.getElementById('ndValue').value;
+    try {
+      const pipelineVal = document.getElementById('ndPipeline').value;
+      await api('/api/crm/deals', { method: 'POST', body: JSON.stringify({ patientName: patientName, phone: phone, title: title || patientName, value: value ? Number(value) : 0, pipeline: pipelineVal }) });
+      showToast('Negocio criado.', 'success');
+      closeNewDealModal();
+      load();
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  (async function(){
+    var params = new URLSearchParams(location.search);
+    var pid = params.get('newDealForPatient');
+    if (!pid) return;
+    try {
+      var d = await api('/api/crm/patients/' + pid);
+      if (d && d.success && d.patient) {
+        openNewDealModal();
+        selectNdPatient(d.patient.id, d.patient.name, d.patient.phone);
+      }
+    } catch (e) { console.error('newDealForPatient error', e); }
+  })();
+</script>
+<div class="modal-overlay" id="bulkModal" style="display:none;"><div class="modal-box">
+    <h2 id="bulkModalTitle">Trocar dono</h2>
+    <select class="input" id="bulkModalSelect" style="width:100%;margin:12px 0;"></select>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn" onclick="closeBulkModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmBulkModal()">Confirmar</button>
+    </div>
+  </div></div>
+  <div class="modal-overlay" id="newDealOverlay" style="display:none;"><div class="modal-box"><h2>Novo Negocio</h2><div class="modal-field"><label>Tipo</label><select class="input" id="ndMode" onchange="toggleNdMode()"><option value="existing">Pessoa existente</option><option value="new">Nova pessoa</option></select></div><div id="ndExistingBlock"><div class="modal-field" style="position:relative;"><label>Buscar pessoa (nome ou telefone)</label><input class="input" id="ndExistingSearch" placeholder="Digite para buscar..." autocomplete="off"><div class="deal-suggestions" id="ndExistingResults"></div></div><div class="muted" id="ndSelectedInfo" style="margin-bottom:10px;font-size:13px;"></div></div><div id="ndNewBlock" style="display:none;"><div class="modal-field"><label>Nome</label><input class="input" id="ndNewName"></div><div class="modal-field"><label>Telefone (obrigatorio)</label><div style="display:flex;gap:6px;"><select class="input" id="ndNewCountry" style="flex:0 0 130px;"><option value="55" selected>Brasil +55</option><option value="1">EUA/Canada +1</option><option value="351">Portugal +351</option><option value="598">Uruguai +598</option><option value="54">Argentina +54</option></select><input class="input" id="ndNewPhone" placeholder="DDD + numero" style="flex:1;"></div></div></div><div class="modal-field"><label>Funil</label><select class="input" id="ndPipeline"><option value="recepcao" selected>Recepcao</option><option value="inbound">Inbound</option><option value="base-leads">Base de Leads</option><option value="indicacao">Indicacao</option><option value="rmkt">RMKT</option></select></div><div class="modal-field"><label>Titulo do negocio (opcional)</label><input class="input" id="ndTitle"></div><div class="modal-field"><label>Valor (opcional)</label><input class="input" id="ndValue" type="number"></div><div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;"><button class="btn" onclick="closeNewDealModal()">Cancelar</button><button class="btn btn-primary" onclick="submitNewDeal()">Criar Negocio</button></div></div></div></body>
+</html>

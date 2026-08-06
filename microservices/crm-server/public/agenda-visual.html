@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Agenda (Calendario)</title>
+<link rel="stylesheet" href="app.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6/locales-all.global.min.js"></script>
+<style>
+  .agenda-wrap { padding: 24px; }
+  .agenda-toolbar { display:flex; align-items:center; gap:12px; margin-bottom:16px; flex-wrap:wrap; justify-content:space-between; }
+  .agenda-toolbar-left { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .gcal-badge { font-size:13px; padding:5px 12px; border-radius:999px; font-weight:600; }
+  .gcal-badge.connected { background:#e6f4ea; color:#1e7e34; }
+  .gcal-badge.disconnected { background:#fdecea; color:#c0392b; }
+  #calendarBox { background:#fff; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  .fc-event { cursor:pointer; }
+  #dealSearchWrap { position:relative; }
+  #dealSearchResults { position:absolute; background:#fff; border:1px solid #ddd; max-height:180px; overflow:auto; width:100%; z-index:20; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.12); }
+  #dealSearchResults div { padding:7px 10px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f0f0; }
+  #dealSearchResults div:hover { background:#f2f4ff; }
+  .selected-deal-chip { display:inline-flex; align-items:center; gap:6px; background:#eef1ff; color:#3a4bdc; padding:4px 10px; border-radius:999px; font-size:12px; margin-top:6px; }
+  .selected-deal-chip button { border:none; background:none; cursor:pointer; color:#3a4bdc; font-weight:700; }
+</style>
+</head>
+<body>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+      <a class="nav-link" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link" href="agenda.html">Agenda</a>
+      <a class="nav-link active" href="agenda-visual.html">Agenda (Calendario)</a>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="user-chip" id="userChip"></span>
+    <button class="btn" onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="agenda-wrap">
+  <div class="agenda-toolbar">
+    <div class="agenda-toolbar-left">
+      <h2 style="margin:0;">Agenda do Avaliador</h2>
+      <input type="hidden" id="dentistSelect" value="6"><span class="input" style="min-width:220px;display:inline-flex;align-items:center;background:#f0f0f0;color:#333;">Dra. Jéssica</span>
+      <span class="gcal-badge disconnected" id="gcalBadge">Verificando Google Calendar...</span>
+      <button class="btn" id="gcalConnectBtn" style="display:none;">Conectar Google Calendar</button>
+      <button class="btn" id="gcalSyncBtn" style="display:none;">Sincronizar agora</button>
+    </div>
+    <button class="btn btn-primary" onclick="openEventModal()">+ Novo Compromisso</button>
+  </div>
+  <div id="calendarBox">
+    <div id="calendar"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="eventModalOverlay" style="display:none;">
+  <div class="modal-box" style="width:520px;max-width:92vw;">
+    <h3 id="eventModalTitle">Novo Compromisso</h3>
+    <div class="modal-field">
+      <label>Titulo</label>
+      <input class="input" id="evTitle" placeholder="Ex: Avaliacao - Fulana">
+    </div>
+    <div class="modal-field" id="dealSearchWrap">
+      <label>Lead / Negocio (opcional)</label>
+      <input class="input" id="evDealSearch" placeholder="Buscar por nome, telefone ou negocio..." autocomplete="off">
+      <div id="dealSearchResults" style="display:none;"></div>
+      <div id="evSelectedDeal"></div>
+    </div>
+    <div class="modal-field">
+      <label>Avaliador (dentista)</label>
+      <input type="hidden" id="evDentist" value="6"><span class="input" style="display:inline-flex;align-items:center;background:#f0f0f0;color:#333;">Dra. Jéssica</span>
+    </div>
+    <div style="display:flex; gap:12px;">
+      <div class="modal-field" style="flex:1;">
+        <label>Inicio</label>
+        <input class="input" id="evStart" type="datetime-local">
+      </div>
+      <div class="modal-field" style="flex:1;">
+        <label>Fim</label>
+        <input class="input" id="evEnd" type="datetime-local">
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Observacoes (opcional)</label>
+      <input class="input" id="evDescription">
+    </div>
+    <div class="modal-field">
+          <label>Probabilidade de comparecimento</label>
+          <div style="display:flex;gap:8px;" id="evLikelihoodGroup">
+            <button type="button" class="btn likelihood-btn" data-val="quente" onclick="selectLikelihood('quente')">Quente</button>
+            <button type="button" class="btn likelihood-btn" data-val="morno" onclick="selectLikelihood('morno')">Morno</button>
+            <button type="button" class="btn likelihood-btn" data-val="frio" onclick="selectLikelihood('frio')">Frio</button>
+          </div>
+        </div>
+        <div id="evQuickStatusRow" style="display:none;border-top:1px solid #eee;margin-top:10px;padding-top:10px;">
+          <label style="display:block;margin-bottom:6px;font-size:13px;color:#666;">Status rapido</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <button type="button" class="btn" style="background:#22c55e;border-color:#16a34a;color:#fff;" onclick="setQuickStatus('confirmed')">Confirmado</button>
+            <button type="button" class="btn" style="background:#d4af37;border-color:#b8960c;color:#fff;" onclick="setQuickStatus('attended')">Compareceu</button>
+            <button type="button" class="btn" style="background:#ec4899;border-color:#db2777;color:#fff;" onclick="setQuickStatus('no_show')">Faltou</button>
+            <button type="button" class="btn" onclick="startReschedule()">Reagendou</button>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+      <button class="btn" id="evDeleteBtn" style="display:none;color:#fff;background:#ef4444;border-color:#dc2626;" onclick="openCancelReasonModal()">Cancelou</button>
+      <div style="display:flex;gap:8px;margin-left:auto;">
+        <button class="btn" onclick="closeEventModal()">Fechar</button>
+        <button class="btn btn-primary" onclick="submitEvent()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="cancelReasonModalOverlay" style="display:none;">
+  <div class="modal-box" style="width:420px;max-width:92vw;">
+    <h3>Cancelar compromisso</h3>
+    <div class="modal-field">
+      <label>Motivo do cancelamento</label>
+      <textarea class="input" id="cancelReasonText" rows="3" placeholder="Descreva o motivo..."></textarea>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">
+      <button class="btn" onclick="closeCancelReasonModal()">Voltar</button>
+      <button class="btn btn-primary" style="background:#dc2626;border-color:#dc2626;" onclick="confirmCancelEvent()">Confirmar cancelamento</button>
+    </div>
+  </div>
+</div>
+<style>.likelihood-btn{background:#fff;color:#333;}</style>
+<script src="app.js"></script>
+<script>
+requireAuth();
+const user = getUser();
+document.getElementById('userChip').textContent = user ? user.name : '';
+
+let calendar = null;
+let editingEventId = null;
+let selectedDealId = null;
+let dealSearchTimer = null;
+let selectedLikelihood = null;
+let reschedulingEvent = null;
+const LIKELIHOOD_COLORS = { quente: '#f97316', morno: '#eab308', frio: '#38bdf8' };
+function renderLikelihoodButtons() {
+  document.querySelectorAll('.likelihood-btn').forEach(function(btn) {
+    const val = btn.getAttribute('data-val');
+    const active = val === selectedLikelihood;
+    const color = LIKELIHOOD_COLORS[val];
+    btn.style.background = active ? color : '#fff';
+    btn.style.color = active ? '#fff' : '#333';
+    btn.style.borderColor = color;
+  });
+}
+function selectLikelihood(val) {
+  selectedLikelihood = (selectedLikelihood === val) ? null : val;
+  renderLikelihoodButtons();
+  if (editingEventId) {
+    api('/api/crm/ui/calendar-events/' + editingEventId, { method: 'PATCH', body: JSON.stringify({ attendanceLikelihood: selectedLikelihood }) })
+      .then(function () { showToast('Classificacao atualizada', 'success'); if (calendar) calendar.refetchEvents(); })
+      .catch(function (e) { showToast(e.message || 'Erro ao atualizar classificacao', 'error'); });
+  }
+}
+async function setQuickStatus(status) {
+  if (!editingEventId) return;
+  try {
+    await api('/api/crm/ui/calendar-events/' + editingEventId, { method: 'PATCH', body: JSON.stringify({ status: status }) });
+    showToast('Status atualizado', 'success');
+    closeEventModal();
+    calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao atualizar status', 'error');
+  }
+}
+function startReschedule() {
+  if (!editingEventId) return;
+  const startVal = document.getElementById('evStart').value;
+  const endVal = document.getElementById('evEnd').value;
+  const durationMs = (startVal && endVal) ? (new Date(endVal) - new Date(startVal)) : (30 * 60000);
+  reschedulingEvent = {
+    id: editingEventId,
+    title: document.getElementById('evTitle').value,
+    description: document.getElementById('evDescription').value,
+    dealId: selectedDealId,
+    attendanceLikelihood: selectedLikelihood,
+    durationMs: durationMs > 0 ? durationMs : (30 * 60000)
+  };
+  closeEventModal();
+  showToast('Selecione o novo horario na agenda para reagendar.', 'success');
+}
+async function completeReschedule(start, end) {
+  const r = reschedulingEvent;
+  reschedulingEvent = null;
+  if (!r) return;
+  try {
+    const created = await api('/api/crm/ui/calendar-events', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: r.title,
+        description: r.description || null,
+        startAt: toLocalInputValue(start),
+        endAt: toLocalInputValue(end),
+        dentistUserId: currentDentistId(),
+        dealId: r.dealId,
+        attendanceLikelihood: r.attendanceLikelihood
+      })
+    });
+    await api('/api/crm/ui/calendar-events/' + r.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ status: 'rescheduled', rescheduledToId: created.event.id })
+    });
+    showToast('Compromisso reagendado com sucesso.', 'success');
+    calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao reagendar', 'error');
+    calendar.refetchEvents();
+  }
+}
+function openCancelReasonModal() {
+  document.getElementById('cancelReasonText').value = '';
+  document.getElementById('cancelReasonModalOverlay').style.display = 'flex';
+}
+function closeCancelReasonModal() {
+  document.getElementById('cancelReasonModalOverlay').style.display = 'none';
+}
+async function confirmCancelEvent() {
+  if (!editingEventId) return;
+  const reason = document.getElementById('cancelReasonText').value.trim();
+  if (!reason) { showToast('Informe o motivo do cancelamento', 'error'); return; }
+  try {
+    await api('/api/crm/ui/calendar-events/' + editingEventId, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled', cancelReason: reason }) });
+    showToast('Compromisso cancelado', 'success');
+    closeCancelReasonModal();
+    closeEventModal();
+    calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao cancelar compromisso', 'error');
+  }
+}
+function renderEventContent(arg) {
+  const props = arg.event.extendedProps || {};
+  const likelihood = props.attendanceLikelihood;
+  const dotColor = likelihood ? LIKELIHOOD_COLORS[likelihood] : null;
+  const dot = dotColor ? ('<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + dotColor + ';margin-right:4px;vertical-align:middle;"></span>') : '';
+  const timeHtml = arg.timeText ? ('<div class="fc-event-time">' + arg.timeText + '</div>') : '';
+  const titleHtml = '<div class="fc-event-title">' + dot + escapeHtml(arg.event.title || '') + '</div>';
+  const wrap = document.createElement('div');
+  wrap.className = 'fc-event-main-frame';
+  wrap.innerHTML = timeHtml + titleHtml;
+  return { domNodes: [wrap] };
+}
+let usersCache = [];
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function toLocalInputValue(d) {
+  const dt = new Date(d);
+  return dt.getFullYear() + '-' + pad(dt.getMonth() + 1) + '-' + pad(dt.getDate()) + 'T' + pad(dt.getHours()) + ':' + pad(dt.getMinutes());
+}
+
+async function loadUsers() {
+  const data = await api('/api/crm/ui/users');
+  usersCache = data.users || [];
+  const dentistSelect = document.getElementById('dentistSelect');
+  const evDentist = document.getElementById('evDentist');
+  const opts = usersCache.map(function(u) { return '<option value="' + u.id + '">' + escapeHtml(u.name) + '</option>'; }).join('');
+  dentistSelect.value = '6';
+  evDentist.value = '6';
+}
+
+async function checkGcalStatus() {
+  const badge = document.getElementById('gcalBadge');
+  const btn = document.getElementById('gcalConnectBtn');
+  try {
+    const data = await api('/api/crm/google-calendar/status');
+    if (data.connected) {
+      badge.textContent = 'Google Calendar conectado';
+      badge.className = 'gcal-badge connected';
+      btn.style.display = 'none';
+      document.getElementById('gcalSyncBtn').style.display = 'inline-block';
+    } else {
+      badge.textContent = 'Google Calendar nao conectado';
+      badge.className = 'gcal-badge disconnected';
+      btn.style.display = 'inline-block';
+      document.getElementById('gcalSyncBtn').style.display = 'none';
+    }
+  } catch (e) {
+    badge.textContent = 'Erro ao checar Google Calendar';
+    badge.className = 'gcal-badge disconnected';
+  }
+}
+
+document.getElementById('gcalSyncBtn').addEventListener('click', async function() {
+  const btn = this;
+  btn.textContent = 'Sincronizando...';
+  btn.disabled = true;
+  try {
+    const data = await api('/api/crm/google-calendar/sync-now');
+    const r = (data.results && data.results[0]) || {};
+    if (r.error) { showToast('Erro na sincronizacao: ' + r.error, 'error'); }
+    else { showToast('Sincronizado! ' + (r.created||0) + ' criados, ' + (r.updated||0) + ' atualizados, ' + (r.cancelled||0) + ' cancelados', 'success'); }
+    if (calendar) calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao sincronizar', 'error');
+  } finally {
+    btn.textContent = 'Sincronizar agora';
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('gcalConnectBtn').addEventListener('click', async function() {
+  try {
+    const data = await api('/api/crm/google-calendar/auth-url');
+    window.location.href = data.url;
+  } catch (e) {
+    showToast('Erro ao iniciar conexao com Google Calendar', 'error');
+  }
+});
+
+function currentDentistId() {
+  const v = document.getElementById('dentistSelect').value;
+  return v ? parseInt(v, 10) : (user ? user.id : null);
+}
+
+async function fetchEvents(fetchInfo, successCallback, failureCallback) {
+  try {
+    const dentistUserId = currentDentistId();
+    const params = new URLSearchParams({ start: fetchInfo.startStr, end: fetchInfo.endStr, dentistUserId: dentistUserId });
+    const data = await api('/api/crm/ui/calendar-events?' + params.toString());
+    successCallback(data.events || []);
+  } catch (e) {
+    console.error('fetchEvents error', e);
+    failureCallback(e);
+  }
+}
+
+function initCalendar() {
+  const el = document.getElementById('calendar');
+  calendar = new FullCalendar.Calendar(el, {
+    initialView: 'timeGridWeek',
+    height: 'auto',
+    slotMinTime: '09:00:00',
+    slotMaxTime: '18:00:00',
+    nowIndicator: true,
+    selectable: true,
+    editable: true,
+    eventTimeFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+      locale: 'pt-br',
+      slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
+      dayHeaderFormat: { weekday: 'short', day: '2-digit', month: '2-digit' },
+      titleFormat: { year: 'numeric', month: 'long', day: 'numeric' },
+    headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+    buttonText: { today: 'Hoje', month: 'Mes', week: 'Semana', day: 'Dia' },
+    firstDay: 1,
+      views: { dayGridMonth: { dayHeaderFormat: { weekday: 'short' }, titleFormat: { year: 'numeric', month: 'long' } } },
+    events: fetchEvents,
+    select: function(info) { if (reschedulingEvent) { completeReschedule(info.start, info.end); calendar.unselect(); return; } openEventModal({ start: info.start, end: info.end }); calendar.unselect(); },
+    dateClick: function(info) {
+      const start = info.date;
+      const end = new Date(start.getTime() + 30 * 60000);
+      if (reschedulingEvent) { completeReschedule(start, end); return; } openEventModal({ start: start, end: end });
+    },
+    eventClick: function(info) { openEventModal({ existing: info.event }); },
+    eventDrop: function(info) { persistEventMove(info.event); },
+    eventResize: function(info) { persistEventMove(info.event); },
+      eventContent: renderEventContent
+  });
+  calendar.render();
+}
+
+async function persistEventMove(event) {
+  try {
+    await api('/api/crm/ui/calendar-events/' + event.id, {
+      method: 'PATCH',
+      body: JSON.stringify({ startAt: event.start.toISOString(), endAt: (event.end || event.start).toISOString() })
+    });
+    showToast('Compromisso atualizado', 'success');
+  } catch (e) {
+    showToast(e.message || 'Erro ao mover compromisso', 'error');
+    calendar.refetchEvents();
+  }
+}
+
+document.getElementById('dentistSelect').addEventListener('change', function() { if (calendar) calendar.refetchEvents(); });
+
+document.getElementById('evDealSearch').addEventListener('input', function() {
+  const q = this.value.trim();
+  clearTimeout(dealSearchTimer);
+  const box = document.getElementById('dealSearchResults');
+  if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  dealSearchTimer = setTimeout(async function() {
+    try {
+      const data = await api('/api/crm/ui/deals?search=' + encodeURIComponent(q) + '&pageSize=10');
+      const rows = data.deals || data.rows || [];
+      if (!rows.length) { box.innerHTML = '<div style="color:#999;">Nenhum resultado</div>'; box.style.display = 'block'; return; }
+      box.innerHTML = rows.map(function(d) {
+        return '<div data-id="' + d.id + '" data-title="' + escapeHtml(d.title || '') + '" data-patient="' + escapeHtml(d.patient_name || '') + '">' + escapeHtml(d.patient_name || '') + (d.title ? ' - ' + escapeHtml(d.title) : '') + '</div>';
+      }).join('');
+      box.style.display = 'block';
+      box.querySelectorAll('div[data-id]').forEach(function(item) {
+        item.addEventListener('click', function() {
+          selectedDealId = parseInt(item.dataset.id, 10);
+          document.getElementById('evSelectedDeal').innerHTML = '<span class="selected-deal-chip">' + escapeHtml(item.dataset.patient) + '<button type="button" onclick="clearSelectedDeal()">x</button></span>';
+          document.getElementById('evDealSearch').value = '';
+          box.style.display = 'none';
+        });
+      });
+    } catch (e) { console.error('deal search error', e); }
+  }, 300);
+});
+
+function clearSelectedDeal() {
+  selectedDealId = null;
+  document.getElementById('evSelectedDeal').innerHTML = '';
+}
+
+function openEventModal(opts) {
+  opts = opts || {};
+  document.getElementById('dealSearchResults').style.display = 'none';
+  document.getElementById('evDealSearch').value = '';
+  clearSelectedDeal();
+  if (opts.existing) {
+    const ev = opts.existing;
+    editingEventId = ev.id;
+    document.getElementById('eventModalTitle').textContent = 'Editar Compromisso';
+    document.getElementById('evTitle').value = ev.title || '';
+    document.getElementById('evDescription').value = (ev.extendedProps && ev.extendedProps.description) || '';
+    document.getElementById('evStart').value = toLocalInputValue(ev.start);
+    document.getElementById('evEnd').value = toLocalInputValue(ev.end || ev.start);
+    if (ev.extendedProps && ev.extendedProps.dentistUserId) document.getElementById('evDentist').value = String(ev.extendedProps.dentistUserId);
+    if (ev.extendedProps && ev.extendedProps.dealId) {
+      selectedDealId = ev.extendedProps.dealId;
+      document.getElementById('evSelectedDeal').innerHTML = '<span class="selected-deal-chip">' + escapeHtml(ev.extendedProps.patientName || ('Negocio #' + selectedDealId)) + '<button type="button" onclick="clearSelectedDeal()">x</button></span>';
+    }
+    document.getElementById('evDeleteBtn').style.display = 'inline-block';
+      document.getElementById('evQuickStatusRow').style.display = 'block';
+      selectedLikelihood = (ev.extendedProps && ev.extendedProps.attendanceLikelihood) || null;
+      renderLikelihoodButtons();
+  } else {
+    editingEventId = null;
+    document.getElementById('eventModalTitle').textContent = 'Novo Compromisso';
+    document.getElementById('evTitle').value = '';
+    document.getElementById('evDescription').value = '';
+    document.getElementById('evStart').value = opts.start ? toLocalInputValue(opts.start) : '';
+    document.getElementById('evEnd').value = opts.end ? toLocalInputValue(opts.end) : '';
+    document.getElementById('evDentist').value = String(currentDentistId() || '');
+    document.getElementById('evDeleteBtn').style.display = 'none';
+      document.getElementById('evQuickStatusRow').style.display = 'none';
+      selectedLikelihood = null;
+      renderLikelihoodButtons();
+  }
+  document.getElementById('eventModalOverlay').style.display = 'flex';
+}
+
+function closeEventModal() {
+  document.getElementById('eventModalOverlay').style.display = 'none';
+}
+
+async function submitEvent() {
+  const title = document.getElementById('evTitle').value.trim();
+  const startVal = document.getElementById('evStart').value;
+  const endVal = document.getElementById('evEnd').value;
+  const dentistUserId = document.getElementById('evDentist').value;
+  const description = document.getElementById('evDescription').value.trim();
+  if (!title) { showToast('Informe um titulo', 'error'); return; }
+  if (!startVal || !endVal) { showToast('Informe inicio e fim', 'error'); return; }
+  const payload = {
+    title: title,
+    description: description || null,
+    startAt: startVal,
+    endAt: endVal,
+    dentistUserId: dentistUserId,
+    dealId: selectedDealId,
+      attendanceLikelihood: selectedLikelihood
+  };
+  try {
+    if (editingEventId) {
+      await api('/api/crm/ui/calendar-events/' + editingEventId, { method: 'PATCH', body: JSON.stringify(payload) });
+      showToast('Compromisso atualizado', 'success');
+    } else {
+      await api('/api/crm/ui/calendar-events', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('Compromisso criado', 'success');
+    }
+    closeEventModal();
+    calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao salvar compromisso', 'error');
+  }
+}
+
+async function deleteEvent() {
+  if (!editingEventId) return;
+  
+  try {
+    await api('/api/crm/ui/calendar-events/' + editingEventId, { method: 'DELETE' });
+    showToast('Compromisso cancelado', 'success');
+    closeEventModal();
+    calendar.refetchEvents();
+  } catch (e) {
+    showToast(e.message || 'Erro ao cancelar compromisso', 'error');
+  }
+}
+
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('dealSearchWrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('dealSearchResults').style.display = 'none';
+});
+
+(async function init() {
+  await loadUsers();
+  initCalendar();
+  checkGcalStatus();
+  const gc = qs('google_connected');
+  if (gc === '1') { showToast('Google Calendar conectado com sucesso!', 'success'); checkGcalStatus(); }
+  else if (gc === '0') { showToast('Nao foi possivel conectar ao Google Calendar. Tente novamente.', 'error'); }
+})();
+</script>
+</body>
+</html>

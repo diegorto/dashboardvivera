@@ -4871,6 +4871,124 @@ app.post('/api/webhooks/google-ads', (req, res) => {
   }
 });
 
+// ============ TINTIM WEBHOOK - captura leads em tempo real (mesmo antes de virar deal no Pipedrive) ============
+function toMySQLDateTime(iso) {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+  } catch (e) { return null; }
+}
+
+app.post('/api/webhooks/tintim', async (req, res) => {
+  try {
+    const s = loadSettingsFile();
+    const expectedSecret = s.tintimWebhookSecret || process.env.TINTIM_WEBHOOK_SECRET || '';
+    const providedSecret = req.headers['x-webhook-secret'] || (req.query && req.query.secret) || '';
+    if (!expectedSecret) {
+      return res.status(500).json({ success: false, error: 'tintimWebhookSecret nao configurado em data/settings.json.' });
+    }
+    if (providedSecret !== expectedSecret) {
+      return res.status(401).json({ success: false, error: 'Secret invalido.' });
+    }
+
+    const body = req.body || {};
+    const isMessageEvent = body.event_type === 'message.create';
+    const lead = isMessageEvent ? (body.lead || {}) : body;
+
+    const phone = toTintimPhone(lead.phone || lead.phone_e164 || '');
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'Payload sem telefone do lead.' });
+    }
+
+    const ad = (lead.ad && typeof lead.ad === 'object') ? lead.ad : {};
+    const visit = (lead.visit && typeof lead.visit === 'object') ? lead.visit : {};
+    const visitParams = (visit.params && typeof visit.params === 'object') ? visit.params : {};
+    const location = (lead.location && typeof lead.location === 'object') ? lead.location : {};
+    const status = (lead.status && typeof lead.status === 'object') ? lead.status : {};
+
+    const vals = [
+      phone,
+      lead.phone_e164 || null,
+      lead.name || null,
+      body.event_type || null,
+      lead.source || null,
+      status.id != null ? String(status.id) : null,
+      status.name || null,
+      lead.utm_source || visitParams.utm_source || null,
+      lead.utm_medium || visitParams.utm_medium || null,
+      lead.utm_campaign || visitParams.utm_campaign || null,
+      lead.utm_content || visitParams.utm_content || null,
+      lead.utm_term || visitParams.utm_term || null,
+      ad.ad_account_id || null,
+      ad.ad_account_name || null,
+      ad.ad_id || null,
+      ad.ad_name || null,
+      ad.adset_id || null,
+      ad.adset_name || null,
+      ad.campaign_id || null,
+      ad.campaign_name || null,
+      lead.ctwa_clid || null,
+      visitParams.fbclid || null,
+      visitParams.gclid || null,
+      visit.name || null,
+      location.country || null,
+      location.state || null,
+      (lead.sale_amount !== '' && lead.sale_amount != null) ? lead.sale_amount : null,
+      toMySQLDateTime(lead.sale_datetime),
+      lead.total_messages != null ? lead.total_messages : null,
+      toMySQLDateTime(lead.created_isoformat),
+      toMySQLDateTime(lead.updated_isoformat),
+      JSON.stringify(body)
+    ];
+
+    const pool = getCrmRankingPool();
+    const sql = `INSERT INTO tintim_leads_raw (
+        phone, phone_e164, name, event_type, source, status_id, status_name,
+        utm_source, utm_medium, utm_campaign, utm_content, utm_term,
+        ad_account_id, ad_account_name, ad_id, ad_name, adset_id, adset_name,
+        campaign_id, campaign_name, ctwa_clid, fbclid, gclid, visit_name,
+        country, state, sale_amount, sale_datetime, total_messages,
+        lead_created_at, lead_updated_at, raw_payload
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ON DUPLICATE KEY UPDATE
+        phone_e164 = VALUES(phone_e164), name = VALUES(name), event_type = VALUES(event_type),
+        source = VALUES(source), status_id = VALUES(status_id), status_name = VALUES(status_name),
+        utm_source = COALESCE(VALUES(utm_source), utm_source),
+        utm_medium = COALESCE(VALUES(utm_medium), utm_medium),
+        utm_campaign = COALESCE(VALUES(utm_campaign), utm_campaign),
+        utm_content = COALESCE(VALUES(utm_content), utm_content),
+        utm_term = COALESCE(VALUES(utm_term), utm_term),
+        ad_account_id = COALESCE(VALUES(ad_account_id), ad_account_id),
+        ad_account_name = COALESCE(VALUES(ad_account_name), ad_account_name),
+        ad_id = COALESCE(VALUES(ad_id), ad_id),
+        ad_name = COALESCE(VALUES(ad_name), ad_name),
+        adset_id = COALESCE(VALUES(adset_id), adset_id),
+        adset_name = COALESCE(VALUES(adset_name), adset_name),
+        campaign_id = COALESCE(VALUES(campaign_id), campaign_id),
+        campaign_name = COALESCE(VALUES(campaign_name), campaign_name),
+        ctwa_clid = COALESCE(VALUES(ctwa_clid), ctwa_clid),
+        fbclid = COALESCE(VALUES(fbclid), fbclid),
+        gclid = COALESCE(VALUES(gclid), gclid),
+        visit_name = COALESCE(VALUES(visit_name), visit_name),
+        country = COALESCE(VALUES(country), country),
+        state = COALESCE(VALUES(state), state),
+        sale_amount = COALESCE(VALUES(sale_amount), sale_amount),
+        sale_datetime = COALESCE(VALUES(sale_datetime), sale_datetime),
+        total_messages = COALESCE(VALUES(total_messages), total_messages),
+        lead_updated_at = COALESCE(VALUES(lead_updated_at), lead_updated_at),
+        raw_payload = VALUES(raw_payload),
+        updated_at = CURRENT_TIMESTAMP`;
+
+    await pool.query(sql, vals);
+    console.log(`[tintim-webhook] Recebido ${body.event_type || '?'} para phone=${phone}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[tintim-webhook] Erro:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 // GET /api/google-ads/test - Testa conexão com Pipeboard Google Ads MCP
 // ==================== GOOGLE ADS ENDPOINTS ====================
 // Nota: Google Ads usa Pipeboard REST API diretamente

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vivera CRM - Conversas Paradas</title>
+<link rel="stylesheet" href="app.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="crm-sidebar" id="crmSidebar">
+ <a href="board.html" data-match="index.html,board.html,stalled.html,agenda.html,detail.html">Negocios</a>
+ <a href="pessoas.html" data-match="pessoas.html">Pessoas</a>
+ <a href="agenda.html" data-match="agenda.html">Atividades</a> <a href="agenda-visual.html" data-match="agenda-visual.html">Agenda (Calendário)</a> <a href="duplicados.html" data-match="duplicados.html">Duplicidades</a>
+ <hr>
+ <div class="sb-group-label">Intelligence</div>
+ <a class="sb-sub" href="dashboard.html#executive" data-match="dashboard.html">Executivo</a>
+ <a class="sb-sub" href="dashboard.html#crmintel">Intelig. CRM</a>
+ <a class="sb-sub" href="dashboard.html#tintim">Tintim</a>
+ <div class="sb-group-label">Media</div>
+ <a class="sb-sub" href="dashboard.html#mktpago">MKT PAGO</a>
+ <a class="sb-sub" href="dashboard.html#googleads">Google Ads</a>
+ <a class="sb-sub" href="dashboard.html#metaads">Meta Ads</a>
+ <a class="sb-sub" href="dashboard.html#campaigns">Campanhas</a>
+ <a class="sb-sub" href="dashboard.html#creatives">Criativos</a>
+ <div class="sb-group-label">Operations</div>
+ <a class="sb-sub" href="dashboard.html#professionals">Profis.</a>
+ <a class="sb-sub" href="dashboard.html#sdrs">SDRs</a>
+ <a class="sb-sub" href="whatsapp.html">WhatsApp</a>
+<div class="sb-group-label">Diretoria</div>
+<a class="sb-sub" href="dashboard.html#diretoria">Diretoria</a>
+<div class="sb-group-label" id="sbAdminLabel" style="display:none">Administracao</div>
+<a class="sb-sub" href="dashboard.html#usuarios" id="sbAdminUsersLink" style="display:none">Usuarios</a>
+</div>
+<script>(function(){ try { var u = JSON.parse(localStorage.getItem('crm_user')||'null'); if (u && u.role === 'admin') { document.getElementById('sbAdminLabel').style.display=''; document.getElementById('sbAdminUsersLink').style.display=''; } } catch(e){} })();</script>
+<script>(function(){var p=location.pathname.split('/').pop()||'index.html';document.querySelectorAll('#crmSidebar a').forEach(function(a){var m=(a.dataset.match||'').split(',');if(m.indexOf(p)!==-1)a.classList.add('active');});})();</script>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="brand">
+      <div class="name">VIVERA</div>
+      <div class="sub">CRM Orofacial Avancada</div>
+    </div>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">Lista</a>
+      <a class="nav-link" href="board.html">Kanban</a>
+      <a class="nav-link active" href="stalled.html">Conversas Paradas</a>
+      <a class="nav-link" href="agenda.html">Agenda</a>
+    </div>
+  </div>
+  <div class="topbar-right" id="topbarRight"></div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">Conversas Paradas</h1>
+  <p class="page-sub" id="totalLabel">Carregando...</p>
+  <div class="card" style="margin-bottom:16px;">
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;">
+      <div style="min-width:220px;">
+        <div style="font-size:13px;color:#666;margin-bottom:4px;">Negocios abertos sem interacao ha mais de 4 dias</div>
+        <div id="kpiNoInteraction4d" style="font-size:32px;font-weight:700;color:#c0392b;">...</div>
+        <div id="kpiOpenTotal" style="font-size:12px;color:#999;margin-top:4px;"></div>
+      </div>
+      <div style="flex:1;min-width:320px;">
+        <div style="font-size:13px;color:#666;margin-bottom:4px;">Dias sem interacao (negocios abertos, 1 a 90 dias, sem contar perdidos)</div>
+        <canvas id="stalledHistogramChart" height="90"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#666;">
+        Sem resposta ha mais de
+        <select class="input" id="daysFilter" style="width:auto;">
+          <option value="7" selected>7 dias</option>
+          <option value="15">15 dias</option>
+          <option value="30">30 dias</option>
+          <option value="90">90 dias</option>
+          <option value="120">120 dias</option>
+        </select>
+      </label>
+      <button class="btn" id="refreshBtn">Atualizar</button>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Paciente</th>
+          <th>Negocio</th>
+          <th id="thOwnerFilter" style="cursor:pointer;user-select:none;" onclick="toggleOwnerFilter(event)">Dono</th>
+      <th id="thStageFilter" style="cursor:pointer;user-select:none;" onclick="toggleStageFilter(event)">Funil</th>
+      <th>Dias no Funil</th>
+      <th>Telefone</th>
+          <th>Status Tintim</th>
+          <th>Ultima interacao</th>
+          <th>Sem resposta ha</th>
+          <th>WhatsApp</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+function fmtDateTime(iso) {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function fmtHoursAgo(h) {
+  if (h == null) return '-';
+  if (h < 24) return h + 'h';
+  const days = Math.floor(h / 24);
+  const rem = h % 24;
+  return days + 'd ' + rem + 'h';
+}
+
+function waLink(d) {
+  if (!d.patient_phone) return '-';
+  const digits = String(d.patient_phone).replace(/\D/g, '');
+  if (!digits) return '-';
+  const firstName = (d.patient_name || '').trim().split(' ')[0] || '';
+  const greeting = firstName ? ('Oi, ' + firstName + '! ') : 'Oi! ';
+  const msg = greeting + 'Tudo bem? Aqui e da Vivera CRM Orofacial. Vi que nossa conversa ficou parada e fiquei na duvida se voce ainda tem interesse em agendar sua avaliacao. Fico a disposicao para ajudar a encontrar o melhor horario. :)';
+  const url = 'https://wa.me/' + digits + '?text=' + encodeURIComponent(msg);
+  return '<a href="' + url + '" target="_blank" onclick="event.stopPropagation()" style="color:#25D366;font-weight:600;text-decoration:none;">&#128241; Chamar</a>';
+}
+
+async function load() {
+  const tbody = document.getElementById('tableBody');
+  const totalLabel = document.getElementById('totalLabel');
+  const days = document.getElementById('daysFilter').value;
+  totalLabel.textContent = 'Carregando...';
+  tbody.innerHTML = '';
+  try {
+    const data = await api('/api/crm/ui/stalled-conversations?days=' + encodeURIComponent(days));
+    const deals = data.deals || [];
+    window.__allDeals = deals;
+    const filteredDeals = deals.filter(function(d){
+      var ownOk = !ownerFilterValue || ((d.owner_name || 'Sem dono') === ownerFilterValue);
+      var stgOk = !stageFilterValue || ((d.stage_label || '-') === stageFilterValue);
+      return ownOk && stgOk;
+    });
+    updateFilterHeaders();
+    totalLabel.textContent = filteredDeals.length + ' de ' + deals.length + ' conversa(s) parada(s) (sem resposta ha mais de ' + days + ' dia(s))';
+    if (!filteredDeals.length) {
+      tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#888;padding:24px;">Nenhuma conversa parada com esses filtros.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filteredDeals.map(d => `
+      <tr onclick="window.location.href='detail.html?id=${d.deal_id}'" style="cursor:pointer;">
+        <td>${d.patient_name || '-'}</td>
+        <td>${d.title || '-'}</td>
+        <td>${d.owner_name || 'Sem dono'}</td>
+        <td>${d.stage_label || '-'}</td>
+        <td>${(d.days_in_stage===null||d.days_in_stage===undefined) ? '-' : d.days_in_stage + 'd'}</td>
+        <td>${d.patient_phone || '-'}</td>
+        <td>${d.status_name || '-'}</td>
+        <td>${fmtDateTime(d.lead_updated_at)}</td>
+        <td style="color:#c0392b;font-weight:600;">${fmtHoursAgo(d.hours_since_last_msg)}</td>
+      <td>${waLink(d)}</td>
+      </tr>
+    `).join('');
+  } catch (e) {
+    totalLabel.textContent = 'Erro ao carregar: ' + e.message;
+  }
+}
+
+let ownerFilterValue = '';
+let stageFilterValue = '';
+function updateFilterHeaders() {
+  const to = document.getElementById('thOwnerFilter');
+  const ts = document.getElementById('thStageFilter');
+  if (to) to.textContent = 'Dono' + (ownerFilterValue ? ' (' + ownerFilterValue + ')' : '');
+  if (ts) ts.textContent = 'Funil' + (stageFilterValue ? ' (' + stageFilterValue + ')' : '');
+}
+function closeFilterPopover() {
+  const el = document.getElementById('filterPopoverEl');
+  if (el) el.remove();
+}
+document.addEventListener('click', closeFilterPopover);
+function showFilterPopover(anchorEl, field, currentValue, fallbackLabel, onSelect) {
+  closeFilterPopover();
+  const list = (window.__allDeals || []);
+  const values = Array.from(new Set(list.map(function(d){ return d[field] || fallbackLabel; }))).sort();
+  const pop = document.createElement('div');
+  pop.id = 'filterPopoverEl';
+  pop.style.cssText = 'position:absolute;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);padding:6px 0;z-index:1000;max-height:260px;overflow:auto;min-width:160px;font-size:13px;';
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.top = (rect.bottom + window.scrollY) + 'px';
+  pop.style.left = (rect.left + window.scrollX) + 'px';
+  const allOpt = document.createElement('div');
+  allOpt.textContent = 'Todos';
+  allOpt.style.cssText = 'padding:6px 14px;cursor:pointer;font-weight:' + (currentValue===''?'700':'400');
+  allOpt.onmouseenter = function(){ allOpt.style.background='#f2f2f2'; };
+  allOpt.onmouseleave = function(){ allOpt.style.background=''; };
+  allOpt.onclick = function(ev){ ev.stopPropagation(); onSelect(''); closeFilterPopover(); };
+  pop.appendChild(allOpt);
+  values.forEach(function(v){
+    const opt = document.createElement('div');
+    opt.textContent = v;
+    opt.style.cssText = 'padding:6px 14px;cursor:pointer;font-weight:' + (currentValue===v?'700':'400');
+    opt.onmouseenter = function(){ opt.style.background='#f2f2f2'; };
+    opt.onmouseleave = function(){ opt.style.background=''; };
+    opt.onclick = function(ev){ ev.stopPropagation(); onSelect(v); closeFilterPopover(); };
+    pop.appendChild(opt);
+  });
+  document.body.appendChild(pop);
+}
+function toggleOwnerFilter(e) {
+  e.stopPropagation();
+  const existing = document.getElementById('filterPopoverEl');
+  if (existing) { closeFilterPopover(); return; }
+  showFilterPopover(e.currentTarget, 'owner_name', ownerFilterValue, 'Sem dono', function(v){ ownerFilterValue = v; load(); });
+}
+function toggleStageFilter(e) {
+  e.stopPropagation();
+  const existing = document.getElementById('filterPopoverEl');
+  if (existing) { closeFilterPopover(); return; }
+  showFilterPopover(e.currentTarget, 'stage_label', stageFilterValue, '-', function(v){ stageFilterValue = v; load(); });
+}
+let stalledChart = null;
+async function loadDashboard() {
+  try {
+    const data = await api('/api/crm/ui/stalled-conversations/dashboard');
+    document.getElementById('kpiNoInteraction4d').textContent = data.noInteraction4d;
+    document.getElementById('kpiOpenTotal').textContent = 'de ' + data.openTotal + ' negocios abertos no total';
+    const labels = data.histogram.map(h => h.days);
+    const counts = data.histogram.map(h => h.count);
+    const ctx = document.getElementById('stalledHistogramChart').getContext('2d');
+    if (stalledChart) stalledChart.destroy();
+    stalledChart = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ label: 'Negocios', data: counts, backgroundColor: '#c0392b' }] },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { title: { display: true, text: 'Dias sem interacao' }, ticks: { maxTicksLimit: 18 } },
+          y: { title: { display: true, text: 'Negocios' }, beginAtZero: true, ticks: { precision: 0 } }
+        }
+      }
+    });
+  } catch (e) {
+    document.getElementById('kpiNoInteraction4d').textContent = 'erro';
+    console.error('dashboard error', e);
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click', load);
+document.getElementById('daysFilter').addEventListener('change', load);
+
+load();
+loadDashboard();
+</script>
+</body>
+</html>
