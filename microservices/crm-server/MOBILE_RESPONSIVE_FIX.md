@@ -74,3 +74,18 @@ Nao foi possivel validar em iPhone fisico (sem acesso a hardware real) -
 aguardando novo teste do Diego. Se persistir, proximo passo e pedir uma
 gravacao de tela do toque, ou tentar Safari no lugar do Chrome para isolar
 se e algo do Chrome iOS especificamente ou do WebKit em geral.
+
+## Update 3: menu abria mas ficava com overlay cinza e itens nao clicaveis
+
+Causa raiz encontrada (nao era mais o toque/gesto, era CSS puro): a regra
+original `.crm-sidebar { ... z-index:200; }` (ja existia no arquivo antes
+de qualquer mudanca mobile) ficava com z-index MENOR que o
+`.crm-sidebar-backdrop` que criei (z-index:450). Resultado: quando a
+sidebar abria em mobile, o backdrop escurecido renderizava por CIMA dela -
+daí o visual "cinza cobrindo tudo" e nenhum clique chegava aos links (o
+backdrop capturava o toque antes).
+
+Fix: `.crm-sidebar` ganhou `z-index:500` dentro do bloco mobile (fica acima
+do backdrop 450, abaixo do botao Menu 600). Testado com clique real: abrir
+menu -> clicar em "Pessoas" (navega) -> abrir menu de novo -> clicar em
+"Duplicidades" (navega). Sem overlay cinza, sem erros no console.
