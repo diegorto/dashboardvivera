@@ -1509,7 +1509,7 @@ loadExecutive();
 }
 }
 window.addEventListener('hashchange', function(){ activateTab((location.hash||'').replace('#','')); });
-activateTab((location.hash||'').replace('#',''));
+  document.addEventListener('DOMContentLoaded', function(){ activateTab((location.hash||'').replace('#','')); });
 </script>
 <div class="modal-overlay" id="sdrDrilldownOverlay" style="display:none;">
 <div class="modal-box" style="width:640px;max-width:92vw;">
