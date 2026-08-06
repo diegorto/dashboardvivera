@@ -187,7 +187,7 @@
  <span style="display:flex;align-items:center;gap:8px;"><button class="wa-btn primary-blue" onclick="resolveConversation(currentConvId)">Concluido</button><button class="wa-btn-icon" onclick="closeConvThread()" title="Fechar" aria-label="Fechar">&times;</button></span>
  </div>
  <div id="convThreadMsgs" class="wa-chat-messages"></div>
-<div class="wa-chat-inputbar"><input type="text" id="convManualInput" placeholder="Enviar mensagem manual (desliga a IA nesta conversa)..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendManualMessage();}"><button class="wa-btn-icon" id="convAttachBtn" onclick="document.getElementById('convAttachInput').click()" title="Anexar arquivo" aria-label="Anexar arquivo">📎</button><input type="file" id="convAttachInput" style="display:none" onchange="handleAttachmentSelected(this)"><button class="wa-btn" onclick="sendManualMessage()">Enviar</button></div><div id="convAttachStatus" style="padding:0 14px 8px;font-size:12px;color:#666;"></div>
+<div class="wa-chat-inputbar"><input type="text" id="convManualInput" placeholder="Enviar mensagem manual (desliga a IA nesta conversa)..." style="flex:1;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-size:16px;" onkeydown="if(event.key==='Enter'){event.preventDefault();sendManualMessage();}"><button class="wa-btn-icon" id="convAttachBtn" onclick="document.getElementById('convAttachInput').click()" title="Anexar arquivo" aria-label="Anexar arquivo">📎</button><input type="file" id="convAttachInput" style="display:none" onchange="handleAttachmentSelected(this)"><button class="wa-btn-icon" id="convRecordBtn" onclick="toggleRecording()" title="Gravar audio" aria-label="Gravar audio">🎤</button><button class="wa-btn" onclick="sendManualMessage()">Enviar</button></div><div id="convAttachStatus" style="padding:0 14px 8px;font-size:12px;color:#666;"></div>
  </div><!-- /convThreadBox -->
 </div><!-- /wa-chat-main -->
 </div><!-- /wa-chat-layout -->
@@ -640,7 +640,93 @@ async function sendAttachment(file) {
   }
 }
 
-async function sendManualMessage() {
+let mediaRecorder = null;
+      let recordedChunks = [];
+      let recordingStartTime = null;
+      let recordingTimerInterval = null;
+
+      async function toggleRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          stopRecording();
+        } else {
+          await startRecording();
+        }
+      }
+
+      async function startRecording() {
+        if (!currentConvId) { alert('Selecione uma conversa antes de gravar.'); return; }
+        var statusEl = document.getElementById('convAttachStatus');
+        var recordBtn = document.getElementById('convRecordBtn');
+        try {
+          var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          var mimeType = '';
+          var candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
+          for (var i = 0; i < candidates.length; i++) {
+            if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(candidates[i])) { mimeType = candidates[i]; break; }
+          }
+          recordedChunks = [];
+          mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType: mimeType }) : new MediaRecorder(stream);
+          mediaRecorder.addEventListener('dataavailable', function (e) {
+            if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+          });
+          mediaRecorder.addEventListener('stop', function () {
+            stream.getTracks().forEach(function (t) { t.stop(); });
+            if (recordingTimerInterval) { clearInterval(recordingTimerInterval); recordingTimerInterval = null; }
+            var blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+            recordedChunks = [];
+            if (blob.size > 0) sendRecordedAudio(blob);
+            else if (statusEl) statusEl.textContent = '';
+          });
+          mediaRecorder.start();
+          recordingStartTime = Date.now();
+          if (recordBtn) { recordBtn.textContent = '⏹️'; recordBtn.title = 'Parar gravacao'; }
+          if (statusEl) {
+            recordingTimerInterval = setInterval(function () {
+              var secs = Math.floor((Date.now() - recordingStartTime) / 1000);
+              statusEl.textContent = '🔴 Gravando... ' + secs + 's';
+            }, 500);
+          }
+        } catch (e) {
+          alert('Nao foi possivel acessar o microfone: ' + e.message);
+        }
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+        }
+        var recordBtn = document.getElementById('convRecordBtn');
+        if (recordBtn) { recordBtn.textContent = '🎤'; recordBtn.title = 'Gravar audio'; }
+      }
+
+      async function sendRecordedAudio(blob) {
+        var statusEl = document.getElementById('convAttachStatus');
+        var recordBtn = document.getElementById('convRecordBtn');
+        if (statusEl) statusEl.textContent = 'Enviando audio...';
+        if (recordBtn) recordBtn.disabled = true;
+        try {
+          var fd = new FormData();
+          fd.append('file', blob, 'recording.webm');
+          var r = await fetch(API_BASE + '/conversations/' + currentConvId + '/send-recorded-audio', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token },
+            body: fd
+          });
+          var data = await r.json();
+          if (!data.success) throw new Error(data.error || 'falha ao enviar audio');
+          if (statusEl) statusEl.textContent = '';
+          var title = document.getElementById('convThreadTitle').textContent;
+          await openConversation(currentConvId, title);
+          await loadConversations();
+        } catch (e) {
+          if (statusEl) statusEl.textContent = '';
+          alert('Erro ao enviar audio: ' + e.message);
+        } finally {
+          if (recordBtn) recordBtn.disabled = false;
+        }
+      }
+
+      async function sendManualMessage() {
 const inp = document.getElementById('convManualInput');
 const text = (inp.value || '').trim();
 if (!text || !currentConvId) return;
