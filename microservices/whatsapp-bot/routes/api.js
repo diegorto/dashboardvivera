@@ -110,6 +110,40 @@ function mediaTypeFromMimetype(mimetype) {
 }
 
 // Envio manual de anexo (documento/foto/video) pela equipe; reusa sendImage/sendVideo/sendDocument/sendAudio.
+const recordingStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const fsx = require('fs')
+    const dir = require('path').join(__dirname, '..', 'assets', 'manual_recordings')
+    try { fsx.mkdirSync(dir, { recursive: true }) } catch (e) {}
+    cb(null, dir)
+  },
+  filename: function (req, file, cb) {
+    cb(null, 'rec_' + Date.now() + '_' + Math.round(Math.random() * 1e9) + '.input')
+  }
+})
+const recordingUpload = multer({ storage: recordingStorage, limits: { fileSize: 20 * 1024 * 1024 } })
+
+// Envio de audio gravado no navegador (MediaRecorder, geralmente webm/opus); transcodifica para ogg/opus via ffmpeg antes de enviar pelo Baileys.
+router.post('/conversations/:id/send-recorded-audio', auth, recordingUpload.single('file'), async (req, res) => {
+  const { execFile } = require('child_process')
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'arquivo obrigatorio' })
+    const inputPath = req.file.path
+    const outputPath = inputPath.replace(/\.input$/, '.ogg')
+    await new Promise((resolve, reject) => {
+      execFile('ffmpeg', ['-y', '-i', inputPath, '-c:a', 'libopus', '-b:a', '64k', '-ar', '48000', '-ac', '1', outputPath], { timeout: 30000 }, (err, stdout, stderr) => {
+        if (err) return reject(new Error('falha ao converter audio (ffmpeg): ' + (stderr ? String(stderr).slice(0, 300) : err.message)))
+        resolve()
+      })
+    })
+    await wa.sendManualMedia(req.params.id, outputPath, 'audio', {})
+    res.json({ success: true })
+  } catch (e) {
+    console.error('[api] erro ao enviar audio gravado:', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, error: 'arquivo obrigatorio' })
