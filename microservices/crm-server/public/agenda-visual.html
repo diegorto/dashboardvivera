@@ -460,6 +460,10 @@ function openEventModal(opts) {
   document.getElementById('dealSearchResults').style.display = 'none';
   document.getElementById('evDealSearch').value = '';
   clearSelectedDeal();
+  if (opts.dealId) {
+    selectedDealId = opts.dealId;
+    document.getElementById('evSelectedDeal').innerHTML = '<span class="selected-deal-chip">' + escapeHtml(opts.patientName || ('Negocio #' + selectedDealId)) + '<button type="button" onclick="clearSelectedDeal()">x</button></span>';
+  }
   if (opts.existing) {
     const ev = opts.existing;
     editingEventId = ev.id;
@@ -480,7 +484,7 @@ function openEventModal(opts) {
   } else {
     editingEventId = null;
     document.getElementById('eventModalTitle').textContent = 'Novo Compromisso';
-    document.getElementById('evTitle').value = '';
+    document.getElementById('evTitle').value = opts.title || '';
     document.getElementById('evDescription').value = '';
     document.getElementById('evStart').value = opts.start ? toLocalInputValue(opts.start) : '';
     document.getElementById('evEnd').value = opts.end ? toLocalInputValue(opts.end) : '';
@@ -550,6 +554,17 @@ document.addEventListener('click', function(e) {
 (async function init() {
   await loadUsers();
   initCalendar();
+  const __apParams = new URLSearchParams(location.search);
+  if (__apParams.get('autoOpen') === '1') {
+    const __apDealId = __apParams.get('dealId');
+    const __apPatient = __apParams.get('patientName') || '';
+    const __apTitle = __apParams.get('title') || (__apPatient ? ('Avaliacao - ' + __apPatient) : '');
+    const __apNow = new Date();
+    __apNow.setSeconds(0, 0);
+    __apNow.setMinutes(Math.ceil(__apNow.getMinutes() / 30) * 30);
+    const __apEnd = new Date(__apNow.getTime() + 30 * 60000);
+    openEventModal({ title: __apTitle, dealId: __apDealId ? parseInt(__apDealId, 10) : null, patientName: __apPatient, start: __apNow, end: __apEnd });
+  }
   checkGcalStatus();
   const gc = qs('google_connected');
   if (gc === '1') { showToast('Google Calendar conectado com sucesso!', 'success'); checkGcalStatus(); }
