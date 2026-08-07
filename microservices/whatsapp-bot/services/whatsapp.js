@@ -157,44 +157,56 @@ async function handleOutgoingFromDevice(fromJid, m, connCtx) {
 // o comportamento do gatilho automatico - mesma logica, so parametrizada.
 async function triggerWelcomeFlow({ fromJid, convId, dealId, pushName, connCtx, chatbotEnabled }) {
   try {
+    // [2026-08-07] Reconstruido a pedido do Diego: o passo-gatilho (antes sempre
+    // audio via sendAudio) agora e dirigido por config (seq_trigger_type +
+    // seq_trigger_content), igual aos steps 1-4. Usa o mesmo mecanismo confiavel
+    // (sendText/sendImage/sendVideo) que ja funciona nos fluxos de cadencia D+1 a
+    // D+15 - nao usa mais sendAudio() diretamente aqui. Timing/logica preservados:
+    // este passo continua disparando IMEDIATAMENTE e sincrono (t=0), antes de
+    // agendar os steps 1-4 via scheduler.scheduleSequence (que roda em paralelo,
+    // com delays cumulativos configurados em seq_stepN_delay_min).
     const seqCfg = await ai.getConfig()
-    const audioPath = seqCfg.seq_trigger_audio_path
-    if (audioPath) {
+    const triggerType = seqCfg.seq_trigger_type || 'text'
+    const triggerContent = seqCfg.seq_trigger_content || seqCfg.seq_trigger_audio_path || ''
+    if (triggerContent) {
       try {
-        await sendAudio(fromJid, require('path').join(__dirname, '..', audioPath), connCtx && connCtx.sock)
-        await saveMessage(convId, 'out', '[audio pre-qualificacao Dr. Diego]', 'ai')
+        const path = require('path')
+        const activeSock = connCtx && connCtx.sock
+        if (triggerType === 'audio') {
+          await sendAudio(fromJid, path.join(__dirname, '..', triggerContent), activeSock)
+        } else if (triggerType === 'image') {
+          await sendImage(fromJid, path.join(__dirname, '..', triggerContent), '', activeSock)
+        } else if (triggerType === 'video') {
+          await sendVideo(fromJid, path.join(__dirname, '..', triggerContent), {}, activeSock)
+        } else {
+          const text = String(triggerContent).split('{nome}').join(pushName || 'Oi')
+          await sendText(fromJid, text, activeSock)
+        }
+        await saveMessage(convId, 'out', '[fluxo inicial - gatilho ' + triggerType + ']', 'ai')
         if (dealId) {
           try {
             await pool.query('UPDATE deals SET stage_id = ? WHERE id = ? AND pipeline_id = (SELECT pipeline_id FROM stages WHERE id = ?)', [8, dealId, 8])
-            console.log('[whatsapp] deal ' + dealId + ' movido para Contato Realizado (stage 8) apos envio do audio 1')
+            console.log('[whatsapp] deal ' + dealId + ' movido para Contato Realizado (stage 8) apos envio do gatilho (' + triggerType + ')')
           } catch (e) {
             console.error('[whatsapp] erro ao mover deal para Contato Realizado:', e.message)
           }
         }
       } catch (e) {
-        console.error('[whatsapp] erro ao enviar audio de pre-qualificacao:', e.message)
+        console.error('[whatsapp] erro ao enviar gatilho do fluxo inicial (' + triggerType + '):', e.message)
         try {
-          const fallbackText = 'Oi' + (pushName ? ', ' + pushName : '') + '! Aqui e o Dr. Diego. O que chamou sua atencao no que voce viu, e o que mais te incomoda hoje quando voce se olha no espelho?'
+          const fallbackText = 'Oi' + (pushName ? ' ' + pushName : '') + '! Aqui e o Dr. Diego. O que chamou sua atencao no que voce viu, e o que mais oje quando voce se olha no espelho?'
           await sendText(fromJid, fallbackText, connCtx && connCtx.sock)
           await saveMessage(convId, 'out', fallbackText, 'ai')
-          console.warn('[whatsapp] fallback de texto enviado no lugar do audio (audio falhou)')
-          if (dealId) {
-            try {
-              await pool.query('UPDATE deals SET stage_id = ? WHERE id = ? AND pipeline_id = (SELECT pipeline_id FROM stages WHERE id = ?)', [8, dealId, 8])
-            } catch (e2) {
-              console.error('[whatsapp] erro ao mover deal para Contato Realizado (fallback texto):', e2.message)
-            }
-          }
         } catch (e2) {
-          console.error('[whatsapp] fallback de texto TAMBEM falhou (audio E texto falharam):', e2.message)
+          console.error('[whatsapp] fallback de texto do gatilho tambem falhou:', e2.message)
         }
       }
     } else {
-      console.warn('[whatsapp] seq_trigger_audio_path nao configurado, pulando audio inicial')
+      console.warn('[whatsapp] seq_trigger_content nao configurado, pulando gatilho inicial')
     }
     if (chatbotEnabled) await require('./scheduler').scheduleSequence(convId, pushName)
   } catch (e) {
-    console.error('[whatsapp] erro ao disparar sequencia apos delay:', e.message)
+    console.error('[whatsapp] erro ao disparar fluxo de boas-vindas:', e.message)
   }
 }
 async function handleIncomingText(fromJid, text, pushName, connCtx) {

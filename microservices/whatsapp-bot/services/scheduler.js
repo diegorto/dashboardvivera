@@ -98,10 +98,16 @@ async function resolveJid(phone) {
       const flowConn = await require('./connectionsStore').getFlowConnection('fluxo_inicial_quiz').catch(() => null)
       const sockOverride = flowConn ? wa.getSocketForConnection(flowConn.id) : undefined
         if (row.message_type === 'audio') {
-          await wa.sendAudio(jid, audioPath, sockOverride)
-        } else {
-          await wa.sendText(jid, row.content, sockOverride)
-        }
+      await wa.sendAudio(jid, audioPath, sockOverride)
+    } else if (row.message_type === 'image') {
+      const imgPath = require('path').join(__dirname, '..', row.content || '')
+      await wa.sendImage(jid, imgPath, '', sockOverride)
+    } else if (row.message_type === 'video') {
+      const vidPath = require('path').join(__dirname, '..', row.content || '')
+      await wa.sendVideo(jid, vidPath, {}, sockOverride)
+    } else {
+      await wa.sendText(jid, row.content, sockOverride)
+    }
         await pool.query("UPDATE scheduled_messages SET status='sent', sent_at=NOW() WHERE id=?", [row.id])
       } catch (e) {
         console.error('[scheduler] erro ao enviar step ' + row.sequence_step + ' conv ' + row.conversation_id + ':', e.message)
