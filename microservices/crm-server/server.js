@@ -24,6 +24,7 @@ function brDayEndToUtc(dateStr) {
   return new Date(new Date(dateStr + 'T00:00:00.000Z').getTime() + BR_OFFSET_MS + 24*60*60*1000 - 1)
 }
 const metaAdsService = require('./metaAdsService')
+const metaConversionsService = require('./metaConversionsService')
 const path = require('path')
 const axios = require('axios')
 const JESSICA_USER_ID = 6; // Dra. Jessica - avaliadora padrao fixa (agenda + Google Calendar compartilhado)
@@ -890,6 +891,7 @@ app.patch('/api/crm/deals/:id', auth, async (req, res) => {
       // indicacao: se este paciente foi indicado, marca a indicacao como fechada
       await conn.query('UPDATE referrals SET status = "fechou", closed_at = NOW(), deal_id = ? WHERE referred_patient_id = ? AND status = "pendente"', [dealId, deal.patient_id])
         syncSaleToTintim(dealId).catch(function(e){ console.error('[tintim-sale]', e.message) })
+              metaConversionsService.handleDealWon(dealId).catch(function(e){ console.error('[meta-capi]', e.message) })
     
       } else if (wonDate) {
         // negocio ja estava ganho: permite apenas corrigir a data retroativa de fechamento
@@ -906,6 +908,7 @@ app.patch('/api/crm/deals/:id', auth, async (req, res) => {
         return res.status(400).json({ success: false, error: 'Selecione um motivo de perda valido (ou informe "Outro: descricao") antes de marcar como Perdido.' });
       }
       await conn.query('UPDATE deals SET status = "lost", lost_date = NOW(), loss_reason = ? WHERE id = ?', [lossReason || null, dealId])
+            metaConversionsService.handleDealLost(dealId).catch(function(e){ console.error('[meta-capi]', e.message) })
       await conn.query('INSERT INTO activities (deal_id, patient_id, user_id, type, content) VALUES (?, ?, ?, "system", ?)',
         [dealId, deal.patient_id, req.user.id, `Negócio perdido${lossReason ? ' — ' + lossReason : ''}`])
     } else if (status === 'open') {
