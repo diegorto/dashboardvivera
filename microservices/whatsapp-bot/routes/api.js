@@ -195,7 +195,7 @@ const mediaLibraryUpload = multer({ storage: mediaLibraryStorage, limits: { file
 
 router.get('/media-library', auth, async (req, res) => {
 try {
-const [rows] = await pool.query('SELECT * FROM media_library ORDER BY usage_count DESC, id DESC')
+const [rows] = await pool.query('SELECT * FROM media_library ORDER BY category, position, id')
 res.json({ success: true, items: rows })
 } catch (e) {
 console.error('[api] erro ao listar media library:', e.message)
@@ -217,7 +217,7 @@ res.status(500).json({ success: false, error: e.message })
 router.post('/media-library', auth, async (req, res) => {
 try {
 const { type, title, category, content, fileName, mimetype } = req.body
-if (!type || ['text','image','video','audio'].indexOf(type) === -1) return res.status(400).json({ success: false, error: 'tipo invalido' })
+if (!type || ['text','image','video','audio','document'].indexOf(type) === -1) return res.status(400).json({ success: false, error: 'tipo invalido' })
 if (!title || !String(title).trim()) return res.status(400).json({ success: false, error: 'titulo obrigatorio' })
 if (!content || !String(content).trim()) return res.status(400).json({ success: false, error: 'conteudo obrigatorio' })
 const [result] = await pool.query(
@@ -248,10 +248,46 @@ res.status(500).json({ success: false, error: e.message })
 }
 })
 
+router.patch('/media-library/:id', auth, async (req, res) => {
+try {
+const [[existing]] = await pool.query('SELECT * FROM media_library WHERE id = ?', [req.params.id])
+if (!existing) return res.status(404).json({ success: false, error: 'item nao encontrado' })
+const { type, title, content, category, position, fileName, mimetype } = req.body
+const updates = []
+const params = []
+if (type !== undefined) {
+if (['text','image','video','audio','document','empty'].indexOf(type) === -1) return res.status(400).json({ success: false, error: 'tipo invalido' })
+updates.push('type = ?'); params.push(type)
+}
+if (title !== undefined) { updates.push('title = ?'); params.push(String(title).trim() || 'vazio') }
+if (content !== undefined) { updates.push('content = ?'); params.push(content || null) }
+if (category !== undefined) { updates.push('category = ?'); params.push(category || null) }
+if (position !== undefined) { updates.push('position = ?'); params.push(position) }
+if (fileName !== undefined) { updates.push('file_name = ?'); params.push(fileName || null) }
+if (mimetype !== undefined) { updates.push('mimetype = ?'); params.push(mimetype || null) }
+if (!updates.length) return res.status(400).json({ success: false, error: 'nada para atualizar' })
+if (existing.content && existing.type !== 'text' && existing.type !== 'empty' && type !== undefined && (type !== existing.type || (content !== undefined && content !== existing.content))) {
+try {
+const oldPath = path.join(__dirname, '..', existing.content)
+if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
+} catch (e) {}
+}
+params.push(req.params.id)
+await pool.query('UPDATE media_library SET ' + updates.join(', ') + ' WHERE id = ?', params)
+const [[updated]] = await pool.query('SELECT * FROM media_library WHERE id = ?', [req.params.id])
+res.json({ success: true, item: updated })
+} catch (e) {
+console.error('[api] erro ao editar item da media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+
+
 router.post('/conversations/:id/send-media-library/:itemId', auth, async (req, res) => {
 try {
 const [[item]] = await pool.query('SELECT * FROM media_library WHERE id = ?', [req.params.itemId])
 if (!item) return res.status(404).json({ success: false, error: 'item nao encontrado' })
+if (item.type === 'empty' || !item.content) return res.status(400).json({ success: false, error: 'Este item ainda esta vazio. Clique em editar para configurar antes de enviar.' })
 if (item.type === 'text') {
 await wa.sendManualMessage(req.params.id, item.content)
 } else {

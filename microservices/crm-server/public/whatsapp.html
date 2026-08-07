@@ -905,7 +905,7 @@ function renderLeadSidebar(info) {
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>' +
     '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>';
   sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
-sidebar.innerHTML += '<div style="margin-top:8px;"><button type="button" onclick="openMediaCentral()" style="width:100%;padding:9px 12px;background:#fff;color:#6c5ce7;border:1px solid #6c5ce7;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Media Central</button></div>';
+sidebar.innerHTML += '<div style="margin-top:8px;"><button type="button" onclick="openMediaCentral()" style="width:100%;padding:9px 12px;background:#fff;color:#6c5ce7;border:1px solid #6c5ce7;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Envio Rapido</button></div>';
 }
 
 window.saveDealMeta = function saveDealMeta(partial) {
@@ -999,7 +999,19 @@ window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
   window.open('/agenda-visual.html?' + params.toString(), '_blank');
 }
 
-window.__mediaCentralItems = null;
+window.__mcMode = 'direto';
+window.__mcActiveTab = 'Abertura';
+window.__mcQueue = [];
+window.__mcItems = [];
+window.__mcEditingId = null;
+var MC_TABS = [
+{ key: 'Abertura', label: 'Abertura' },
+{ key: 'Prova', label: 'Prova' },
+{ key: 'Oferta', label: 'Oferta' },
+{ key: 'Objecao', label: 'Objecao' }
+];
+var MC_KIND_LABEL = { text: 'TXT', image: 'IMG', video: 'VID', audio: 'AUD', document: 'PDF', empty: '' };
+var MC_KEYS = ['1','2','3','4','5','6','7','8','9','0','-','='];
 function mcEscapeHtml(s) {
 return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
 return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
@@ -1009,160 +1021,253 @@ window.openMediaCentral = function openMediaCentral() {
 if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
 mcEnsureModal();
 document.getElementById('mediaCentralOverlay').style.display = 'flex';
+window.__mcMode = 'direto';
+window.__mcQueue = [];
+window.__mcEditingId = null;
 loadMediaCentralItems();
+}
+window.closeMediaCentral = function closeMediaCentral() {
+var ov = document.getElementById('mediaCentralOverlay');
+if (ov) ov.style.display = 'none';
+document.removeEventListener('keydown', mcHandleKeydown);
 }
 function mcEnsureModal() {
 if (document.getElementById('mediaCentralOverlay')) return;
 var ov = document.createElement('div');
 ov.id = 'mediaCentralOverlay';
-ov.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;';
+ov.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(29,31,32,.5);z-index:200;align-items:flex-start;justify-content:center;padding-top:6vh;overflow-y:auto;';
 ov.innerHTML =
-'<div style="background:#fff;width:520px;max-width:92vw;max-height:82vh;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;">' +
-'<div style="padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">' +
-'<strong style="font-size:15px;">Media Central</strong>' +
-'<button type="button" onclick="closeMediaCentral()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#999;line-height:1;">&times;</button>' +
+'<div id="mcPanel" style="width:640px;max-width:94vw;background:#f2f2f3;border:1px solid rgba(29,31,32,.16);box-shadow:0 12px 32px rgba(43,43,45,.22);font-family:Barlow,Arial,sans-serif;color:#1d1f20;">' +
+'<div style="padding:11px 13px;border-bottom:1px solid rgba(29,31,32,.16);display:flex;align-items:center;gap:10px;">' +
+'<div style="width:22px;height:22px;border:1px solid #5980a6;display:flex;align-items:center;justify-content:center;flex:0 0 auto;"><span style="width:6px;height:6px;background:#5980a6;display:block;"></span></div>' +
+'<div style="flex:1;min-width:0;">' +
+'<h2 style="margin:0;font-family:Barlow Condensed,Arial,sans-serif;font-weight:700;font-size:16px;letter-spacing:.08em;text-transform:uppercase;">Envio Rapido</h2>' +
+'<div style="font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:#7a7a7d;margin-top:2px;">Conversa atual - midias por categoria</div>' +
 '</div>' +
-'<div style="padding:10px 18px;border-bottom:1px solid #f0f0f0;">' +
-'<input type="text" id="mcSearchInput" placeholder="Buscar midia ou texto..." oninput="renderMediaCentralList()" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:13px;">' +
+'<button type="button" id="mcModeBtn" onclick="mcToggleMode()" style="font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:6px 9px;border:1px solid rgba(29,31,32,.16);background:transparent;color:#7a7a7d;cursor:pointer;">Direto</button>' +
+'<button type="button" onclick="closeMediaCentral()" style="border:none;background:none;font-size:18px;cursor:pointer;color:#7a7a7d;line-height:1;">&times;</button>' +
 '</div>' +
-'<div id="mediaCentralList" style="flex:1;overflow-y:auto;padding:8px 18px;"></div>' +
-'<div style="padding:10px 18px;border-top:1px solid #eee;">' +
-'<button type="button" onclick="mcToggleAddForm()" style="border:1px dashed #bbb;background:#fff;border-radius:6px;padding:6px 12px;font-size:12px;color:#666;cursor:pointer;">+ Adicionar item</button>' +
-'<div id="mcAddForm" style="display:none;margin-top:10px;">' +
-'<select id="mcAddType" onchange="mcToggleAddFields()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
-'<option value="text">Texto</option><option value="image">Imagem</option><option value="video">Video</option><option value="audio">Audio</option>' +
-'</select>' +
-'<input type="text" id="mcAddTitle" placeholder="Titulo (ex: Endereco da clinica)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
-'<input type="text" id="mcAddCategory" placeholder="Categoria (opcional)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
-'<textarea id="mcAddText" placeholder="Texto da mensagem" style="width:100%;box-sizing:border-box;min-height:60px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;"></textarea>' +
-'<input type="file" id="mcAddFile" style="display:none;margin-bottom:6px;">' +
-'<button type="button" onclick="submitMediaCentralItem()" style="padding:7px 14px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Salvar</button>' +
-'<span id="mcAddStatus" style="margin-left:8px;font-size:11px;color:#666;"></span>' +
-'</div>' +
-'</div>' +
+'<div id="mcTabs" style="display:flex;border-bottom:1px solid rgba(29,31,32,.16);"></div>' +
+'<div id="mcQueueBar" style="display:none;padding:8px 13px;border-bottom:1px solid rgba(29,31,32,.16);font-size:11px;color:#416180;background:#eef6ff;align-items:center;gap:8px;"></div>' +
+'<div id="mcBody" style="padding:14px;"></div>' +
 '</div>';
 document.body.appendChild(ov);
 ov.addEventListener('click', function(e){ if (e.target === ov) closeMediaCentral(); });
 }
-window.closeMediaCentral = function closeMediaCentral() {
-var ov = document.getElementById('mediaCentralOverlay');
-if (ov) ov.style.display = 'none';
+window.mcToggleMode = function mcToggleMode() {
+window.__mcMode = window.__mcMode === 'direto' ? 'fila' : 'direto';
+window.__mcQueue = [];
+var btn = document.getElementById('mcModeBtn');
+if (btn) {
+btn.textContent = window.__mcMode === 'direto' ? 'Direto' : 'Fila';
+btn.style.borderColor = window.__mcMode === 'fila' ? '#5980a6' : 'rgba(29,31,32,.16)';
+btn.style.background = window.__mcMode === 'fila' ? '#5980a6' : 'transparent';
+btn.style.color = window.__mcMode === 'fila' ? '#f2f2f3' : '#7a7a7d';
 }
-window.mcToggleAddFields = function mcToggleAddFields() {
-var type = document.getElementById('mcAddType').value;
-document.getElementById('mcAddText').style.display = type === 'text' ? 'block' : 'none';
-document.getElementById('mcAddFile').style.display = type === 'text' ? 'none' : 'block';
-}
-window.mcToggleAddForm = function mcToggleAddForm() {
-var f = document.getElementById('mcAddForm');
-f.style.display = f.style.display === 'none' ? 'block' : 'none';
-mcToggleAddFields();
+mcRenderQueueBar();
+mcRenderGrid();
 }
 async function loadMediaCentralItems() {
-var listEl = document.getElementById('mediaCentralList');
-listEl.innerHTML = '<p style="color:#999;font-size:12px;">Carregando...</p>';
+var body = document.getElementById('mcBody');
+body.innerHTML = '<p style="color:#7a7a7d;font-size:12px;">Carregando...</p>';
 try {
 var data = await api('/media-library');
 if (!data || !data.success) throw new Error((data && data.error) || 'falha ao carregar');
-window.__mediaCentralItems = data.items || [];
-renderMediaCentralList();
+window.__mcItems = data.items || [];
+mcRenderTabs();
+mcRenderGrid();
+document.removeEventListener('keydown', mcHandleKeydown);
+document.addEventListener('keydown', mcHandleKeydown);
 } catch (e) {
-listEl.innerHTML = '<p style="color:#c00;font-size:12px;">Erro ao carregar: ' + mcEscapeHtml(e.message) + '</p>';
+body.innerHTML = '<p style="color:#c0392b;font-size:12px;">Erro ao carregar: ' + mcEscapeHtml(e.message) + '</p>';
 }
 }
-function mcIconForType(type) {
-return type === 'image' ? 'Imagem' : type === 'video' ? 'Video' : type === 'audio' ? 'Audio' : 'Texto';
+function mcRenderTabs() {
+var el = document.getElementById('mcTabs');
+el.innerHTML = MC_TABS.map(function(t){
+var active = t.key === window.__mcActiveTab;
+return '<button type="button" onclick="mcSelectTab(\'' + t.key + '\')" style="flex:1;min-width:0;padding:10px 4px 9px;text-align:center;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,.16);background:' + (active ? '#5980a6' : 'transparent') + ';color:' + (active ? '#f2f2f3' : '#1d1f20') + ';font-family:Barlow Condensed,Arial,sans-serif;font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;">' + mcEscapeHtml(t.label) + '</button>';
+}).join('');
 }
-window.renderMediaCentralList = function renderMediaCentralList() {
-var listEl = document.getElementById('mediaCentralList');
-var items = window.__mediaCentralItems || [];
-var searchEl = document.getElementById('mcSearchInput');
-var q = (searchEl && searchEl.value || '').toLowerCase();
-var filtered = items.filter(function(it){ return !q || (it.title||'').toLowerCase().indexOf(q) !== -1 || (it.category||'').toLowerCase().indexOf(q) !== -1; });
-if (!filtered.length) { listEl.innerHTML = '<p style="color:#999;font-size:12px;padding:10px 0;">Nenhum item encontrado.</p>'; return; }
-var topItems = filtered.filter(function(it){ return (it.usage_count || 0) > 0; }).slice(0, 3);
-var topIds = topItems.map(function(it){ return it.id; });
-var restItems = filtered.filter(function(it){ return topIds.indexOf(it.id) === -1; });
-var html = '';
-if (topItems.length && !q) {
-html += '<div style="color:#666;font-size:11px;text-transform:uppercase;margin:6px 0 4px;">Mais usados</div>';
-topItems.forEach(function(it){ html += mcRenderItem(it); });
-html += '<div style="color:#666;font-size:11px;text-transform:uppercase;margin:14px 0 4px;">Todos os itens</div>';
-restItems.forEach(function(it){ html += mcRenderItem(it); });
-} else {
-filtered.forEach(function(it){ html += mcRenderItem(it); });
+window.mcSelectTab = function mcSelectTab(key) {
+window.__mcActiveTab = key;
+mcRenderTabs();
+mcRenderGrid();
 }
-listEl.innerHTML = html;
+function mcItemsForActiveTab() {
+var items = (window.__mcItems || []).filter(function(it){ return it.category === window.__mcActiveTab; });
+var byPos = {};
+items.forEach(function(it){ byPos[it.position] = it; });
+var out = [];
+for (var p = 1; p <= 12; p++) out.push(byPos[p] || { id: null, type: 'empty', title: 'vazio', category: window.__mcActiveTab, position: p, content: null, usage_count: 0 });
+return out;
 }
-function mcRenderItem(it) {
-var typeLabel = mcIconForType(it.type);
-var preview = it.type === 'text' ? '<div style="font-size:12px;color:#666;margin-top:2px;max-height:36px;overflow:hidden;">' + mcEscapeHtml(String(it.content||'').slice(0,120)) + '</div>' : '';
-return '<div onclick="sendMediaCentralItem(' + it.id + ', this)" style="display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer;border:1px solid #eee;margin-bottom:6px;" onmouseover="this.style.background=\'#f7f6ff\'" onmouseout="this.style.background=\'#fff\'">' +
-'<div style="font-size:10px;font-weight:700;color:#6c5ce7;background:#eef2ff;border-radius:4px;padding:3px 6px;white-space:nowrap;">' + typeLabel + '</div>' +
-'<div style="flex:1;min-width:0;">' +
-'<div style="font-weight:600;font-size:13px;">' + mcEscapeHtml(it.title) + (it.category ? ' <span style="font-weight:400;color:#999;font-size:11px;">- ' + mcEscapeHtml(it.category) + '</span>' : '') + '</div>' +
-preview +
+function mcLenLabel(it) {
+if (it.type === 'empty' || !it.content) return '';
+if (it.type === 'text') return String(it.content).length + ' car.';
+return (it.file_name || it.mimetype || it.type || '').toString().slice(0,18);
+}
+function mcRenderGrid() {
+window.__mcEditingId = null;
+var body = document.getElementById('mcBody');
+var slots = mcItemsForActiveTab();
+var html = '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;">';
+slots.forEach(function(it, idx){
+var isEmpty = it.type === 'empty' || !it.content;
+var inQueue = window.__mcQueue.indexOf(it.id) !== -1;
+var kindLabel = MC_KIND_LABEL[it.type] || '';
+var borderColor = inQueue ? '#5980a6' : 'rgba(29,31,32,.16)';
+var bg = inQueue ? '#eef6ff' : '#f2f2f3';
+var clickAttr = isEmpty ? '' : (' onclick="mcPadClick(' + it.id + ')"');
+html += '<div style="border:1px solid ' + borderColor + ';background:' + bg + ';padding:9px 9px 22px;min-height:62px;position:relative;' + (isEmpty ? 'opacity:.55;' : 'cursor:pointer;') + '"' + clickAttr + '>' +
+'<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;">' +
+'<span style="font-size:8.5px;font-weight:600;letter-spacing:.1em;color:#416180;border:1px solid #94bce3;padding:2px 4px;">' + (kindLabel || (idx+1)) + '</span>' +
+'<span style="font-size:9px;color:#98989b;">' + (idx < 12 ? MC_KEYS[idx] : '') + '</span>' +
 '</div>' +
-'<div style="font-size:11px;color:#bbb;white-space:nowrap;">' + (it.usage_count || 0) + 'x</div>' +
+'<div style="font-size:11.5px;font-weight:500;line-height:1.25;' + (isEmpty ? 'color:#98989b;font-style:italic;' : '') + '">' + mcEscapeHtml(it.title) + '</div>' +
+'<div style="font-size:9px;color:#7a7a7d;margin-top:3px;">' + mcEscapeHtml(mcLenLabel(it)) + '</div>' +
+'<span onclick="event.stopPropagation();mcOpenEdit(' + it.id + ')" style="position:absolute;bottom:6px;right:8px;font-size:9px;color:#416180;text-decoration:underline;cursor:pointer;">editar</span>' +
 '</div>';
+});
+html += '</div>';
+body.innerHTML = html;
 }
-window.sendMediaCentralItem = async function sendMediaCentralItem(id, el) {
-if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
-if (el) { el.style.opacity = '0.5'; el.style.pointerEvents = 'none'; }
-try {
-var res = await api('/conversations/' + currentConvId + '/send-media-library/' + id, { method: 'POST' });
-if (!res || !res.success) throw new Error((res && res.error) || 'falha ao enviar');
-closeMediaCentral();
-var title = document.getElementById('convThreadTitle').textContent;
-await openConversation(currentConvId, title);
-await loadConversations();
-} catch (e) {
-if (el) { el.style.opacity = '1'; el.style.pointerEvents = ''; }
-alert('Erro ao enviar: ' + e.message);
+window.mcOpenEdit = function mcOpenEdit(id) {
+var item = (window.__mcItems || []).find(function(it){ return it.id === id; });
+if (!item) return;
+window.__mcEditingId = id;
+var body = document.getElementById('mcBody');
+var isEmpty = item.type === 'empty';
+var types = ['text','image','video','audio','document'];
+var labels = { text: 'Texto', image: 'Imagem', video: 'Video', audio: 'Audio', document: 'Documento (PDF)' };
+var typeOptions = types.map(function(t){
+var sel = item.type === t ? ' selected' : '';
+return '<option value="' + t + '"' + sel + '>' + labels[t] + '</option>';
+}).join('');
+body.innerHTML =
+'<div style="margin-bottom:10px;font-size:11px;color:#7a7a7d;">' + mcEscapeHtml(item.category) + ' - posicao ' + item.position + '</div>' +
+'<select id="mcEditType" onchange="mcEditToggleFields()" style="width:100%;padding:7px;border:1px solid rgba(29,31,32,.16);background:#fff;font-size:12px;margin-bottom:8px;">' + typeOptions + '</select>' +
+'<input type="text" id="mcEditTitle" placeholder="Titulo do botao" value="' + mcEscapeHtml(isEmpty ? '' : item.title) + '" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid rgba(29,31,32,.16);font-size:12px;margin-bottom:8px;">' +
+'<textarea id="mcEditText" placeholder="Texto da mensagem" style="width:100%;box-sizing:border-box;min-height:80px;padding:7px 9px;border:1px solid rgba(29,31,32,.16);font-size:12px;margin-bottom:8px;">' + (item.type === 'text' ? mcEscapeHtml(item.content || '') : '') + '</textarea>' +
+'<div id="mcEditFileWrap" style="margin-bottom:8px;">' +
+(item.type !== 'text' && !isEmpty && item.content ? '<div style="font-size:11px;color:#7a7a7d;margin-bottom:4px;">Arquivo atual: ' + mcEscapeHtml(item.file_name || String(item.content).split('/').pop()) + '</div>' : '') +
+'<input type="file" id="mcEditFile" style="font-size:12px;">' +
+'</div>' +
+'<div id="mcEditStatus" style="font-size:11px;color:#7a7a7d;margin-bottom:8px;"></div>' +
+'<div style="display:flex;gap:8px;">' +
+'<button type="button" onclick="mcSaveEdit()" style="padding:8px 16px;background:#5980a6;color:#f2f2f3;border:none;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;">Salvar</button>' +
+'<button type="button" onclick="mcRenderGrid()" style="padding:8px 16px;background:transparent;color:#7a7a7d;border:1px solid rgba(29,31,32,.16);font-size:12px;cursor:pointer;">Cancelar</button>' +
+'</div>';
+mcEditToggleFields();
 }
+window.mcEditToggleFields = function mcEditToggleFields() {
+var type = document.getElementById('mcEditType').value;
+document.getElementById('mcEditText').style.display = type === 'text' ? 'block' : 'none';
+document.getElementById('mcEditFileWrap').style.display = type === 'text' ? 'none' : 'block';
 }
-window.submitMediaCentralItem = async function submitMediaCentralItem() {
-var type = document.getElementById('mcAddType').value;
-var title = document.getElementById('mcAddTitle').value.trim();
-var category = document.getElementById('mcAddCategory').value.trim();
-var statusEl = document.getElementById('mcAddStatus');
+window.mcSaveEdit = async function mcSaveEdit() {
+var id = window.__mcEditingId;
+var type = document.getElementById('mcEditType').value;
+var title = document.getElementById('mcEditTitle').value.trim();
+var statusEl = document.getElementById('mcEditStatus');
 if (!title) { alert('Informe um titulo.'); return; }
 statusEl.textContent = 'Salvando...';
 try {
-var content = '';
-var fileName = '';
-var mimetype = '';
+var payload = { type: type, title: title };
 if (type === 'text') {
-content = document.getElementById('mcAddText').value.trim();
-if (!content) { alert('Informe o texto.'); statusEl.textContent = ''; return; }
+var text = document.getElementById('mcEditText').value.trim();
+if (!text) { alert('Informe o texto.'); statusEl.textContent = ''; return; }
+payload.content = text;
 } else {
-var fileInput = document.getElementById('mcAddFile');
+var fileInput = document.getElementById('mcEditFile');
 var file = fileInput.files && fileInput.files[0];
-if (!file) { alert('Selecione um arquivo.'); statusEl.textContent = ''; return; }
+if (file) {
 var fd = new FormData();
 fd.append('file', file);
 var upRes = await fetch(API_BASE + '/media-library/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
 var upData = await upRes.json();
 if (!upData.success) throw new Error(upData.error || 'falha no upload');
-content = upData.path;
-fileName = upData.fileName || file.name;
-mimetype = upData.mimetype || file.type;
+payload.content = upData.path;
+payload.fileName = upData.fileName;
+payload.mimetype = upData.mimetype;
+} else {
+var current = (window.__mcItems || []).find(function(it){ return it.id === id; });
+if (!current || !current.content || current.type === 'empty' || current.type !== type) { alert('Selecione um arquivo.'); statusEl.textContent = ''; return; }
 }
-var createRes = await api('/media-library', { method: 'POST', body: JSON.stringify({ type: type, title: title, category: category, content: content, fileName: fileName, mimetype: mimetype }) });
-if (!createRes || !createRes.success) throw new Error((createRes && createRes.error) || 'falha ao salvar');
-document.getElementById('mcAddTitle').value = '';
-document.getElementById('mcAddCategory').value = '';
-document.getElementById('mcAddText').value = '';
-document.getElementById('mcAddFile').value = '';
+}
+var res = await api('/media-library/' + id, { method: 'PATCH', body: JSON.stringify(payload) });
+if (!res || !res.success) throw new Error((res && res.error) || 'falha ao salvar');
 statusEl.textContent = '';
-mcToggleAddForm();
 await loadMediaCentralItems();
 } catch (e) {
 statusEl.textContent = '';
-alert('Erro ao salvar item: ' + e.message);
+alert('Erro ao salvar: ' + e.message);
 }
 }
-
+window.mcPadClick = async function mcPadClick(id) {
+if (window.__mcMode === 'fila') {
+var idx = window.__mcQueue.indexOf(id);
+if (idx === -1) window.__mcQueue.push(id); else window.__mcQueue.splice(idx, 1);
+mcRenderQueueBar();
+mcRenderGrid();
+return;
+}
+var ok = await mcSendItem(id);
+if (ok) {
+closeMediaCentral();
+var title = document.getElementById('convThreadTitle').textContent;
+await openConversation(currentConvId, title);
+await loadConversations();
+}
+}
+async function mcSendItem(id) {
+if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return false; }
+try {
+var res = await api('/conversations/' + currentConvId + '/send-media-library/' + id, { method: 'POST' });
+if (!res || !res.success) throw new Error((res && res.error) || 'falha ao enviar');
+return true;
+} catch (e) {
+alert('Erro ao enviar: ' + e.message);
+return false;
+}
+}
+function mcRenderQueueBar() {
+var bar = document.getElementById('mcQueueBar');
+if (!bar) return;
+if (window.__mcMode !== 'fila' || !window.__mcQueue.length) { bar.style.display = 'none'; return; }
+bar.style.display = 'flex';
+bar.innerHTML = '<span>' + window.__mcQueue.length + ' selecionado(s) na fila</span>' +
+'<button type="button" onclick="mcSendQueue()" style="margin-left:auto;padding:5px 12px;background:#5980a6;color:#f2f2f3;border:none;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;">Enviar sequencia</button>';
+}
+window.mcSendQueue = async function mcSendQueue() {
+var queue = window.__mcQueue.slice();
+if (!queue.length) return;
+var bar = document.getElementById('mcQueueBar');
+for (var i = 0; i < queue.length; i++) {
+bar.innerHTML = '<span>Enviando ' + (i+1) + ' de ' + queue.length + '...</span>';
+var ok = await mcSendItem(queue[i]);
+if (!ok) break;
+await new Promise(function(r){ setTimeout(r, 600); });
+}
+window.__mcQueue = [];
+mcRenderQueueBar();
+closeMediaCentral();
+var title = document.getElementById('convThreadTitle').textContent;
+await openConversation(currentConvId, title);
+await loadConversations();
+}
+function mcHandleKeydown(e) {
+var ov = document.getElementById('mediaCentralOverlay');
+if (!ov || ov.style.display === 'none') return;
+if (window.__mcEditingId !== null) return;
+var idx = MC_KEYS.indexOf(e.key);
+if (idx === -1) return;
+var slots = mcItemsForActiveTab();
+var it = slots[idx];
+if (!it || it.type === 'empty' || !it.content) return;
+e.preventDefault();
+mcPadClick(it.id);
+}
 
 async function loadConversationSidebar(id) {
   var sidebar = ensureLeadSidebar();
