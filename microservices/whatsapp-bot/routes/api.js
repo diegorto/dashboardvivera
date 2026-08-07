@@ -184,7 +184,7 @@ router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single(
 router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT c.deal_id AS dealId, d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag
+      `SELECT c.deal_id AS dealId, d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag, d.notas_manuais
        FROM whatsapp_conversations c
        LEFT JOIN deals d ON d.id = c.deal_id
        WHERE c.id = ?`,
@@ -201,6 +201,7 @@ router.get('/conversations/:id/sidebar', auth, async (req, res) => {
       tags,
       leadScore: row.lead_score,
       resumo: row.resumo_crm || null,
+      notasManuais: row.notas_manuais || null,
       stageTag: row.stage_tag || null
     })
   } catch (e) {
@@ -236,6 +237,14 @@ router.patch('/conversations/:id/deal-meta', auth, async (req, res) => {
       updates.push('lead_score = ?')
       params.push(score)
     }
+    if (req.body.notasManuais !== undefined) {
+      const notas = req.body.notasManuais
+      if (notas !== null && typeof notas !== 'string') {
+        return res.status(400).json({ success: false, error: 'notasManuais deve ser texto (ou null)' })
+      }
+      updates.push('notas_manuais = ?')
+      params.push(notas === null ? null : notas.slice(0, 5000))
+    }
     if (!updates.length) return res.status(400).json({ success: false, error: 'nada para atualizar' })
 
     params.push(dealId)
@@ -243,6 +252,18 @@ router.patch('/conversations/:id/deal-meta', auth, async (req, res) => {
     res.json({ success: true })
   } catch (e) {
     console.error('[api] erro ao atualizar deal-meta:', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
+router.get('/labels', auth, async (req, res) => {
+  try {
+    const [labels] = await pool.query(
+      `SELECT id, name, color FROM labels WHERE active = 1 ORDER BY name`
+    )
+    res.json({ success: true, labels })
+  } catch (e) {
+    console.error('[api] erro ao buscar labels:', e.message)
     res.status(500).json({ success: false, error: e.message })
   }
 })
