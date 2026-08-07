@@ -42,12 +42,21 @@ function auth(req, res, next) {
 
 router.get('/status', auth, async (req, res) => {
   try {
-    const [[conn]] = await pool.query('SELECT status, qr_code, phone_number FROM whatsapp_connections ORDER BY updated_at DESC LIMIT 1')
-    if (conn) return res.json({ success: true, status: conn.status, qr: conn.qr_code || null, phone_number: conn.phone_number || null })
+    const live = wa.getStatus()
+    if (live && live.status && live.status !== 'disconnected') {
+      return res.json({ success: true, ...live })
+    }
+    try {
+      const [[conn]] = await pool.query('SELECT phone_number FROM whatsapp_connections ORDER BY updated_at DESC LIMIT 1')
+      return res.json({ success: true, ...live, phone_number: (live && live.phone_number) || (conn && conn.phone_number) || null })
+    } catch (dbErr) {
+      console.error('[api] status: fallback legado indisponivel:', dbErr.message)
+      return res.json({ success: true, ...live })
+    }
   } catch (e) {
-    console.error('[api] erro ao ler status da conexao ativa (id=3), usando fallback legado:', e.message)
+    console.error('[api] erro ao ler status:', e.message)
+    return res.status(500).json({ success: false, error: 'status indisponivel' })
   }
-  res.json({ success: true, ...wa.getStatus() })
 })
 
 router.get('/conversations', auth, async (req, res) => {
