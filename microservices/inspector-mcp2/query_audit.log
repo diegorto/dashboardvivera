@@ -326,3 +326,23 @@
 {"ts":"2026-08-07T02:51:24.532Z","rejected":false,"sql":"SELECT \n  d.id,\n  d.title,\n  d.won_date,\n  d.value,\n  d.palavra_chave,\n  d.origem,\n  d.campanha,\n  d.conjunto,\n  d.ad_campaign_name,\n  d.tintim_source_raw\nFROM deals d\nWHERE d.id IN (5236, 5492)","rowCount":2}
 {"ts":"2026-08-07T02:51:31.968Z","rejected":false,"sql":"SELECT \n  COUNT(*) as total,\n  CASE \n    WHEN d.status = 'won' THEN 'Ganho ✅'\n    WHEN d.status = 'lost' THEN 'Perdido ❌'\n    ELSE 'Em aberto'\n  END as status\nFROM deals d\nWHERE d.conjunto = 'video_boas_vindas_dr_diego'\nGROUP BY d.status","rowCount":3}
 {"ts":"2026-08-07T02:51:36.680Z","rejected":false,"sql":"SELECT \n  d.id,\n  d.title,\n  d.won_date,\n  d.value,\n  d.created_at,\n  d.status,\n  d.stage_id,\n  d.procedure_name,\n  d.owner_name\nFROM deals d\nWHERE d.conjunto = 'video_boas_vindas_dr_diego'\nORDER BY d.won_date DESC, d.created_at DESC","rowCount":10}
+{"ts":"2026-08-07T15:44:47.945Z","rejected":true,"reason":"only SELECT statements are allowed","sql":"SHOW TABLES"}
+{"ts":"2026-08-07T15:44:50.754Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' LIMIT 50","rowCount":50}
+{"ts":"2026-08-07T15:44:54.149Z","rejected":false,"sql":"SELECT * FROM deals LIMIT 5","rowCount":5}
+{"ts":"2026-08-07T15:44:59.347Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND table_name LIKE '%meta%' OR table_name LIKE '%goal%' OR table_name LIKE '%target%'","rowCount":2}
+{"ts":"2026-08-07T15:45:02.268Z","rejected":false,"sql":"SELECT * FROM diretoria_metas LIMIT 10","rowCount":10}
+{"ts":"2026-08-07T15:45:07.328Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND (table_name LIKE '%realizado%' OR table_name LIKE '%achieved%' OR table_name LIKE '%resultado%' OR table_name LIKE '%performance%')","rowCount":0}
+{"ts":"2026-08-07T15:45:10.705Z","rejected":false,"sql":"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'vivera_crm' AND table_name = 'diretoria_metas'","rowCount":4}
+{"ts":"2026-08-07T15:45:13.670Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND table_name LIKE '%diretoria%'","rowCount":1}
+{"ts":"2026-08-07T15:45:17.379Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND (table_name LIKE '%receita%' OR table_name LIKE '%revenue%' OR table_name LIKE '%faturamento%' OR table_name LIKE '%sales%')","rowCount":0}
+{"ts":"2026-08-07T15:45:21.428Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' ORDER BY table_name","rowCount":58}
+{"ts":"2026-08-07T15:45:27.608Z","rejected":false,"sql":"SELECT * FROM sdr_insight_cache LIMIT 5","rowCount":5}
+{"ts":"2026-08-07T15:45:31.928Z","rejected":false,"sql":"SELECT DISTINCT indicador_key FROM diretoria_metas","rowCount":17}
+{"ts":"2026-08-07T15:45:35.523Z","rejected":false,"sql":"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema = 'vivera_crm' AND table_name LIKE 'diretoria%'","rowCount":4}
+{"ts":"2026-08-07T15:45:42.176Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND (table_name LIKE '%diretoria%' OR table_name LIKE '%kpi%' OR table_name LIKE '%metrics%' OR table_name LIKE '%indicador%')","rowCount":1}
+{"ts":"2026-08-07T15:45:45.907Z","rejected":false,"sql":"SELECT * FROM diretoria_metas ORDER BY periodo_key DESC LIMIT 20","rowCount":20}
+{"ts":"2026-08-07T15:45:50.311Z","rejected":false,"sql":"SELECT * FROM procedures LIMIT 5","rowCount":5}
+{"ts":"2026-08-07T15:45:54.160Z","rejected":false,"sql":"SELECT column_name FROM information_schema.columns WHERE table_schema = 'vivera_crm' AND (column_name LIKE '%realizado%' OR column_name LIKE '%achieved%' OR column_name LIKE '%actual%' OR column_name LIKE '%result%')","rowCount":2}
+{"ts":"2026-08-07T15:45:57.046Z","rejected":false,"sql":"SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'vivera_crm' AND column_name = 'procedimentos_realizados'","rowCount":2}
+{"ts":"2026-08-07T15:46:02.744Z","rejected":true,"reason":"only SELECT statements are allowed","sql":"SHOW TABLES LIKE '%diretoria%'"}
+{"ts":"2026-08-07T15:46:08.999Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema = 'vivera_crm' AND (table_name LIKE 'dir%' OR table_name LIKE '%meta%' OR table_name LIKE '%achieved%' OR table_name LIKE '%realizado%')","rowCount":2}

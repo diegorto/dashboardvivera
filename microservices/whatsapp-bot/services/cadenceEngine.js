@@ -9,6 +9,8 @@ const path = require('path')
 
 const TRIGGER_KEYWORD = 'fluxo_cadencia_inbound'
 const POLL_INTERVAL_MS = 15 * 60 * 1000 // 15 min
+const CADENCE_BURST_MAX = 15 // regra permanente Diego 2026-08-07: nunca mais que 15 msgs de cadencia em qualquer janela de 5min
+const CADENCE_BURST_WINDOW_MINUTES = 5
 
 const STEP_STAGE_ID = { d1: 3, d2: 4, d3: 5, d4: 6, d5: 7, d15_despedida: 69 }
 const STEP_PIPELINE_ID = { d1: 1, d2: 1, d3: 1, d4: 1, d5: 1, d15_despedida: 5 }
@@ -380,11 +382,14 @@ async function processDueEnrollments() {
   const sendBudget = await getSendBudgetForThisTick()
   const { minGapSec } = await getDailyBudgetCfg()
   let sendsUsedThisTick = 0
+    const [[cadenceBurstRow]] = await pool.query("SELECT COUNT(*) c FROM chatbot_cadence_enrollment WHERE last_sent_at >= NOW() - INTERVAL " + CADENCE_BURST_WINDOW_MINUTES + " MINUTE")
+    let burstUsedThisTick = cadenceBurstRow ? Number(cadenceBurstRow.c) : 0
+    if (burstUsedThisTick >= CADENCE_BURST_MAX) console.log('[cadenceEngine][RATE_LIMIT] limite de ' + CADENCE_BURST_MAX + ' msgs/' + CADENCE_BURST_WINDOW_MINUTES + 'min ja atingido (' + burstUsedThisTick + '), aguardando proximo ciclo')
   let lastSendAt = 0
   if (sendBudget.budget === 0) console.log('[cadenceEngine] envios de cadencia pausados: ' + (sendBudget.reason || 'sem orcamento'))
   for (const en of rows) {
     try {
-      if (sendsUsedThisTick >= sendBudget.budget) break
+      if (sendsUsedThisTick >= sendBudget.budget || burstUsedThisTick >= CADENCE_BURST_MAX) break
       const deal = await getDealAndPatient(en.deal_id)
       if (!deal) continue
       { const allowlist = require('./allowlist'); if (await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) { continue } }
@@ -397,6 +402,7 @@ async function processDueEnrollments() {
       }
       await sendStepContentResilient(en.current_step, deal, jid)
       sendsUsedThisTick++
+      burstUsedThisTick++
       lastSendAt = Date.now()
 
       const nowHourBRT = new Date(Date.now() - 3 * 60 * 60 * 1000).getUTCHours()

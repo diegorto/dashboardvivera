@@ -141,3 +141,7 @@
 [ALERT 2026-08-06T13:30:01.977Z] Bot WhatsApp Vivera AINDA com status "disconnected" ha 8650 min. Segue desconectado (alerta repetido).
 [ALERT 2026-08-06T14:35:01.811Z] Bot WhatsApp Vivera AINDA com status "disconnected" ha 8715 min. Segue desconectado (alerta repetido).
 [ALERT 2026-08-06T14:53:21.272Z] Bot WhatsApp Vivera - CRM TINTIM (id 5) parado ha 8 min. Watchdog em processo pode ja ter tentado reconectar sem sucesso.
+[ALERT 2026-08-07T14:50:01.986Z] Bot WhatsApp Vivera - CRM - TINTIM (id 8) parado ha 5 min. Watchdog em processo pode ja ter tentado reconectar sem sucesso.
+[ALERT 2026-08-07T15:45:01.717Z] Bot WhatsApp Vivera - CRM TINTIM (id 9) parado ha 5 min. Watchdog em processo pode ja ter tentado reconectar sem sucesso.
+[ALERT 2026-08-07T17:00:01.790Z] Bot WhatsApp Vivera - crm (id 10) parado ha 5 min. Watchdog em processo pode ja ter tentado reconectar sem sucesso.
+[ALERT 2026-08-07T18:05:01.605Z] Bot WhatsApp Vivera - crm (id 10) parado ha 70 min. Watchdog em processo pode ja ter tentado reconectar sem sucesso.

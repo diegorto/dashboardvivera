@@ -586,13 +586,22 @@ async function simulateHumanTyping(activeSock, jid, text) {
 }
 
 async function sendText(jid, text, sockOverride) {
+  try {
+
   if (!sockOverride && !sock) throw new Error('WhatsApp nao conectado')
   const activeSock = sockOverride || sock
   console.log('[whatsapp][DIAG] sendText: socket ws.readyState=' + (activeSock.ws && activeSock.ws.readyState) + ' jid=' + jid + ' usingOverride=' + !!sockOverride)
   await simulateHumanTyping(activeSock, jid, text)
   const sendResult = await activeSock.sendMessage(jid, { text })
+    realSendConsecutiveFailures = 0
   console.log('[whatsapp][DIAG] sendText: sendMessage retornou -> ' + JSON.stringify({ id: sendResult && sendResult.key && sendResult.key.id, status: sendResult && sendResult.status, hasMessage: !!(sendResult && sendResult.message) }))
   return sendResult
+
+  } catch (e) {
+    realSendConsecutiveFailures++
+    console.warn('[whatsapp][WATCHDOG][BAND-AID] falha real de envio (sendText), contador=' + realSendConsecutiveFailures + ': ' + e.message)
+    throw e
+  }
 }
 
 async function sendAudio(jid, filePath, sockOverride) {
@@ -906,35 +915,31 @@ async function forceReconnectConnection(connectionId) {
 // (sendPresenceUpdate) periodicamente; se falhar 2x seguidas com status
 // 'connected', forca o encerramento do socket antigo e reconexao.
 let watchdogConsecutiveFailures = 0
+let realSendConsecutiveFailures = 0 // contador de falhas reais de envio (sendText), usado pelo watchdog
 function startConnectionWatchdog() {
   setInterval(async () => {
     try {
-      if (connectionStatus !== 'connected' || !sock) return
-      const probe = new Promise((resolve, reject) => {
-        if (!sock || typeof sock.sendPresenceUpdate !== 'function') { reject(new Error('sock sem sendPresenceUpdate')); return }
-        sock.sendPresenceUpdate('available').then(resolve).catch(reject)
-      })
-      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('watchdog probe timeout')), 8000))
-      await Promise.race([probe, timeout])
-      watchdogConsecutiveFailures = 0
-    } catch (e) {
-      watchdogConsecutiveFailures++
-      console.warn('[whatsapp][WATCHDOG][BAND-AID] sondagem falhou (' + e.message + '), falha consecutiva #' + watchdogConsecutiveFailures + ' com status=connected')
-      if (watchdogConsecutiveFailures >= 2) {
-        console.warn('[whatsapp][WATCHDOG][BAND-AID] 2+ falhas seguidas com status=connected. Forcando fechar e reconectar o socket.')
-        watchdogConsecutiveFailures = 0
-        const oldSock = sock
-        try { if (oldSock && typeof oldSock.end === 'function') oldSock.end(new Error('watchdog forced restart')) } catch (e2) { console.error('[whatsapp][WATCHDOG][BAND-AID] erro ao encerrar socket antigo:', e2.message) }
-        setTimeout(() => {
-          if (connectionStatus !== 'connecting' && connectionStatus !== 'qr_pending') {
-            console.warn('[whatsapp][WATCHDOG][BAND-AID] close nao disparou reconexao sozinho, chamando startSocket() diretamente')
-            startSocket().catch(e3 => console.error('[whatsapp][WATCHDOG][BAND-AID] erro no restart manual:', e3.message))
-          }
-        }, 15000)
+      console.log('[whatsapp][WATCHDOG][DIAG] tick status=' + connectionStatus + ' failures=' + realSendConsecutiveFailures)
+      if (realSendConsecutiveFailures < 2) return
+      console.warn('[whatsapp][WATCHDOG][BAND-AID] ' + realSendConsecutiveFailures + '+ falhas reais de envio (sendText) consecutivas com status=connected. Forcando fechar e reconectar o socket.')
+      realSendConsecutiveFailures = 0
+      const oldSock = sock
+      try {
+        if (oldSock && typeof oldSock.end === 'function') oldSock.end(new Error('watchdog forced restart'))
+      } catch (e2) {
+        console.error('[whatsapp][WATCHDOG][BAND-AID] erro ao encerrar socket antigo:', e2.message)
       }
+      setTimeout(() => {
+        if (connectionStatus !== 'connecting' && connectionStatus !== 'connected') {
+          console.warn('[whatsapp][WATCHDOG][BAND-AID] close nao disparou reconexao sozinho, chamando startSocket() diretamente')
+          startSocket().catch(e3 => console.error('[whatsapp][WATCHDOG][BAND-AID] erro no restart manual:', e3.message))
+        }
+      }, 15000)
+    } catch (e) {
+      console.error('[whatsapp][WATCHDOG][BAND-AID] erro no ciclo do watchdog:', e.message)
     }
   }, 60000)
-  console.log('[whatsapp][WATCHDOG][BAND-AID] watchdog de saude da conexao ativado (checagem a cada 60s)')
+  console.log('[whatsapp][WATCHDOG][BAND-AID] watchdog de saude da conexao ativado (checagem a cada 60s, baseado em falhas reais de envio)')
 }
 startConnectionWatchdog()
 // ===== FIM BAND-AID =====

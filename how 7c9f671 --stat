@@ -1,0 +1,34 @@
+0113bb2|2026-08-06 23:08:19 +0000|fix: mensagens de erro legiveis no modal de disparo manual da cadencia (allowlist, token expirado, falha de rede)
+7c9f671|2026-08-06 22:06:18 +0000|feat: restringe fluxo de boas-vindas ao allowlist e adiciona disparo manual (Fluxo Inicial) via CRM
+60f1680|2026-08-06 21:32:28 +0000|feat: sidebar do WhatsApp com tag/lead score editaveis (clique no score, chips com remover, input +tag); fallback read-only quando conversa nao esta vinculada a um negocio
+137ee16|2026-08-06 21:27:27 +0000|feat: endpoint PATCH /conversations/:id/deal-meta para editar tags e lead_score do negocio vinculado
+d543e5b|2026-08-06 21:16:02 +0000|feat: botao Agendar horario na sidebar do WhatsApp - abre agenda-visual.html pre-preenchida (dealId/patientName/titulo); expoe dealId no endpoint de sidebar
+77ec803|2026-08-06 20:19:02 +0000|feat: agenda-visual aceita autoOpen/dealId/patientName/title via query params para pre-preencher Novo Compromisso
+0405547|2026-08-06 20:10:10 +0000|fix(crm-ui): adia chamada inicial de activateTab ate DOMContentLoaded
+36a4ddf|2026-08-06 19:37:19 +0000|fix: ignora mensagem de texto duplicada quando WhatsApp reenvia transcricao nativa do audio (janela de 8s)
+db1105c|2026-08-06 17:59:10 +0000|fix: sendAudio usa buffer em memoria (nao url) + retry automatico ate 2x com backoff
+c3d3116|2026-08-06 17:33:36 +0000|checkpoint: ack-aware sendAudio + guard de conexao recente + endpoint /media
+bf60985|2026-08-06 16:26:13 +0000|fix: audio player usa API_BASE correto (whatsapp-api) e chama load() apos setar src
+91c527f|2026-08-06 15:26:01 +0000|watchdog: monitoramento e auto-reconexao de conexao WhatsApp
+9f312f0|2026-08-06 15:02:54 +0000|fix(whatsapp): bloqueia envio de midia logo apos reconexao (janela instavel) para evitar upload corrompido
+efa247d|2026-08-06 14:46:21 +0000|feat(whatsapp): player+transcricao de audio (in/out) no CRM; salva midia+transcricao de audio enviado direto do celular
+673fb13|2026-08-06 13:48:24 +0000|fix(whatsapp): audio - confirma entrega via ACK antes de reportar sucesso, evita fallback silencioso p/ socket errado, serve midia autenticada
+41bdbe5|2026-08-06 13:20:31 +0000|fix(whatsapp mobile): abrir chat direto ao selecionar conversa + botao manual para painel do lead
+da04062|2026-08-06 12:27:04 +0000|docs: documenta causa do overlay cinza (z-index da sidebar vs backdrop)
+a0d34d5|2026-08-06 12:25:58 +0000|fix: menu mobile abria mas itens nao respondiam ao toque (backdrop acima da sidebar)
+63e1b47|2026-08-06 11:43:06 +0000|refactor: single unconditional pushMemory choke point in handleIncomingText, right after saveMessage, before any branching (allowlist/handoff/quiz). Removes redundant point-patches and the internal user-push in ai.generateReply to avoid duplication. Verified with automated test simulating generic/treatment/price scenarios (all pass) plus full 30-case regression suite (30/30).
+d7e8d89|2026-08-06 11:38:05 +0000|docs: atualiza documentacao com investigacao do bug no Chrome iOS
+d844208|2026-08-06 11:37:10 +0000|fix: possivel causa raiz do Menu mobile nao abrir no Chrome iOS/WebKit
+82f3925|2026-08-06 11:14:18 +0000|fix: quiz/generic-interest intent flow silently skipped memory push, causing AI to lose context of messages that matched treatment/generic_interest classification (root cause of persistent audio-context bug)
+4d7d405|2026-08-06 11:12:32 +0000|fix: botao Menu mobile usava onclick inline, migrado para addEventListener
+aa5039e|2026-08-06 10:38:35 +0000|fix: eliminate audio/text race condition - lock now wraps entire transcribe+reply flow
+cfdc092|2026-08-06 10:26:22 +0000|docs: documenta correcao de responsividade mobile do CRM
+ed7814b|2026-08-06 10:25:33 +0000|fix: responsividade mobile do CRM (sidebar retratil, paineis em drawer, tabelas com scroll)
+baf1352|2026-08-06 10:01:58 +0000|checkpoint: estado pre-existente antes de ajuste de responsividade mobile do CRM
+1ae50a7|2026-08-06 09:56:23 +0000|docs: clarify diminutivo rule only applies to live AI-generated text, not fixed templates
+f9fae91|2026-08-06 09:35:26 +0000|fix: gpt-5.6 family rejects temperature != 1, add llmTemp() guard on all 7 callLLM sites
+da1fac6|2026-08-06 01:34:17 +0000|remove trainer-mode (LOBSTER trigger) interception from handleIncomingText - Decisao do Diego: feature de trainer-mode via WhatsApp removida por completo, nao sera mais usada (ajustes de prompt agora sao feitos direto no chat). Causa raiz do bug de mensagens sem resposta (audio e texto engolidos silenciosamente, sem excecao/log): trainerMode.maybeHandle(conv, phone, text, sendText, fromJid) podia retornar true para mensagens normais e a linha seguinte if (trainerHandled) return; interrompia o processamento antes de chegar em ai.generateReply, sem lancar erro. Removidas 3 linhas: require('./trainerMode'), a chamada maybeHandle, e o if/return. Verificado: node -c limpo, pm2 restart sem crash-loop (status online), conexao 5 reconectou (status=connected), teste sintetico local confirma que o fluxo chega em ensureConversation/saveMessage sem excecao. Aguardando teste ao vivo real (texto+audio) do Diego para confirmacao final. services/trainerMode.js mantido no disco mas nao é mais requerido em lugar nenhum do whatsapp-bot (grep -rln confirmou).
+d49aed9|2026-08-06 01:13:52 +0000|item4: botao de gravacao de audio no navegador (MediaRecorder) + envio via send-recorded-audio
+20edbc1|2026-08-06 01:10:43 +0000|item4: rota send-recorded-audio com transcodificacao ffmpeg (webm/opus -> ogg/opus)
+d6a17e4|2026-08-06 00:48:51 +0000|checkpoint: item 3 - transcricao de audio enviado pela equipe (outbound) - testado ao vivo com audio real
+a7c8b37|2026-08-06 00:38:40 +0000|checkpoint: item 2 - envio de anexos (doc/imagem/video) pela equipe via CRM - testado ao vivo (entrega + persistencia confirmadas)
