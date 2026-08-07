@@ -142,6 +142,33 @@ function buildSystemPrompt(cfg) {
   return prompt
 }
 
+// Substitui variaveis simples nas respostas de FAQ (ex.: {{nome_lead}}) pelo
+// valor real conhecido da conversa. Se o nome nao for conhecido, remove a
+// variavel e limpa espaco/pontuacao residual em vez de deixar {{nome_lead}} literal.
+// [2026-08-07] Achado no teste da Fase 2: o humanizeLLM nao so reformata em
+// bolhas, ele PARAFRASEIA e ATE INVENTA conteudo (testado ao vivo: pergunta
+// sobre amamentacao voltou com claim medico especifico nao aprovado; pergunta
+// sobre Exojet voltou citando ingredientes - GHK-Cu, DNA de salmao - que nao
+// existem em nenhum texto configurado). Isso e inaceitavel pra respostas de FAQ
+// pre-aprovadas (preco, garantia, dor, contraindicacao, etc) - o texto exato
+// aprovado pelo Diego precisa chegar como esta, sem reinterpretacao da IA.
+// Por isso, quando a resposta vem do FAQ (faqHit), pulamos o humanizeLLM e
+// usamos so uma quebra mecanica por frase - mesmo espirito das mensagens FIXAS
+// de cadencia (D1-D15) que ja NAO passam por geracao ao vivo da IA.
+function mechanicalFaqChunks(text) {
+  if (!text) return []
+  const parts = text.split(/(?<=[.?!])\s+(?=[A-ZÀ-Ú])/).map(function(s){ return s.trim() }).filter(Boolean)
+  return parts.length ? parts : [text]
+}
+function fillFaqTemplate(text, knownName) {
+  if (!text) return text
+  const name = (knownName || '').trim()
+  let out = text.replace(/\{\{nome_lead\}\}/g, name)
+  if (!name) {
+    out = out.replace(/\s+([,.!?])/g, '$1').replace(/\s{2,}/g, ' ').trim()
+  }
+  return out
+}
 // RAG simples por palavra-chave sobre o FAQ configurado (sem dependencia externa de vetores).
 function searchFaq(cfg, userText) {
   let items = []
@@ -407,7 +434,7 @@ replyText = cfg.fallback_handoff_message || 'Vou chamar alguem da nossa equipe p
 await setFallbackStreak(conversationId, 0, ttl)
 if (needsHandoff) replyText = trimForHandoff(replyText) + '\n\n' + await buildHandoffNotice(conversationId)
 } else if (faqHit) {
-replyText = faqHit.a
+replyText = fillFaqTemplate(faqHit.a, knownName)
 await setFallbackStreak(conversationId, 0, ttl)
 if (needsHandoff) replyText = trimForHandoff(replyText) + '\n\n' + await buildHandoffNotice(conversationId)
 } else if (isFirstContact) {
@@ -468,7 +495,12 @@ await pushMemory(conversationId, 'assistant', replyText, ttl)
     console.error('[ai] erro no guardrail de descoberta repetida', discErr.message)
   }
 if (!needsHandoff) replyText = trimForHandoff(replyText, 600)
-  let chunks = cfg.humanizer_enabled === 'true' ? await humanizeLLM(replyText, cfg) : [replyText]
+  let chunks
+  if (faqHit) {
+    chunks = mechanicalFaqChunks(replyText)
+  } else {
+    chunks = cfg.humanizer_enabled === 'true' ? await humanizeLLM(replyText, cfg) : [replyText]
+  }
   const MAX_BUBBLES = 3
   if (chunks.length > MAX_BUBBLES) {
     const head = chunks.slice(0, MAX_BUBBLES - 1)

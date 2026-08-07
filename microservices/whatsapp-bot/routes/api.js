@@ -181,6 +181,96 @@ router.post('/conversations/:id/send-attachment', auth, attachmentUpload.single(
   }
 })
 
+// ===== Media Central (biblioteca de midias reutilizaveis) =====
+const mediaLibraryDir = path.join(__dirname, '..', 'assets', 'media_library')
+if (!fs.existsSync(mediaLibraryDir)) fs.mkdirSync(mediaLibraryDir, { recursive: true })
+const mediaLibraryStorage = multer.diskStorage({
+destination: function (req, file, cb) { cb(null, mediaLibraryDir) },
+filename: function (req, file, cb) {
+const ext = path.extname(file.originalname || '') || ''
+cb(null, 'lib_' + Date.now() + '_' + Math.round(Math.random() * 1e9) + ext)
+}
+})
+const mediaLibraryUpload = multer({ storage: mediaLibraryStorage, limits: { fileSize: 64 * 1024 * 1024 } })
+
+router.get('/media-library', auth, async (req, res) => {
+try {
+const [rows] = await pool.query('SELECT * FROM media_library ORDER BY usage_count DESC, id DESC')
+res.json({ success: true, items: rows })
+} catch (e) {
+console.error('[api] erro ao listar media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+
+router.post('/media-library/upload', auth, mediaLibraryUpload.single('file'), async (req, res) => {
+try {
+if (!req.file) return res.status(400).json({ success: false, error: 'arquivo obrigatorio' })
+const relPath = 'assets/media_library/' + req.file.filename
+res.json({ success: true, path: relPath, fileName: req.file.originalname, mimetype: req.file.mimetype })
+} catch (e) {
+console.error('[api] erro ao enviar arquivo da media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+
+router.post('/media-library', auth, async (req, res) => {
+try {
+const { type, title, category, content, fileName, mimetype } = req.body
+if (!type || ['text','image','video','audio'].indexOf(type) === -1) return res.status(400).json({ success: false, error: 'tipo invalido' })
+if (!title || !String(title).trim()) return res.status(400).json({ success: false, error: 'titulo obrigatorio' })
+if (!content || !String(content).trim()) return res.status(400).json({ success: false, error: 'conteudo obrigatorio' })
+const [result] = await pool.query(
+'INSERT INTO media_library (type, title, content, category, file_name, mimetype) VALUES (?, ?, ?, ?, ?, ?)',
+[type, String(title).trim(), content, category || null, fileName || null, mimetype || null]
+)
+res.json({ success: true, id: result.insertId })
+} catch (e) {
+console.error('[api] erro ao criar item da media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+
+router.delete('/media-library/:id', auth, async (req, res) => {
+try {
+const [[item]] = await pool.query('SELECT * FROM media_library WHERE id = ?', [req.params.id])
+if (item && item.type !== 'text') {
+try {
+const fullPath = path.join(__dirname, '..', item.content)
+if (fs.existsSync(fullPath)) fs.unlinkSync(fullPath)
+} catch (e) {}
+}
+await pool.query('DELETE FROM media_library WHERE id = ?', [req.params.id])
+res.json({ success: true })
+} catch (e) {
+console.error('[api] erro ao remover item da media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+
+router.post('/conversations/:id/send-media-library/:itemId', auth, async (req, res) => {
+try {
+const [[item]] = await pool.query('SELECT * FROM media_library WHERE id = ?', [req.params.itemId])
+if (!item) return res.status(404).json({ success: false, error: 'item nao encontrado' })
+if (item.type === 'text') {
+await wa.sendManualMessage(req.params.id, item.content)
+} else {
+const fullPath = path.join(__dirname, '..', item.content)
+await wa.sendManualMedia(req.params.id, fullPath, item.type, {
+fileName: item.file_name || item.title,
+mimetype: item.mimetype || undefined
+})
+}
+await pool.query('UPDATE media_library SET usage_count = usage_count + 1 WHERE id = ?', [req.params.itemId])
+res.json({ success: true })
+} catch (e) {
+console.error('[api] erro ao enviar item da media library:', e.message)
+res.status(500).json({ success: false, error: e.message })
+}
+})
+// ===== fim Media Central =====
+
+
 router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(

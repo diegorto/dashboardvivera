@@ -1,0 +1,29 @@
+[1mdiff --git a/microservices/crm-server/crm-ui-api.js b/microservices/crm-server/crm-ui-api.js[m
+[1mindex 00fdbc9..fb7dc6f 100644[m
+[1m--- a/microservices/crm-server/crm-ui-api.js[m
+[1m+++ b/microservices/crm-server/crm-ui-api.js[m
+[36m@@ -596,7 +596,7 @@[m [mapp.get('/api/crm/ui/dashboard/executive/vendas-drilldown', auth, requireAdmin,[m
+     const from = req.query.from || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);[m
+     const to = req.query.to || new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10);[m
+     const { fromDt, toDt } = brRangeToUtc(from, to);[m
+[31m-    const fonteExpr = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Org\u00e2nico","Instagram Org\u00e2nico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem n\u00e3o Identificada","N\u00e3o rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';[m
+[32m+[m[32m    const fonteExpr = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Instagram","Instagram Org\u00e2nico","Organico","Org\u00e2nico") AND COALESCE(d.tintim_source_raw,"") NOT IN ("Meta Ads","Google Ads") AND (d.origem IN ("Instagram Org\u00e2nico","Organico","Org\u00e2nico") OR COALESCE(d.utm_source,"") LIKE "organ%" OR (COALESCE(d.plataforma,"") NOT IN ("Meta Ads","Meta") AND COALESCE(d.utm_source,"") <> "meta-ads" AND d.ad_campaign_name IS NULL AND d.ad_adset_name IS NULL AND d.ad_name IS NULL AND COALESCE(d.campanha,"") = "")) THEN "Instagram Organico" WHEN WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Org\u00e2nico","Instagram Org\u00e2nico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem n\u00e3o Identificada","N\u00e3o rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';[m
+     const [groups] = await pool.query([m
+       'SELECT ' + fonteExpr + ' AS origem, COUNT(*) AS vendas, COALESCE(SUM(d.value),0) AS receita ' +[m
+       'FROM deals d WHERE d.status = "won" AND d.won_date BETWEEN ? AND ? ' +[m
+[36m@@ -842,13 +842,13 @@[m [mapp.get('/api/crm/ui/dashboard/sdrs', auth, requireAdmin, async (req, res) => {[m
+       '    COALESCE(SUM(CASE WHEN d.value > 0 THEN d.value ELSE 0 END),0) AS valor_orcamentos_gerados ' +[m
+       '  FROM deals d ' +[m
+       '  LEFT JOIN stages s ON s.id = d.stage_id ' +[m
+[31m-      '  WHERE d.pipeline_id = 1 AND d.add_date BETWEEN ? AND ? AND d.count_as_lead_entry = 1 ' +[m
+[32m+[m[32m      '  WHERE d.stage_id IN (SELECT id FROM stages WHERE pipeline_id = 1) AND d.add_date BETWEEN ? AND ? AND d.count_as_lead_entry = 1 ' +[m
+       '  GROUP BY d.owner_name ' +[m
+       ') dm ON dm.ownerName = u.name ' +[m
+       'LEFT JOIN ( ' +[m
+       '  SELECT d3.owner_name AS ownerName, COUNT(d3.id) AS vendas, COALESCE(SUM(d3.value),0) AS receita ' +[m
+       '  FROM deals d3 ' +[m
+[31m-      "  WHERE d3.pipeline_id = 1 AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +[m
+[32m+[m[32m      "  WHERE d3.stage_id IN (SELECT id FROM stages WHERE pipeline_id = 1) AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +[m
+       '  GROUP BY d3.owner_name ' +[m
+       ') vm ON vm.ownerName = u.name ' +[m
+       "WHERE u.role = 'sdr' AND u.active = 1 " +[m

@@ -897,6 +897,7 @@ function renderLeadSidebar(info) {
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>' +
     '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>';
   sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
+sidebar.innerHTML += '<div style="margin-top:8px;"><button type="button" onclick="openMediaCentral()" style="width:100%;padding:9px 12px;background:#fff;color:#6c5ce7;border:1px solid #6c5ce7;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Media Central</button></div>';
 }
 
 window.saveDealMeta = function saveDealMeta(partial) {
@@ -989,6 +990,171 @@ window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
   if (patientName) params.set('patientName', patientName);
   window.open('/agenda-visual.html?' + params.toString(), '_blank');
 }
+
+window.__mediaCentralItems = null;
+function mcEscapeHtml(s) {
+return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+});
+}
+window.openMediaCentral = function openMediaCentral() {
+if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
+mcEnsureModal();
+document.getElementById('mediaCentralOverlay').style.display = 'flex';
+loadMediaCentralItems();
+}
+function mcEnsureModal() {
+if (document.getElementById('mediaCentralOverlay')) return;
+var ov = document.createElement('div');
+ov.id = 'mediaCentralOverlay';
+ov.style.cssText = 'display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;';
+ov.innerHTML =
+'<div style="background:#fff;width:520px;max-width:92vw;max-height:82vh;border-radius:10px;display:flex;flex-direction:column;overflow:hidden;">' +
+'<div style="padding:14px 18px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">' +
+'<strong style="font-size:15px;">Media Central</strong>' +
+'<button type="button" onclick="closeMediaCentral()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#999;line-height:1;">&times;</button>' +
+'</div>' +
+'<div style="padding:10px 18px;border-bottom:1px solid #f0f0f0;">' +
+'<input type="text" id="mcSearchInput" placeholder="Buscar midia ou texto..." oninput="renderMediaCentralList()" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:7px 10px;font-size:13px;">' +
+'</div>' +
+'<div id="mediaCentralList" style="flex:1;overflow-y:auto;padding:8px 18px;"></div>' +
+'<div style="padding:10px 18px;border-top:1px solid #eee;">' +
+'<button type="button" onclick="mcToggleAddForm()" style="border:1px dashed #bbb;background:#fff;border-radius:6px;padding:6px 12px;font-size:12px;color:#666;cursor:pointer;">+ Adicionar item</button>' +
+'<div id="mcAddForm" style="display:none;margin-top:10px;">' +
+'<select id="mcAddType" onchange="mcToggleAddFields()" style="width:100%;padding:6px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
+'<option value="text">Texto</option><option value="image">Imagem</option><option value="video">Video</option><option value="audio">Audio</option>' +
+'</select>' +
+'<input type="text" id="mcAddTitle" placeholder="Titulo (ex: Endereco da clinica)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
+'<input type="text" id="mcAddCategory" placeholder="Categoria (opcional)" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;">' +
+'<textarea id="mcAddText" placeholder="Texto da mensagem" style="width:100%;box-sizing:border-box;min-height:60px;padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;margin-bottom:6px;"></textarea>' +
+'<input type="file" id="mcAddFile" style="display:none;margin-bottom:6px;">' +
+'<button type="button" onclick="submitMediaCentralItem()" style="padding:7px 14px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Salvar</button>' +
+'<span id="mcAddStatus" style="margin-left:8px;font-size:11px;color:#666;"></span>' +
+'</div>' +
+'</div>' +
+'</div>';
+document.body.appendChild(ov);
+ov.addEventListener('click', function(e){ if (e.target === ov) closeMediaCentral(); });
+}
+window.closeMediaCentral = function closeMediaCentral() {
+var ov = document.getElementById('mediaCentralOverlay');
+if (ov) ov.style.display = 'none';
+}
+window.mcToggleAddFields = function mcToggleAddFields() {
+var type = document.getElementById('mcAddType').value;
+document.getElementById('mcAddText').style.display = type === 'text' ? 'block' : 'none';
+document.getElementById('mcAddFile').style.display = type === 'text' ? 'none' : 'block';
+}
+window.mcToggleAddForm = function mcToggleAddForm() {
+var f = document.getElementById('mcAddForm');
+f.style.display = f.style.display === 'none' ? 'block' : 'none';
+mcToggleAddFields();
+}
+async function loadMediaCentralItems() {
+var listEl = document.getElementById('mediaCentralList');
+listEl.innerHTML = '<p style="color:#999;font-size:12px;">Carregando...</p>';
+try {
+var data = await api('/media-library');
+if (!data || !data.success) throw new Error((data && data.error) || 'falha ao carregar');
+window.__mediaCentralItems = data.items || [];
+renderMediaCentralList();
+} catch (e) {
+listEl.innerHTML = '<p style="color:#c00;font-size:12px;">Erro ao carregar: ' + mcEscapeHtml(e.message) + '</p>';
+}
+}
+function mcIconForType(type) {
+return type === 'image' ? 'Imagem' : type === 'video' ? 'Video' : type === 'audio' ? 'Audio' : 'Texto';
+}
+window.renderMediaCentralList = function renderMediaCentralList() {
+var listEl = document.getElementById('mediaCentralList');
+var items = window.__mediaCentralItems || [];
+var searchEl = document.getElementById('mcSearchInput');
+var q = (searchEl && searchEl.value || '').toLowerCase();
+var filtered = items.filter(function(it){ return !q || (it.title||'').toLowerCase().indexOf(q) !== -1 || (it.category||'').toLowerCase().indexOf(q) !== -1; });
+if (!filtered.length) { listEl.innerHTML = '<p style="color:#999;font-size:12px;padding:10px 0;">Nenhum item encontrado.</p>'; return; }
+var topItems = filtered.filter(function(it){ return (it.usage_count || 0) > 0; }).slice(0, 3);
+var topIds = topItems.map(function(it){ return it.id; });
+var restItems = filtered.filter(function(it){ return topIds.indexOf(it.id) === -1; });
+var html = '';
+if (topItems.length && !q) {
+html += '<div style="color:#666;font-size:11px;text-transform:uppercase;margin:6px 0 4px;">Mais usados</div>';
+topItems.forEach(function(it){ html += mcRenderItem(it); });
+html += '<div style="color:#666;font-size:11px;text-transform:uppercase;margin:14px 0 4px;">Todos os itens</div>';
+restItems.forEach(function(it){ html += mcRenderItem(it); });
+} else {
+filtered.forEach(function(it){ html += mcRenderItem(it); });
+}
+listEl.innerHTML = html;
+}
+function mcRenderItem(it) {
+var typeLabel = mcIconForType(it.type);
+var preview = it.type === 'text' ? '<div style="font-size:12px;color:#666;margin-top:2px;max-height:36px;overflow:hidden;">' + mcEscapeHtml(String(it.content||'').slice(0,120)) + '</div>' : '';
+return '<div onclick="sendMediaCentralItem(' + it.id + ', this)" style="display:flex;align-items:center;gap:10px;padding:9px 8px;border-radius:8px;cursor:pointer;border:1px solid #eee;margin-bottom:6px;" onmouseover="this.style.background=\'#f7f6ff\'" onmouseout="this.style.background=\'#fff\'">' +
+'<div style="font-size:10px;font-weight:700;color:#6c5ce7;background:#eef2ff;border-radius:4px;padding:3px 6px;white-space:nowrap;">' + typeLabel + '</div>' +
+'<div style="flex:1;min-width:0;">' +
+'<div style="font-weight:600;font-size:13px;">' + mcEscapeHtml(it.title) + (it.category ? ' <span style="font-weight:400;color:#999;font-size:11px;">- ' + mcEscapeHtml(it.category) + '</span>' : '') + '</div>' +
+preview +
+'</div>' +
+'<div style="font-size:11px;color:#bbb;white-space:nowrap;">' + (it.usage_count || 0) + 'x</div>' +
+'</div>';
+}
+window.sendMediaCentralItem = async function sendMediaCentralItem(id, el) {
+if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
+if (el) { el.style.opacity = '0.5'; el.style.pointerEvents = 'none'; }
+try {
+var res = await api('/conversations/' + currentConvId + '/send-media-library/' + id, { method: 'POST' });
+if (!res || !res.success) throw new Error((res && res.error) || 'falha ao enviar');
+closeMediaCentral();
+var title = document.getElementById('convThreadTitle').textContent;
+await openConversation(currentConvId, title);
+await loadConversations();
+} catch (e) {
+if (el) { el.style.opacity = '1'; el.style.pointerEvents = ''; }
+alert('Erro ao enviar: ' + e.message);
+}
+}
+window.submitMediaCentralItem = async function submitMediaCentralItem() {
+var type = document.getElementById('mcAddType').value;
+var title = document.getElementById('mcAddTitle').value.trim();
+var category = document.getElementById('mcAddCategory').value.trim();
+var statusEl = document.getElementById('mcAddStatus');
+if (!title) { alert('Informe um titulo.'); return; }
+statusEl.textContent = 'Salvando...';
+try {
+var content = '';
+var fileName = '';
+var mimetype = '';
+if (type === 'text') {
+content = document.getElementById('mcAddText').value.trim();
+if (!content) { alert('Informe o texto.'); statusEl.textContent = ''; return; }
+} else {
+var fileInput = document.getElementById('mcAddFile');
+var file = fileInput.files && fileInput.files[0];
+if (!file) { alert('Selecione um arquivo.'); statusEl.textContent = ''; return; }
+var fd = new FormData();
+fd.append('file', file);
+var upRes = await fetch(API_BASE + '/media-library/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+var upData = await upRes.json();
+if (!upData.success) throw new Error(upData.error || 'falha no upload');
+content = upData.path;
+fileName = upData.fileName || file.name;
+mimetype = upData.mimetype || file.type;
+}
+var createRes = await api('/media-library', { method: 'POST', body: JSON.stringify({ type: type, title: title, category: category, content: content, fileName: fileName, mimetype: mimetype }) });
+if (!createRes || !createRes.success) throw new Error((createRes && createRes.error) || 'falha ao salvar');
+document.getElementById('mcAddTitle').value = '';
+document.getElementById('mcAddCategory').value = '';
+document.getElementById('mcAddText').value = '';
+document.getElementById('mcAddFile').value = '';
+statusEl.textContent = '';
+mcToggleAddForm();
+await loadMediaCentralItems();
+} catch (e) {
+statusEl.textContent = '';
+alert('Erro ao salvar item: ' + e.message);
+}
+}
+
 
 async function loadConversationSidebar(id) {
   var sidebar = ensureLeadSidebar();
