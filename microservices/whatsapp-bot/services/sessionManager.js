@@ -138,6 +138,12 @@ function getConnectionAgeMs(connectionId) {
 function getSocket(connectionId) {
   return sockets.get(connectionId)
 }
+function getActiveConnectionId() {
+  for (const [id, sock] of sockets) {
+    if (sock) return id
+  }
+  return null
+}
 
 async function getQr(connectionId) {
   return qrCache.get(connectionId) || null
@@ -179,4 +185,4 @@ async function forceReconnect(connectionId) {
   }
 }
 
-module.exports = { startAll, connectNew, getSocket, getQr, disconnect, startSocket, forceReconnect, getConnectionAgeMs }
+module.exports = { startAll, connectNew, getSocket, getQr, disconnect, startSocket, forceReconnect, getConnectionAgeMs, getActiveConnectionId }

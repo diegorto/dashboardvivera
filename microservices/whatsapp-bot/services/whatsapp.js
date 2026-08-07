@@ -693,14 +693,23 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
   const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
   if (!conv) throw new Error('conversa nao encontrada')
   const jid = conv.wa_jid || (String(conv.phone || '').replace('+', '')) + '@s.whatsapp.net'
-  const sockOverride = getSocketForConnection(conv.connection_id)
+  let effectiveConnectionId = conv.connection_id
+  let sockOverride = getSocketForConnection(effectiveConnectionId)
   if (conv.connection_id && !sockOverride) {
-    throw new Error('Conexao WhatsApp (conexao ' + conv.connection_id + ') indisponivel no momento (reconectando). Tente novamente em alguns segundos.')
+  const fallbackId = getActiveConnectionId()
+  if (fallbackId) {
+  console.warn('[whatsapp] conexao ' + conv.connection_id + ' da conversa ' + conversationId + ' nao encontrada; usando conexao ativa ' + fallbackId + ' como fallback')
+  effectiveConnectionId = fallbackId
+  sockOverride = getSocketForConnection(effectiveConnectionId)
+  } else {
+  console.warn('[whatsapp] conexao ' + conv.connection_id + ' da conversa ' + conversationId + ' nao encontrada e nenhuma conexao alternativa ativa (sessionManager pode estar desativado); usando conexao padrao (legado) como fallback')
+  effectiveConnectionId = null
   }
-  const connAgeMs = getConnectionAgeMs(conv.connection_id)
+  }
+  const connAgeMs = effectiveConnectionId ? getConnectionAgeMs(effectiveConnectionId) : null
   const MIN_STABLE_MS = 20000
-  if (conv.connection_id && connAgeMs !== null && connAgeMs < MIN_STABLE_MS) {
-    throw new Error('Conexao WhatsApp (conexao ' + conv.connection_id + ') reconectou ha pouco (' + Math.round(connAgeMs/1000) + 's). Aguarde alguns segundos e tente novamente para evitar midia corrompida.')
+  if (effectiveConnectionId && sockOverride && connAgeMs !== null && connAgeMs < MIN_STABLE_MS) {
+  throw new Error('Conexao WhatsApp (conexao ' + effectiveConnectionId + ') reconectou ha pouco (' + Math.round(connAgeMs/1000) + 's). Aguarde alguns segundos e tente novamente para evitar midia corrompida.')
   }
   let sentAudioMsgId = null
   if (mediaType === 'image') await sendImage(jid, filePath, opts.caption || '', sockOverride)
@@ -747,7 +756,14 @@ async function sendManualMessage(conversationId, text) {
   const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
   if (!conv) throw new Error('conversa nao encontrada')
   const jid = conv.wa_jid || (String(conv.phone || '').replace('+', '') + '@s.whatsapp.net')
-  const sockOverride = getSocketForConnection(conv.connection_id)
+  let sockOverride = getSocketForConnection(conv.connection_id)
+  if (conv.connection_id && !sockOverride) {
+  const fallbackId = getActiveConnectionId()
+  if (fallbackId) {
+  console.warn('[whatsapp] conexao ' + conv.connection_id + ' da conversa ' + conversationId + ' nao encontrada; usando conexao ativa ' + fallbackId + ' como fallback')
+  sockOverride = getSocketForConnection(fallbackId)
+  }
+  }
   await sendText(jid, text, sockOverride)
   await saveMessage(conversationId, 'out', text, 'human')
   await pool.query('UPDATE whatsapp_conversations SET ai_enabled = 0 WHERE id = ?', [conversationId])
@@ -874,10 +890,53 @@ let _sessionManager = null
 function registerSessionManager(sm) { _sessionManager = sm }
 function getSocketForConnection(connectionId) { if (!connectionId) return undefined; return _sessionManager ? _sessionManager.getSocket(connectionId) : undefined }
 function getConnectionAgeMs(connectionId) { if (!connectionId) return null; return _sessionManager ? _sessionManager.getConnectionAgeMs(connectionId) : null }
+function getActiveConnectionId() { return _sessionManager && _sessionManager.getActiveConnectionId ? _sessionManager.getActiveConnectionId() : null }
 
 async function forceReconnectConnection(connectionId) {
   if (!connectionId || !_sessionManager || !_sessionManager.forceReconnect) return false
   try { return await _sessionManager.forceReconnect(connectionId) } catch (e) { console.error('[whatsapp] erro ao forcar reconexao da conexao ' + connectionId + ':', e.message); return false }
 }
+
+
+// ===== BAND-AID 2026-08-07 (Diego): watchdog de saude da conexao =====
+// Isso e um paliativo, NAO a causa raiz. Causa raiz ainda em investigacao
+// (Baileys rc13, socket fica em estado fantasma: connectionStatus='connected'
+// mas envios reais falham com "Connection Closed" e o evento close nunca
+// dispara pra reconectar sozinho). Esse watchdog faz uma sondagem leve
+// (sendPresenceUpdate) periodicamente; se falhar 2x seguidas com status
+// 'connected', forca o encerramento do socket antigo e reconexao.
+let watchdogConsecutiveFailures = 0
+function startConnectionWatchdog() {
+  setInterval(async () => {
+    try {
+      if (connectionStatus !== 'connected' || !sock) return
+      const probe = new Promise((resolve, reject) => {
+        if (!sock || typeof sock.sendPresenceUpdate !== 'function') { reject(new Error('sock sem sendPresenceUpdate')); return }
+        sock.sendPresenceUpdate('available').then(resolve).catch(reject)
+      })
+      const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('watchdog probe timeout')), 8000))
+      await Promise.race([probe, timeout])
+      watchdogConsecutiveFailures = 0
+    } catch (e) {
+      watchdogConsecutiveFailures++
+      console.warn('[whatsapp][WATCHDOG][BAND-AID] sondagem falhou (' + e.message + '), falha consecutiva #' + watchdogConsecutiveFailures + ' com status=connected')
+      if (watchdogConsecutiveFailures >= 2) {
+        console.warn('[whatsapp][WATCHDOG][BAND-AID] 2+ falhas seguidas com status=connected. Forcando fechar e reconectar o socket.')
+        watchdogConsecutiveFailures = 0
+        const oldSock = sock
+        try { if (oldSock && typeof oldSock.end === 'function') oldSock.end(new Error('watchdog forced restart')) } catch (e2) { console.error('[whatsapp][WATCHDOG][BAND-AID] erro ao encerrar socket antigo:', e2.message) }
+        setTimeout(() => {
+          if (connectionStatus !== 'connecting' && connectionStatus !== 'qr_pending') {
+            console.warn('[whatsapp][WATCHDOG][BAND-AID] close nao disparou reconexao sozinho, chamando startSocket() diretamente')
+            startSocket().catch(e3 => console.error('[whatsapp][WATCHDOG][BAND-AID] erro no restart manual:', e3.message))
+          }
+        }, 15000)
+      }
+    }
+  }, 60000)
+  console.log('[whatsapp][WATCHDOG][BAND-AID] watchdog de saude da conexao ativado (checagem a cada 60s)')
+}
+startConnectionWatchdog()
+// ===== FIM BAND-AID =====
 
 module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
