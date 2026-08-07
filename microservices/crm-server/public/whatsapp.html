@@ -864,20 +864,35 @@ function renderLeadSidebar(info) {
     var tagChips = (info.tags || []).map(function(t, ti){
       return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 6px 2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + ' <span onclick="removeTagForCurrentLead(' + ti + ')" style="cursor:pointer;font-weight:700;margin-left:3px;">&times;</span></span>';
     }).join('');
-    tagsHtml = tagChips + '<input type="text" id="newTagInputLS" placeholder="+ tag" style="border:1px solid #ddd;border-radius:12px;padding:2px 8px;font-size:12px;width:80px;margin-top:2px;" onkeydown="if(event.key===&apos;Enter&apos;){addTagForCurrentLead(this.value);this.value=&apos;&apos;;}">';
+    tagsHtml = tagChips + '<span style="position:relative;display:inline-block;">' +
+      '<button type="button" onclick="toggleTagPickerLS()" style="border:1px dashed #bbb;background:#fff;border-radius:12px;padding:2px 10px;font-size:12px;cursor:pointer;color:#666;">+ tag</button>' +
+      '<div id="tagPickerLS" style="display:none;position:absolute;z-index:20;top:26px;left:0;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);width:200px;max-height:220px;overflow-y:auto;padding:6px;">' +
+        '<input type="text" id="tagPickerSearchLS" placeholder="Buscar etiqueta..." oninput="renderTagPickerOptionsLS()" style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:4px 6px;font-size:12px;margin-bottom:6px;">' +
+        '<div id="tagPickerListLS"></div>' +
+      '</div>' +
+    '</span>';
   } else {
     tagsHtml = (info.tags && info.tags.length)
       ? info.tags.map(function(t){ return '<span style="display:inline-block;background:#eef2ff;color:#3730a3;border-radius:12px;padding:2px 8px;margin:2px 4px 2px 0;font-size:12px;">' + escapeHtmlLS(t) + '</span>'; }).join('')
       : '<span style="color:#999;">sem tags</span>';
   }
   var resumoHtml = info.resumo ? escapeHtmlLS(info.resumo).replace(/\n/g,'<br>') : '<span style="color:#999;">sem resumo ainda</span>';
-  var linkNoteHtml = info.dealId ? '' : '<div style="margin-bottom:14px;font-size:11px;color:#c0392b;">Esta conversa nao esta vinculada a um negocio. Vincule para editar tags e score.</div>';
+  var linkNoteHtml = info.dealId ? '' : '<div style="margin-bottom:14px;font-size:11px;color:#c0392b;">Esta conversa nao esta vinculada a um negocio. Vincule para editar tags, score e notas.</div>';
+  var notesHtml;
+  if (info.dealId) {
+    notesHtml = '<textarea id="notasManuaisLS" placeholder="Complemento manual (o que a IA nao captou)..." style="width:100%;box-sizing:border-box;min-height:70px;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;">' + escapeHtmlLS(info.notasManuais || '') + '</textarea>' +
+      '<button type="button" onclick="saveNotasManuaisForCurrentLead()" style="margin-top:6px;padding:6px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Salvar nota</button>' +
+      '<span id="notasManuaisSavedLS" style="margin-left:8px;font-size:11px;color:#2e7d32;display:none;">Salvo!</span>';
+  } else {
+    notesHtml = '<span style="color:#999;">sem notas</span>';
+  }
   sidebar.innerHTML =
     '<div style="font-weight:700;margin-bottom:10px;">' + (info.dealTitle ? escapeHtmlLS(info.dealTitle) : 'Lead') + '</div>' +
     linkNoteHtml +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Lead score</div>' + scoreHtml + '</div>' +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
-    '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>';
+    '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>' +
+    '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>';
   sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
 }
 
@@ -888,6 +903,7 @@ window.saveDealMeta = function saveDealMeta(partial) {
     if (window.__lastSidebarInfo) {
       if (partial.tags !== undefined) window.__lastSidebarInfo.tags = partial.tags;
       if (partial.leadScore !== undefined) window.__lastSidebarInfo.leadScore = partial.leadScore;
+      if (partial.notasManuais !== undefined) window.__lastSidebarInfo.notasManuais = partial.notasManuais;
       renderLeadSidebar(window.__lastSidebarInfo);
     }
   }).catch(function(e){ alert('Erro ao salvar: ' + e.message); });
@@ -910,6 +926,56 @@ window.removeTagForCurrentLead = function removeTagForCurrentLead(idx) {
   saveDealMeta({ tags: tags });
 }
 
+window.__labelsCatalogLS = null;
+window.toggleTagPickerLS = function toggleTagPickerLS() {
+  var dd = document.getElementById('tagPickerLS');
+  if (!dd) return;
+  if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
+  dd.style.display = 'block';
+  var search = document.getElementById('tagPickerSearchLS');
+  if (search) { search.value = ''; search.focus(); }
+  if (window.__labelsCatalogLS) { renderTagPickerOptionsLS(); return; }
+  api('/labels').then(function(r){
+    window.__labelsCatalogLS = (r && r.success && r.labels) ? r.labels : [];
+    renderTagPickerOptionsLS();
+  }).catch(function(e){
+    var list = document.getElementById('tagPickerListLS');
+    if (list) list.innerHTML = '<div style="color:#c0392b;font-size:12px;">Erro ao carregar etiquetas.</div>';
+  });
+}
+window.renderTagPickerOptionsLS = function renderTagPickerOptionsLS() {
+  var list = document.getElementById('tagPickerListLS');
+  if (!list) return;
+  var catalog = window.__labelsCatalogLS || [];
+  var q = (document.getElementById('tagPickerSearchLS').value || '').toLowerCase();
+  var info = window.__lastSidebarInfo || {};
+  var current = (info.tags || []);
+  var opts = catalog.filter(function(l){
+    return current.indexOf(l.name) === -1 && (!q || l.name.toLowerCase().indexOf(q) !== -1);
+  });
+  if (!opts.length) { list.innerHTML = '<div style="color:#999;font-size:12px;padding:4px 2px;">Nenhuma etiqueta encontrada.</div>'; return; }
+  list.innerHTML = opts.map(function(l){
+    var dot = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (l.color || '#ccc') + ';margin-right:6px;"></span>';
+    return '<div onclick="addTagFromPickerLS(\'' + encodeURIComponent(l.name) + '\')" style="padding:5px 6px;cursor:pointer;font-size:12px;border-radius:4px;display:flex;align-items:center;" onmouseover="this.style.background=\'#f2f2f7\'" onmouseout="this.style.background=\'transparent\'">' + dot + escapeHtmlLS(l.name) + '</div>';
+  }).join('');
+}
+window.addTagFromPickerLS = function addTagFromPickerLS(encodedName) {
+  var name = decodeURIComponent(encodedName);
+  addTagForCurrentLead(name);
+  var dd = document.getElementById('tagPickerLS');
+  if (dd) dd.style.display = 'none';
+}
+window.saveNotasManuaisForCurrentLead = function saveNotasManuaisForCurrentLead() {
+  var el = document.getElementById('notasManuaisLS');
+  if (!el || !currentConvId) return;
+  var val = el.value;
+  api('/conversations/' + currentConvId + '/deal-meta', { method: 'PATCH', body: JSON.stringify({ notasManuais: val }) }).then(function(r){
+    if (!r || !r.success) { alert('Erro ao salvar nota: ' + ((r && r.error) || 'desconhecido')); return; }
+    if (window.__lastSidebarInfo) window.__lastSidebarInfo.notasManuais = val;
+    var saved = document.getElementById('notasManuaisSavedLS');
+    if (saved) { saved.style.display = 'inline'; setTimeout(function(){ saved.style.display = 'none'; }, 2000); }
+  }).catch(function(e){ alert('Erro ao salvar nota: ' + e.message); });
+}
 window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
   if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
   var info = window.__lastSidebarInfo || {};
