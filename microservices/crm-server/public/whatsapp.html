@@ -47,6 +47,12 @@
   .flow-node.reminder { border-color:#FF6E6E; }
   .flow-node.end { border-color:#666; }
   .flow-node .nt { font-size:10px; text-transform:uppercase; opacity:.6; }
+  .flow-mindmap { position:relative; min-height:500px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; overflow:auto; padding:8px; }
+  .flow-node.readonly { cursor:default; }
+  .flow-node.readonly .nt { display:flex; align-items:center; justify-content:space-between; }
+  .flow-mindmap-legend { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:#64748b; margin-bottom:8px; }
+  .flow-mindmap-legend span { display:inline-flex; align-items:center; gap:4px; }
+  .flow-mindmap-legend i { width:10px; height:10px; border-radius:3px; display:inline-block; }
   .flow-palette { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
   .flow-palette button { font-size:12px; padding:6px 10px; border-radius:6px; border:1px solid #e2e8f0; background:#fff; color:var(--ink-900); cursor:pointer; }
 .big-switch { position:relative; display:inline-block; width:56px; height:30px; flex-shrink:0; }
@@ -362,8 +368,10 @@
           <button onclick="addNode('reminder')">+ Lembrete</button>
           <button onclick="addNode('end')">+ Fim</button>
           <button class="wa-btn" style="margin-left:auto;" onclick="saveFlowGraph()">Salvar fluxo</button>
+          <button class="wa-btn secondary" id="flowMindmapToggleBtn" onclick="toggleFlowView()">Ver como mindmap</button>
         </div>
         <div class="flow-canvas" id="flowCanvas"></div>
+        <div class="flow-mindmap" id="flowMindmap" style="display:none;"></div>
       </div>
     </div>
     <div class="wa-panel" id="panel-cadencia">
@@ -1394,6 +1402,7 @@ let currentFlowId = null;
 let flowNodes = [];
 let flowEdges = [];
 let nodeSeq = 1;
+let flowViewMode = 'editor';
 
 async function loadOrientacao() {
   const data = await api('/ai-config');
@@ -1694,6 +1703,11 @@ async function openFlow(id) {
   flowNodes = (data.nodes || []).map(n => ({ client_id: 'n' + n.id, id: n.id, node_type: n.node_type, label: n.label, position_x: n.position_x, position_y: n.position_y, config: typeof n.config === 'string' ? JSON.parse(n.config || '{}') : (n.config || {}) }));
   flowEdges = (data.edges || []).map(e => ({ source: 'n' + e.source_node_id, target: 'n' + e.target_node_id, source_handle: e.source_handle }));
   document.getElementById('flowEditorBox').style.display = 'block';
+  flowViewMode = 'editor';
+  var __fc = document.getElementById('flowCanvas'); if (__fc) __fc.style.display = '';
+  var __fm = document.getElementById('flowMindmap'); if (__fm) __fm.style.display = 'none';
+  var __fb = document.getElementById('flowMindmapToggleBtn'); if (__fb) __fb.textContent = 'Ver como mindmap';
+  document.querySelectorAll('#flowEditorBox .flow-palette button[onclick^="addNode"]').forEach(function(b){ b.style.display = ''; });
   renderFlow();
 }
 function addNode(type) {
@@ -1723,6 +1737,154 @@ function renderFlow() {
     document.addEventListener('mouseup', () => dragging = false);
     canvas.appendChild(div);
   });
+}
+function flowNodeTypeLabel(t) {
+  var labels = { trigger:'Gatilho', message:'Mensagem', question:'Pergunta', condition:'Condicao', wait:'Espera', reminder:'Lembrete', end:'Fim' };
+  return labels[t] || t;
+}
+function renderFlowMindmap() {
+  var container = document.getElementById('flowMindmap');
+  if (!container) return;
+  container.innerHTML = '';
+  var legend = document.createElement('div');
+  legend.className = 'flow-mindmap-legend';
+  legend.innerHTML = ['trigger','message','question','condition','wait','reminder','end'].map(function(t){
+    var colors = { trigger:'#7C4DFF', message:'#25D366', question:'#4DA6FF', condition:'#FFB84D', wait:'#888', reminder:'#FF6E6E', end:'#666' };
+    return '<span><i style="background:' + colors[t] + ';"></i>' + flowNodeTypeLabel(t) + '</span>';
+  }).join('');
+  container.appendChild(legend);
+  if (!flowNodes.length) {
+    var empty = document.createElement('p');
+    empty.style.cssText = 'padding:16px;color:#888;';
+    empty.textContent = 'Este fluxo ainda nao tem nenhum passo salvo no construtor visual.';
+    container.appendChild(empty);
+    return;
+  }
+  var byId = {}; flowNodes.forEach(function(n){ byId[n.client_id] = n; });
+  var outgoing = {}; flowNodes.forEach(function(n){ outgoing[n.client_id] = []; });
+  var hasIncoming = {};
+  flowEdges.forEach(function(e){ if (outgoing[e.source]) outgoing[e.source].push(e); hasIncoming[e.target] = true; });
+  var hasEdges = flowEdges.length > 0;
+  var nodeW = 200, nodeH = 76, colGapX = 260, rowGapY = 106;
+  var positions = {};
+  var usedSequentialFallback = false;
+  var wrap = document.createElement('div');
+  wrap.style.position = 'relative';
+  if (hasEdges) {
+    var roots = flowNodes.filter(function(n){ return !hasIncoming[n.client_id]; }).map(function(n){ return n.client_id; });
+    if (!roots.length) roots = [flowNodes[0].client_id];
+    var depth = {}; var visited = {};
+    var queue = roots.map(function(id){ return { id: id, d: 0 }; });
+    roots.forEach(function(id){ depth[id] = 0; });
+    var guard = 0;
+    while (queue.length && guard < 2000) {
+      guard++;
+      var cur = queue.shift();
+      if (visited[cur.id]) continue;
+      visited[cur.id] = true;
+      if (depth[cur.id] === undefined || depth[cur.id] > cur.d) depth[cur.id] = cur.d;
+      (outgoing[cur.id] || []).forEach(function(e){
+        if (!byId[e.target]) return;
+        queue.push({ id: e.target, d: cur.d + 1 });
+      });
+    }
+    flowNodes.forEach(function(n){ if (depth[n.client_id] === undefined) depth[n.client_id] = 0; });
+    var byDepth = {};
+    flowNodes.forEach(function(n){ var d = depth[n.client_id]; (byDepth[d] = byDepth[d] || []).push(n); });
+    Object.keys(byDepth).sort(function(a,b){ return a - b; }).forEach(function(d){
+      byDepth[d].forEach(function(n, i){
+        positions[n.client_id] = { x: 12 + d * colGapX, y: 12 + i * rowGapY };
+      });
+    });
+  } else {
+    usedSequentialFallback = true;
+    flowNodes.slice().sort(function(a,b){ return (a.id||0) - (b.id||0); }).forEach(function(n, i){
+      positions[n.client_id] = { x: 12, y: 12 + i * rowGapY };
+    });
+  }
+  var xs = Object.keys(positions).map(function(k){ return positions[k].x; });
+  var ys = Object.keys(positions).map(function(k){ return positions[k].y; });
+  var maxX = (xs.length ? Math.max.apply(null, xs) : 0) + nodeW + 40;
+  var maxY = (ys.length ? Math.max.apply(null, ys) : 0) + nodeH + 40;
+  var svgNS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', maxX); svg.setAttribute('height', maxY);
+  svg.style.position = 'absolute'; svg.style.left = '0'; svg.style.top = '0'; svg.style.pointerEvents = 'none';
+  var defs = document.createElementNS(svgNS, 'defs');
+  defs.innerHTML = '<marker id="flowArrowHead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#94a3b8"></path></marker>';
+  svg.appendChild(defs);
+  function edgeLine(x1,y1,x2,y2,label,dashed) {
+    var line = document.createElementNS(svgNS,'line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1); line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    line.setAttribute('stroke', dashed ? '#cbd5e1' : '#94a3b8');
+    line.setAttribute('stroke-width','2');
+    if (dashed) line.setAttribute('stroke-dasharray','5,4');
+    line.setAttribute('marker-end','url(#flowArrowHead)');
+    svg.appendChild(line);
+    if (label) {
+      var text = document.createElementNS(svgNS,'text');
+      text.setAttribute('x', (x1+x2)/2); text.setAttribute('y', (y1+y2)/2 - 6);
+      text.setAttribute('font-size','11'); text.setAttribute('fill','#475569'); text.setAttribute('text-anchor','middle');
+      text.textContent = label;
+      svg.appendChild(text);
+    }
+  }
+  if (hasEdges) {
+    flowEdges.forEach(function(e){
+      var s = positions[e.source], t = positions[e.target];
+      if (!s || !t) return;
+      edgeLine(s.x + nodeW, s.y + nodeH/2, t.x, t.y + nodeH/2, e.source_handle || '', false);
+    });
+  } else {
+    var ordered = flowNodes.slice().sort(function(a,b){ return (a.id||0)-(b.id||0); });
+    for (var i=0;i<ordered.length-1;i++){
+      var s2 = positions[ordered[i].client_id], t2 = positions[ordered[i+1].client_id];
+      edgeLine(s2.x + nodeW/2, s2.y + nodeH, t2.x + nodeW/2, t2.y, '', true);
+    }
+  }
+  if (usedSequentialFallback) {
+    var note = document.createElement('div');
+    note.style.cssText = 'font-size:12px; color:#b45309; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; padding:6px 10px; margin-bottom:10px;';
+    note.textContent = 'Sem conexoes salvas neste fluxo ainda - exibindo os passos na ordem em que foram criados.';
+    container.appendChild(note);
+  }
+  wrap.appendChild(svg);
+  flowNodes.forEach(function(n){
+    var pos = positions[n.client_id];
+    if (!pos) return;
+    var div = document.createElement('div');
+    div.className = 'flow-node readonly ' + n.node_type;
+    div.style.position = 'absolute';
+    div.style.left = pos.x + 'px'; div.style.top = pos.y + 'px';
+    div.style.width = nodeW + 'px'; div.style.minHeight = nodeH + 'px';
+    var txt = (n.config && n.config.text) ? n.config.text : (n.label || '');
+    var safeTxt = txt ? String(txt).replace(/</g,'&lt;') : '<span style="opacity:.5;">(vazio)</span>';
+    div.innerHTML = '<div class="nt">' + flowNodeTypeLabel(n.node_type) + '</div><div style="font-size:12px; margin-top:4px; white-space:pre-wrap; word-break:break-word;">' + safeTxt + '</div>';
+    wrap.appendChild(div);
+  });
+  wrap.style.width = maxX + 'px';
+  wrap.style.height = maxY + 'px';
+  container.appendChild(wrap);
+}
+function toggleFlowView() {
+  var canvas = document.getElementById('flowCanvas');
+  var mindmap = document.getElementById('flowMindmap');
+  var btn = document.getElementById('flowMindmapToggleBtn');
+  var paletteButtons = document.querySelectorAll('#flowEditorBox .flow-palette button[onclick^="addNode"]');
+  if (flowViewMode === 'editor') {
+    flowViewMode = 'mindmap';
+    if (canvas) canvas.style.display = 'none';
+    if (mindmap) mindmap.style.display = 'block';
+    paletteButtons.forEach(function(b){ b.style.display = 'none'; });
+    if (btn) btn.textContent = 'Ver como lista';
+    renderFlowMindmap();
+  } else {
+    flowViewMode = 'editor';
+    if (canvas) canvas.style.display = '';
+    if (mindmap) mindmap.style.display = 'none';
+    paletteButtons.forEach(function(b){ b.style.display = ''; });
+    if (btn) btn.textContent = 'Ver como mindmap';
+  }
 }
 async function saveFlowGraph() {
   if (!currentFlowId) return;
