@@ -16,6 +16,13 @@ const BR_OFFSET_MS = 3 * 60 * 60 * 1000
 function brDateOnlyToUtc(dateStr) {
   return new Date(new Date(dateStr + 'T00:00:00.000Z').getTime() + BR_OFFSET_MS)
 }
+// Fim do dia (23:59:59.999) em horario de Brasilia, convertido para UTC.
+// Usado com brDateOnlyToUtc nos filtros de periodo (Ganhos/Perdidos do Kanban),
+// que antes comparavam won_date/lost_date (UTC) contra strings de data ingenuas
+// e faziam fechamentos de hoje (Brasilia) carem no dia anterior.
+function brDayEndToUtc(dateStr) {
+  return new Date(new Date(dateStr + 'T00:00:00.000Z').getTime() + BR_OFFSET_MS + 24*60*60*1000 - 1)
+}
 const metaAdsService = require('./metaAdsService')
 const path = require('path')
 const axios = require('axios')
@@ -501,7 +508,7 @@ app.get('/api/crm/deals/lost-list', auth, async (req, res) => {
       'FROM deals d JOIN patients p ON p.id = d.patient_id ' +
       "WHERE d.status = 'lost' AND d.lost_date BETWEEN ? AND ? " +
       'ORDER BY d.lost_date DESC',
-      [from + ' 00:00:00', to + ' 23:59:59']
+      [brDateOnlyToUtc(from), brDayEndToUtc(to)]
     );
     const total = rows.reduce((acc, r) => acc + Number(r.value || 0), 0);
     res.json({ success: true, from, to, count: rows.length, total, deals: rows });
@@ -519,7 +526,7 @@ app.get('/api/crm/deals/won-list', auth, async (req, res) => {
       'FROM deals d JOIN patients p ON p.id = d.patient_id LEFT JOIN professionals pr ON pr.id = d.professional_id ' +
       "WHERE d.status = 'won' AND d.won_date BETWEEN ? AND ? " +
       'ORDER BY d.won_date DESC',
-      [from + ' 00:00:00', to + ' 23:59:59']
+      [brDateOnlyToUtc(from), brDayEndToUtc(to)]
     );
     const total = rows.reduce((acc, r) => acc + Number(r.value || 0), 0);
     res.json({ success: true, from, to, count: rows.length, total, deals: rows });

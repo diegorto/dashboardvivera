@@ -536,7 +536,7 @@ function wdRangeDatesFor(sel, fromId, toId){
   else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
   else if (sel === 'custom') { var cf = document.getElementById(fromId); var ct = document.getElementById(toId); if (cf.value && ct.value) { return { from: cf.value, to: ct.value }; } from = now; to = now; }
   else { from = now; to = now; }
-  var iso = function(d){ return d.toISOString().slice(0,10); };
+  var iso = function(d){ return d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); };
   return { from: iso(from), to: iso(to) };
 }
 function wdRangeDates(sel){
@@ -550,7 +550,7 @@ function wdRangeDates(sel){
   else if (sel === 'lastmonth') { from = new Date(now.getFullYear(), now.getMonth()-1, 1); to = new Date(now.getFullYear(), now.getMonth(), 0); }
   else if (sel === 'custom') { var cf = document.getElementById('wdFrom'); var ct = document.getElementById('wdTo'); if (cf.value && ct.value) { return { from: cf.value, to: ct.value }; } from = now; to = now; }
   else { from = now; to = now; }
-  var iso = function(d){ return d.toISOString().slice(0,10); };
+  var iso = function(d){ return d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }); };
   return { from: iso(from), to: iso(to) };
 }
 function openWonDealsModal(){
