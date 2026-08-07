@@ -1350,10 +1350,28 @@ app.post('/api/crm/webhooks/tintim', async (req, res) => {
     const provided = req.query.secret || req.headers['x-webhook-secret']
     if (secret && provided !== secret) return res.status(401).json({ success: false, error: 'Segredo inválido' })
 
-    const b = req.body || {}
+    let b = req.body || {}
     console.log('[tintim-webhook] event_type=', b.event_type, 'from_me=', b.from_me, 'msg=', b.message ? String(b.message).slice(0,60) : null)
     // aceita variacoes de payload do Tintim
     const phone = b.phone || b.telefone || b.customer_phone || (b.lead && b.lead.phone)
+    if (b.event_type === 'lead.create' && phone) {
+      try {
+        const CODE = process.env.TINTIM_ACCOUNT_CODE
+        const TOKEN = process.env.TINTIM_ACCOUNT_TOKEN
+        let digitsFull = String(phone).replace(/\D/g, '')
+        if (digitsFull && !digitsFull.startsWith('55')) digitsFull = '55' + digitsFull
+        if (digitsFull && CODE && TOKEN) {
+          const rFull = await fetch('https://s.tintim.app/api/v1/' + CODE + '/lead/' + digitsFull + '?token=' + TOKEN)
+          if (rFull.status !== 404) {
+            const fullLead = await rFull.json().catch(() => null)
+            if (fullLead && (fullLead.phone || fullLead.name)) {
+              b = Object.assign({}, fullLead, { event_type: b.event_type, message: b.message, from_me: b.from_me, phone: b.phone || fullLead.phone })
+              console.log('[tintim-webhook] dados completos do Tintim aplicados via GET para', digitsFull)
+            }
+          }
+        }
+      } catch (eFull) { console.error('[tintim-webhook] falha ao buscar dados completos do Tintim', eFull.message) }
+    }
     let campanha = b.campanha || b.campaign || b.campaign_name || (b.ad && b.ad.campaign_name) || b.utm_campaign || null
     // Meta Ads (dynamic URL params) manda utm_term={{adset.id}} e utm_content={{ad.id}} quando o Tintim
     // ainda nao resolveu os nomes (b.ad null). Google Ads usa utm_term=palavra-chave (texto) e por isso
