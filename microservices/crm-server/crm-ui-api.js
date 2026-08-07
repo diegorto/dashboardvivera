@@ -626,21 +626,21 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
 
     const [bySource] = await pool.query(
       'SELECT COALESCE(NULLIF(CASE WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Orgânico","Instagram Orgânico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem não Identificada","Não rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio") AS fonte, ' +
-      'SUM(CASE WHEN d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") THEN 1 ELSE 0 END) AS leads, ' +
-      'SUM(CASE WHEN d.add_date BETWEEN ? AND ? AND s.sort >= 9 AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") THEN 1 ELSE 0 END) AS qualificados, ' +
+      'SUM(CASE WHEN d.pipeline_id IN (1,4) AND d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") THEN 1 ELSE 0 END) AS leads, ' +
+      'SUM(CASE WHEN d.pipeline_id IN (1,4) AND d.add_date BETWEEN ? AND ? AND s.sort >= 9 AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") THEN 1 ELSE 0 END) AS qualificados, ' +
       'SUM(CASE WHEN d.status = "won" AND d.won_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS vendas, ' +
       'COALESCE(SUM(CASE WHEN d.status = "won" AND d.won_date BETWEEN ? AND ? THEN d.value ELSE 0 END),0) AS receita ' +
       'FROM deals d LEFT JOIN stages s ON s.id = d.stage_id ' +
-      'WHERE d.pipeline_id IN (1,4) ' +
       'GROUP BY fonte ORDER BY leads DESC',
       [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
     );
 
+    const fonteExprLocal = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Orgânico","Instagram Orgânico","Instagram Orgânico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem não Identificada","Não rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
     const [bySourceAgendadas] = await pool.query(
-      'SELECT ' + fonteExpr + ' AS fonte, COUNT(*) c FROM activities a JOIN deals d ON d.id = a.deal_id WHERE a.type = "Agendou" AND a.created_at BETWEEN ? AND ? GROUP BY fonte',
+      'SELECT ' + fonteExprLocal + ' AS fonte, COUNT(*) c FROM activities a JOIN deals d ON d.id = a.deal_id WHERE a.type = "Agendou" AND a.created_at BETWEEN ? AND ? GROUP BY fonte',
       [fromDt, toDt]
     );
-    const fontePacienteExpr = 'CASE WHEN LOWER(TRIM(COALESCE(d.campanha,""))) = "ja e paciente" THEN "Ja e paciente" ELSE ' + fonteExpr + ' END';
+    const fontePacienteExpr = 'CASE WHEN LOWER(TRIM(COALESCE(d.campanha,""))) = "ja e paciente" THEN "Ja e paciente" ELSE ' + fonteExprLocal + ' END';
     const [bySourceOrcamento] = await pool.query(
       'SELECT ' + fontePacienteExpr + ' AS fonte, COALESCE(SUM(a.amount),0) AS total FROM activities a JOIN deals d ON d.id = a.deal_id WHERE a.type = "Orcamento Gerado" AND a.created_at BETWEEN ? AND ? GROUP BY fonte',
       [fromDt, toDt]
