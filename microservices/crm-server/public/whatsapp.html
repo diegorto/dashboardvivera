@@ -186,6 +186,7 @@
   .wa-chat-header{padding:10px 12px;}
 }
 </style>
+<input type="text" id="convSearchInput" placeholder="Buscar por nome ou telefone..." oninput="applyConvFilters()" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;margin-bottom:8px;">
 <div id="convFiltersBar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
   <select id="convFilterOwner" onchange="applyConvFilters()" style="padding:4px 8px;border-radius:6px;">
     <option value="">Todas as SDRs</option>
@@ -540,8 +541,17 @@ function setConvFilter(cat) {
 function applyConvFilters() {
   var ownerSel = document.getElementById('convFilterOwner');
   var ownerVal = ownerSel ? ownerSel.value : '';
+  var searchEl = document.getElementById('convSearchInput');
+  var searchVal = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  var searchDigits = searchVal.replace(/\D/g, '');
   var list = __allConversations.filter(function(c) {
     if (ownerVal && c.deal_owner_name !== ownerVal) return false;
+    if (searchVal) {
+      var nameMatch = (c.contact_name || '').toLowerCase().indexOf(searchVal) !== -1;
+      var phoneDigits = String(c.phone || '').replace(/\D/g, '');
+      var phoneMatch = searchDigits && phoneDigits.indexOf(searchDigits) !== -1;
+      if (!nameMatch && !phoneMatch) return false;
+    }
     if (__convFilterCat === 'sdr') return c.last_sent_by === 'human';
     if (__convFilterCat === 'bot') return c.last_sent_by === 'ai';
     if (__convFilterCat === 'lead') return c.last_sent_by === 'lead';
