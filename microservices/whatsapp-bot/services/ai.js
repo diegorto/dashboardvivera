@@ -330,6 +330,13 @@ let needsHandoff = qualification
   // [2026-08-01 Diego] Pedido EXPLICITO do lead por um humano bypassa a trava de 1 turno
   // e a checagem de "ja teve handoff antes" - sempre pode disparar na hora, sem atraso.
   const explicitHumanRequest = /\b(humano|pessoa real|atendente|sdr|falar com (uma pessoa|alguem)|quero uma pessoa|manda uma pessoa|chama (a |o )?helenice)\b/i.test(userText || '')
+  // [2026-08-06] Pedido do Diego: pausar o handoff automatico disparado so pela
+  // qualificacao (a IA decidindo sozinha que "esta pronto pra Helenice"), ate
+  // definirmos o fluxo de agendamento direto que vai substituir isso. Mantem o
+  // handoff quando o lead pede humano explicitamente (explicitHumanRequest).
+  // Os gatilhos de seguranca abaixo (fallback enlatado, anti-repeticao) nao sao
+  // afetados - eles setam needsHandoff = true depois deste ponto.
+  if (needsHandoff && !explicitHumanRequest) needsHandoff = false
   if (needsHandoff && !explicitHumanRequest) {
     const handoffPendingKey = `handoffPending:${conversationId}`
     const alreadyPendingHandoff = await redis.get(handoffPendingKey)
