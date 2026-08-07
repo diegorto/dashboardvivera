@@ -596,7 +596,7 @@ app.get('/api/crm/ui/dashboard/executive/vendas-drilldown', auth, requireAdmin, 
     const from = req.query.from || new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10);
     const to = req.query.to || new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10);
     const { fromDt, toDt } = brRangeToUtc(from, to);
-    const fonteExpr = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Org\u00e2nico","Instagram Org\u00e2nico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem n\u00e3o Identificada","N\u00e3o rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
+    const fonteExpr = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Instagram","Instagram Org\u00e2nico","Organico","Org\u00e2nico") AND COALESCE(d.tintim_source_raw,"") NOT IN ("Meta Ads","Google Ads") AND (d.origem IN ("Instagram Org\u00e2nico","Organico","Org\u00e2nico") OR COALESCE(d.utm_source,"") LIKE "organ%" OR (COALESCE(d.plataforma,"") NOT IN ("Meta Ads","Meta") AND COALESCE(d.utm_source,"") <> "meta-ads" AND d.ad_campaign_name IS NULL AND d.ad_adset_name IS NULL AND d.ad_name IS NULL AND COALESCE(d.campanha,"") = "")) THEN "Instagram Organico" WHEN WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Org\u00e2nico","Instagram Org\u00e2nico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem n\u00e3o Identificada","N\u00e3o rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
     const [groups] = await pool.query(
       'SELECT ' + fonteExpr + ' AS origem, COUNT(*) AS vendas, COALESCE(SUM(d.value),0) AS receita ' +
       'FROM deals d WHERE d.status = "won" AND d.won_date BETWEEN ? AND ? ' +
@@ -635,7 +635,7 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
       [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
     );
 
-    const fonteExprLocal = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Orgânico","Instagram Orgânico","Instagram Orgânico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem não Identificada","Não rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
+    const fonteExprLocal = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Instagram","Instagram Orgânico","Organico","Orgânico") AND COALESCE(d.tintim_source_raw,"") NOT IN ("Meta Ads","Google Ads") AND (d.origem IN ("Instagram Orgânico","Organico","Orgânico") OR COALESCE(d.utm_source,"") LIKE "organ%" OR (COALESCE(d.plataforma,"") NOT IN ("Meta Ads","Meta") AND COALESCE(d.utm_source,"") <> "meta-ads" AND d.ad_campaign_name IS NULL AND d.ad_adset_name IS NULL AND d.ad_name IS NULL AND COALESCE(d.campanha,"") = "")) THEN "Instagram Organico" WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Orgânico","Instagram Orgânico","Instagram Orgânico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem não Identificada","Não rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
     const [bySourceAgendadas] = await pool.query(
       'SELECT ' + fonteExprLocal + ' AS fonte, COUNT(*) c FROM activities a JOIN deals d ON d.id = a.deal_id WHERE a.type = "Agendou" AND a.created_at BETWEEN ? AND ? GROUP BY fonte',
       [fromDt, toDt]
@@ -842,13 +842,13 @@ app.get('/api/crm/ui/dashboard/sdrs', auth, requireAdmin, async (req, res) => {
       '    COALESCE(SUM(CASE WHEN d.value > 0 THEN d.value ELSE 0 END),0) AS valor_orcamentos_gerados ' +
       '  FROM deals d ' +
       '  LEFT JOIN stages s ON s.id = d.stage_id ' +
-      '  WHERE d.pipeline_id = 1 AND d.add_date BETWEEN ? AND ? AND d.count_as_lead_entry = 1 ' +
+      '  WHERE d.stage_id IN (SELECT id FROM stages WHERE pipeline_id = 1) AND d.add_date BETWEEN ? AND ? AND d.count_as_lead_entry = 1 ' +
       '  GROUP BY d.owner_name ' +
       ') dm ON dm.ownerName = u.name ' +
       'LEFT JOIN ( ' +
       '  SELECT d3.owner_name AS ownerName, COUNT(d3.id) AS vendas, COALESCE(SUM(d3.value),0) AS receita ' +
       '  FROM deals d3 ' +
-      "  WHERE d3.pipeline_id = 1 AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +
+      "  WHERE d3.stage_id IN (SELECT id FROM stages WHERE pipeline_id = 1) AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +
       '  GROUP BY d3.owner_name ' +
       ') vm ON vm.ownerName = u.name ' +
       "WHERE u.role = 'sdr' AND u.active = 1 " +
