@@ -3,6 +3,7 @@
 // O nome e 100% configuravel via chatbot_ai_config (chave assistant_name), sem precisar mexer em codigo.
 const pool = require('../db')
 const redis = require('../lib/redis')
+const faqSemantic = require('./faqSemantic')
 
 function llmTemp(desired) {
   var m = String(process.env.OPENAI_MODEL || '');
@@ -101,6 +102,8 @@ function mostSimilarAiMessage(candidate, recentAiMessages, threshold) {
     fallback_redirect_message: 'Entendi. Um instante que ja te direciono certinho.',
     fallback_handoff_message: 'Vou chamar alguem da nossa equipe para continuar te ajudando por aqui.',
     faq_items: '[]',
+  faq_semantic_enabled: 'false',
+  faq_items_embedded: '[]',
   allowlist_courtesy_message: 'Oi! Recebi sua mensagem. No momento nossa assistente virtual esta em fase piloto e ainda nao atende esse contato automaticamente, mas ja avisei nossa equipe e alguem vai te responder por aqui em breve. Obrigada pela paciencia!'
   }
 
@@ -308,7 +311,20 @@ const systemPrompt = buildSystemPrompt(cfg)
     : systemPrompt
 const ttl = parseInt(cfg.redis_ttl_seconds || '86400')
 const memory = await getMemory(conversationId)
-const faqHit = searchFaq(cfg, userText)
+// [Fase 2 - RAG semantico] Se habilitado via config, tenta busca semantica
+  // (embeddings) primeiro; cai pro keyword-matching original em caso de erro
+  // ou config desligada. Ate "faq_semantic_enabled" ser ligado (ou enquanto
+  // o FAQ configurado for muito pequeno pra fazer diferenca real), o
+  // comportamento fica identico ao anterior.
+  let faqHit = null
+  if (cfg.faq_semantic_enabled === 'true') {
+    try {
+      faqHit = await faqSemantic.searchFaqSemantic(cfg, userText, setConfig)
+    } catch (e) {
+      console.error('[ai] busca semantica de FAQ falhou, usando keyword fallback:', e.message)
+    }
+  }
+  if (!faqHit) faqHit = searchFaq(cfg, userText)
 const isFirstContact = memory.length === 0
 let replyText = null
 const [llm, qualification] = await Promise.all([
