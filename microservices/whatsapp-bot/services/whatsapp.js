@@ -173,6 +173,21 @@ async function triggerWelcomeFlow({ fromJid, convId, dealId, pushName, connCtx, 
         }
       } catch (e) {
         console.error('[whatsapp] erro ao enviar audio de pre-qualificacao:', e.message)
+        try {
+          const fallbackText = 'Oi' + (pushName ? ', ' + pushName : '') + '! Aqui e o Dr. Diego. O que chamou sua atencao no que voce viu, e o que mais te incomoda hoje quando voce se olha no espelho?'
+          await sendText(fromJid, fallbackText, connCtx && connCtx.sock)
+          await saveMessage(convId, 'out', fallbackText, 'ai')
+          console.warn('[whatsapp] fallback de texto enviado no lugar do audio (audio falhou)')
+          if (dealId) {
+            try {
+              await pool.query('UPDATE deals SET stage_id = ? WHERE id = ? AND pipeline_id = (SELECT pipeline_id FROM stages WHERE id = ?)', [8, dealId, 8])
+            } catch (e2) {
+              console.error('[whatsapp] erro ao mover deal para Contato Realizado (fallback texto):', e2.message)
+            }
+          }
+        } catch (e2) {
+          console.error('[whatsapp] fallback de texto TAMBEM falhou (audio E texto falharam):', e2.message)
+        }
       }
     } else {
       console.warn('[whatsapp] seq_trigger_audio_path nao configurado, pulando audio inicial')
@@ -561,8 +576,11 @@ async function simulateHumanTyping(activeSock, jid, text) {
 async function sendText(jid, text, sockOverride) {
   if (!sockOverride && !sock) throw new Error('WhatsApp nao conectado')
   const activeSock = sockOverride || sock
+  console.log('[whatsapp][DIAG] sendText: socket ws.readyState=' + (activeSock.ws && activeSock.ws.readyState) + ' jid=' + jid + ' usingOverride=' + !!sockOverride)
   await simulateHumanTyping(activeSock, jid, text)
-  await activeSock.sendMessage(jid, { text })
+  const sendResult = await activeSock.sendMessage(jid, { text })
+  console.log('[whatsapp][DIAG] sendText: sendMessage retornou -> ' + JSON.stringify({ id: sendResult && sendResult.key && sendResult.key.id, status: sendResult && sendResult.status, hasMessage: !!(sendResult && sendResult.message) }))
+  return sendResult
 }
 
 async function sendAudio(jid, filePath, sockOverride) {
