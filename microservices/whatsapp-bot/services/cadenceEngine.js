@@ -8,7 +8,7 @@ const wa = require('./whatsapp')
 const path = require('path')
 
 const TRIGGER_KEYWORD = 'fluxo_cadencia_inbound'
-const POLL_INTERVAL_MS = 15 * 60 * 1000 // 15 min
+const POLL_INTERVAL_MS = 60 * 1000 // 1 min (era 15min; quase-tempo-real via trigger stage_history)
 const CADENCE_BURST_MAX = 15 // regra permanente Diego 2026-08-07: nunca mais que 15 msgs de cadencia em qualquer janela de 5min
 const CADENCE_BURST_WINDOW_MINUTES = 5
 
@@ -201,7 +201,8 @@ async function autoEnrollNewDeals() {
   const placeholders = stageIds.map(() => '?').join(',')
   const [deals] = await pool.query(
     'SELECT id, stage_id, stage_entered_at FROM deals WHERE stage_id IN (' + placeholders + ') ' +
-    'AND id NOT IN (SELECT deal_id FROM chatbot_cadence_enrollment)',
+    'AND id NOT IN (SELECT deal_id FROM chatbot_cadence_enrollment) ' +
+        'AND id IN (SELECT deal_id FROM whatsapp_conversations WHERE cadence_enabled = 1)',
     stageIds
   )
   const enrollBudget = await getEnrollBudgetForThisTick()
