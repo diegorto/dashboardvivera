@@ -761,10 +761,51 @@ async function sendManualMedia(conversationId, filePath, mediaType, opts) {
   return true
 }
 
+function computeAltBrPhoneVariant(digitsOnly) {
+  if (!digitsOnly || !digitsOnly.startsWith('55')) return null
+  const rest = digitsOnly.slice(2)
+  if (rest.length === 11 && rest[2] === '9') {
+    return '55' + rest.slice(0, 2) + rest.slice(3)
+  }
+  if (rest.length === 10) {
+    return '55' + rest.slice(0, 2) + '9' + rest.slice(2)
+  }
+  return null
+}
+
+async function resolveAndCacheJid(conv, sockOverrideForCheck) {
+  if (conv.wa_jid) return conv.wa_jid
+  const digitsOnly = String(conv.phone || '').replace(/\D/g, '')
+  const altPhone = computeAltBrPhoneVariant(digitsOnly)
+  const candidates = [digitsOnly]
+  if (altPhone && altPhone !== digitsOnly) candidates.push(altPhone)
+  for (const candidate of candidates) {
+    try {
+      const results = await checkOnWhatsApp(candidate, sockOverrideForCheck)
+      if (results && results[0] && results[0].jid) {
+        const jid = results[0].jid
+        try {
+          await pool.query('UPDATE whatsapp_conversations SET wa_jid = ?, resolved_at = NOW() WHERE id = ?', [jid, conv.id])
+        } catch (e) {
+          console.error('[whatsapp][jid-resolver] erro ao salvar wa_jid para conversationId=' + conv.id + ':', e.message)
+        }
+        return jid
+      }
+    } catch (e) {
+      console.error('[whatsapp][jid-resolver] erro ao checar onWhatsApp para candidate ' + candidate + ':', e.message)
+    }
+  }
+  return null
+}
+
+
 async function sendManualMessage(conversationId, text) {
   const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
   if (!conv) throw new Error('conversa nao encontrada')
-  const jid = conv.wa_jid || (String(conv.phone || '').replace('+', '') + '@s.whatsapp.net')
+  const jid = await resolveAndCacheJid(conv, sockOverride)
+  if (!jid) {
+    throw new Error('Numero de WhatsApp nao encontrado (nem variante salva nem alternativa com/sem 9) para conversationId=' + conversationId + ' phone=' + conv.phone)
+  }
   let sockOverride = getSocketForConnection(conv.connection_id)
   if (conv.connection_id && !sockOverride) {
   const fallbackId = getActiveConnectionId()
