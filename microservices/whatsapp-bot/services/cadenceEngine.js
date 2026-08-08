@@ -227,6 +227,49 @@ async function checkAndSendDespedida(sockOverride) {
   }
 }
 
+
+const QUEUE_STAGE_TO_STEP = { 3: 'd1', 4: 'd2', 5: 'd3', 6: 'd4', 7: 'd5' }
+const QUEUE_POLL_INTERVAL_MS = 5 * 1000 // 5s - drena fila alimentada pelo trigger de banco no evento real de mudanca de etapa
+
+async function processCadenceQueue(sockOverride) {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, deal_id, to_stage_id FROM cadence_trigger_queue WHERE processed_at IS NULL ORDER BY id LIMIT 50'
+    )
+    for (const row of rows) {
+      try {
+        const step = QUEUE_STAGE_TO_STEP[row.to_stage_id]
+        if (step) {
+          const [convRows] = await pool.query(
+            'SELECT id, wa_jid, phone, cadence_enabled FROM whatsapp_conversations WHERE deal_id = ? LIMIT 1',
+            [row.deal_id]
+          )
+          const conv = convRows && convRows[0]
+          if (conv && conv.cadence_enabled) {
+            const [dealRows] = await pool.query('SELECT id, stage_tag FROM deals WHERE id = ?', [row.deal_id])
+            const deal = dealRows && dealRows[0]
+            const tag = (deal && deal.stage_tag) || ''
+            if ((',' + tag + ',').indexOf(',' + step + ',') === -1) {
+              const jid = conv.wa_jid || await resolveJid(conv.phone, sockOverride)
+              if (jid) {
+                await sendStepContentResilient(step, { id: row.deal_id, patient_phone: conv.phone }, jid)
+                const newTag = tag ? (tag + ',' + step) : step
+                await pool.query('UPDATE deals SET stage_tag = ? WHERE id = ?', [newTag, row.deal_id])
+              }
+            }
+          }
+        }
+        await pool.query('UPDATE cadence_trigger_queue SET processed_at = NOW() WHERE id = ?', [row.id])
+      } catch (e) {
+        console.error('[cadenceEngine] erro ao processar fila item id=' + row.id + ':', e.message)
+        try { await pool.query('UPDATE cadence_trigger_queue SET processed_at = NOW() WHERE id = ?', [row.id]) } catch (e2) {}
+      }
+    }
+  } catch (e) {
+    console.error('[cadenceEngine] erro em processCadenceQueue:', e.message)
+  }
+}
+
 async function autoEnrollNewDeals() {
   const stageIds = Object.values(STEP_STAGE_ID)
   const placeholders = stageIds.map(() => '?').join(',')
@@ -468,6 +511,7 @@ async function runTick() {
 
 function start() {
   setInterval(runTick, POLL_INTERVAL_MS)
+  setInterval(processCadenceQueue, QUEUE_POLL_INTERVAL_MS)
   console.log('[cadenceEngine] poller iniciado (intervalo ' + (POLL_INTERVAL_MS / 60000) + ' min) - gated por is_active de "' + TRIGGER_KEYWORD + '"')
 }
 
