@@ -224,6 +224,24 @@ async function handleIncomingText(fromJid, text, pushName, connCtx) {
     }
   } catch (e) { console.error('[whatsapp] erro checando allowlist:', e.message) }
   const conv = await ensureConversation(phone, pushName, fromJid, connCtx && connCtx.connectionId)
+
+    if (conv && conv.cadence_enabled) {
+      try {
+        await pool.query('UPDATE whatsapp_conversations SET cadence_enabled = 0 WHERE id = ?', [conv.id])
+        if (conv.deal_id) {
+          const [dealRows] = await pool.query('SELECT sdr_user_id FROM deals WHERE id = ?', [conv.deal_id])
+          const dealRow = dealRows && dealRows[0]
+          if (dealRow && dealRow.sdr_user_id) {
+            await pool.query(
+              'INSERT INTO owner_notifications (owner_user_id, deal_id, type, message, created_at) VALUES (?, ?, ?, ?, NOW())',
+              [dealRow.sdr_user_id, conv.deal_id, 'lead_respondeu', 'Lead respondeu durante a cadencia automatica - cadencia pausada, atendimento manual necessario.']
+            )
+          }
+        }
+      } catch (e) {
+        console.error('[whatsapp] erro ao pausar cadencia por resposta do lead:', e.message)
+      }
+    }
 // ---- Modo treinador (equipe do piloto corrigindo a Vivi via emoji de lagosta) ----
 // Roda ANTES de qualquer outra logica (CRM, allowlist de leads, IA) porque isso nao
 // e mensagem de lead - e a equipe interna editando o comportamento do bot. So numeros

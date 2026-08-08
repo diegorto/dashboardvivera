@@ -12,7 +12,7 @@ const POLL_INTERVAL_MS = 60 * 1000 // 1 min (era 15min; quase-tempo-real via tri
 const CADENCE_BURST_MAX = 15 // regra permanente Diego 2026-08-07: nunca mais que 15 msgs de cadencia em qualquer janela de 5min
 const CADENCE_BURST_WINDOW_MINUTES = 5
 
-const STEP_STAGE_ID = { d1: 3, d2: 4, d3: 5, d4: 6, d5: 7, d15_despedida: 69 }
+const STEP_STAGE_ID = { d1: 3, d2: 4, d3: 5, d4: 6, d5: 7 }
 const STEP_PIPELINE_ID = { d1: 1, d2: 1, d3: 1, d4: 1, d5: 1, d15_despedida: 5 }
 const STEP_ORDER = ['d1', 'd2', 'd3', 'd4', 'd5', 'd15_despedida', 'handoff_done']
 const STEP_GAP_DAYS = { d2: 1, d3: 1, d4: 1, d5: 1, d15_despedida: 15, handoff_done: 30 }
@@ -195,6 +195,37 @@ function fireAtFromDayAndHourBRT(baseDate, dayOffset, hourBRT) {
 }
 
 // ---- enrollment automatico a partir do estagio atual do deal ----
+
+
+const D5_STAGE_ID = 7
+const DESPEDIDA_DELAY_DAYS = 15
+
+async function checkAndSendDespedida(sockOverride) {
+  try {
+    const [rows] = await pool.query(
+      "SELECT d.id AS deal_id, d.stage_tag, wc.id AS conv_id, wc.wa_jid, wc.phone " +
+      "FROM deals d JOIN whatsapp_conversations wc ON wc.deal_id = d.id " +
+      "WHERE d.stage_id = ? AND d.stage_entered_at <= (NOW() - INTERVAL ? DAY) AND wc.cadence_enabled = 1 " +
+      "AND NOT EXISTS (SELECT 1 FROM whatsapp_messages wm WHERE wm.conversation_id = wc.id AND wm.direction = 'in' AND wm.created_at > d.stage_entered_at)",
+      [D5_STAGE_ID, DESPEDIDA_DELAY_DAYS]
+    )
+    for (const row of rows) {
+      const tag = row.stage_tag || ''
+      if ((',' + tag + ',').indexOf(',d15_despedida,') !== -1) continue
+      const jid = row.wa_jid || await resolveJid(row.phone, sockOverride)
+      if (!jid) continue
+      try {
+        await sendStepContentResilient('d15_despedida', { id: row.deal_id, patient_phone: row.phone }, jid)
+        const newTag = tag ? (tag + ',d15_despedida') : 'd15_despedida'
+        await pool.query('UPDATE deals SET stage_tag = ? WHERE id = ?', [newTag, row.deal_id])
+      } catch (e) {
+        console.error('[cadenceEngine] erro ao enviar despedida D+15 deal_id=' + row.deal_id + ':', e.message)
+      }
+    }
+  } catch (e) {
+    console.error('[cadenceEngine] erro em checkAndSendDespedida:', e.message)
+  }
+}
 
 async function autoEnrollNewDeals() {
   const stageIds = Object.values(STEP_STAGE_ID)
@@ -425,6 +456,7 @@ async function runTick() {
   try {
     if (!(await isEngineActive())) return
     await autoEnrollNewDeals()
+    await checkAndSendDespedida()
     await detectResponses()
     await processDueEnrollments()
   } catch (e) {
