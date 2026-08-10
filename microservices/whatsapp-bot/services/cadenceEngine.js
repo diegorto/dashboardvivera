@@ -513,7 +513,8 @@ async function runTick() {
 
 function start() {
   setInterval(runTick, POLL_INTERVAL_MS)
-  setInterval(processCadenceQueue, QUEUE_POLL_INTERVAL_MS)
+  // EMERGENCY PAUSE 2026-08-10 - Diego: duplicate-send bug, DO NOT re-enable without approval
+  // setInterval(processCadenceQueue, QUEUE_POLL_INTERVAL_MS)
   console.log('[cadenceEngine] poller iniciado (intervalo ' + (POLL_INTERVAL_MS / 60000) + ' min) - gated por is_active de "' + TRIGGER_KEYWORD + '"')
 }
 
