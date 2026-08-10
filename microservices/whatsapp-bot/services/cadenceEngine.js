@@ -245,6 +245,8 @@ async function processCadenceQueue(sockOverride) {
             [row.deal_id]
           )
           const conv = convRows && convRows[0]
+          if (!conv) { console.warn('[cadenceEngine] fila item deal_id=' + row.deal_id + ': nenhuma whatsapp_conversations vinculada a esse deal_id - envio pulado silenciosamente') }
+          else if (!conv.cadence_enabled) { console.warn('[cadenceEngine] fila item deal_id=' + row.deal_id + ': cadence_enabled desmarcado - envio pulado') }
           if (conv && conv.cadence_enabled) {
             const [dealRows] = await pool.query('SELECT id, stage_tag FROM deals WHERE id = ?', [row.deal_id])
             const deal = dealRows && dealRows[0]
