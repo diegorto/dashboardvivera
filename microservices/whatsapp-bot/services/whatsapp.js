@@ -820,11 +820,11 @@ async function resolveAndCacheJid(conv, sockOverrideForCheck) {
 async function sendManualMessage(conversationId, text) {
   const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
   if (!conv) throw new Error('conversa nao encontrada')
+  let sockOverride = getSocketForConnection(conv.connection_id)
   const jid = await resolveAndCacheJid(conv, sockOverride)
   if (!jid) {
     throw new Error('Numero de WhatsApp nao encontrado (nem variante salva nem alternativa com/sem 9) para conversationId=' + conversationId + ' phone=' + conv.phone)
   }
-  let sockOverride = getSocketForConnection(conv.connection_id)
   if (conv.connection_id && !sockOverride) {
   const fallbackId = getActiveConnectionId()
   if (fallbackId) {
