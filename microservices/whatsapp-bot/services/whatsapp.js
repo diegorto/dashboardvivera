@@ -958,6 +958,17 @@ let _sessionManager = null
 function registerSessionManager(sm) { _sessionManager = sm }
 function getSocketForConnection(connectionId) { if (!connectionId) return undefined; return _sessionManager ? _sessionManager.getSocket(connectionId) : undefined }
 function getConnectionAgeMs(connectionId) { if (!connectionId) return null; return _sessionManager ? _sessionManager.getConnectionAgeMs(connectionId) : null }
+function isConnectionReallyHealthy(connectionId, minStableMs) {
+  try {
+    const sock = getSocketForConnection(connectionId)
+    if (!sock || !sock.ws || sock.ws.readyState !== 1) return false
+    if (!sock.user || !sock.user.id) return false
+    const ageMs = getConnectionAgeMs(connectionId)
+    const minStable = typeof minStableMs === 'number' ? minStableMs : 8000
+    if (typeof ageMs === 'number' && ageMs < minStable) return false
+    return true
+  } catch (e) { return false }
+}
 function getActiveConnectionId() { return _sessionManager && _sessionManager.getActiveConnectionId ? _sessionManager.getActiveConnectionId() : null }
 
 async function forceReconnectConnection(connectionId) {
@@ -1003,4 +1014,4 @@ function startConnectionWatchdog() {
 startConnectionWatchdog()
 // ===== FIM BAND-AID =====
 
-module.exports = { startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { isConnectionReallyHealthy, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }

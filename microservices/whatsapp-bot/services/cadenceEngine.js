@@ -374,6 +374,18 @@ async function sendStepContent(step, deal, jid) {
 
 async function sendStepContentResilient(step, deal, jid) {
   try {
+    const flowConnPre = await require('./connectionsStore').getFlowConnection(TRIGGER_KEYWORD)
+    const connIdPre = flowConnPre ? flowConnPre.id : wa.getActiveConnectionId()
+    if (!connIdPre || !wa.isConnectionReallyHealthy(connIdPre)) {
+      console.warn('[cadenceEngine] envio abortado (fail-clean): conexao ' + connIdPre + ' nao esta genuinamente estavel agora - sem retry acumulado, proximo trigger decide de novo')
+      throw new Error('CADENCE_SKIP_CONEXAO_INSTAVEL')
+    }
+  } catch (eHealth) {
+    if (eHealth && eHealth.message === 'CADENCE_SKIP_CONEXAO_INSTAVEL') throw eHealth
+    console.warn('[cadenceEngine] falha ao checar saude da conexao antes do envio, abortando por seguranca:', eHealth && eHealth.message)
+    throw new Error('CADENCE_SKIP_CONEXAO_INSTAVEL')
+  }
+  try {
     await sendStepContent(step, deal, jid)
   } catch (e) {
     if (e && /connection closed/i.test(e.message || '')) {
@@ -514,7 +526,7 @@ async function runTick() {
 function start() {
   setInterval(runTick, POLL_INTERVAL_MS)
   // EMERGENCY PAUSE 2026-08-10 - Diego: duplicate-send bug, DO NOT re-enable without approval
-  // setInterval(processCadenceQueue, QUEUE_POLL_INTERVAL_MS)
+  setInterval(processCadenceQueue, QUEUE_POLL_INTERVAL_MS)
   console.log('[cadenceEngine] poller iniciado (intervalo ' + (POLL_INTERVAL_MS / 60000) + ' min) - gated por is_active de "' + TRIGGER_KEYWORD + '"')
 }
 
