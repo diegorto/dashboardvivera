@@ -331,6 +331,7 @@ function stripRepeatedDiscoveryQuestion(text, recentAssistantMsgs) {
 }
 
 async function generateReply(conversationId, userText, knownName) {
+  knownName = require('./nameUtils').getFirstName(knownName)
 const cfg = await getConfig()
 const systemPrompt = buildSystemPrompt(cfg)
   const groundedSystemPrompt = knownName

@@ -19,6 +19,7 @@ async function getSeqConfig() {
 }
 
 async function scheduleSequence(conversationId, leadName) {
+  leadName = require('./nameUtils').getFirstName(leadName)
   const cfg = await getSeqConfig()
   let ownerName = ''
   try {

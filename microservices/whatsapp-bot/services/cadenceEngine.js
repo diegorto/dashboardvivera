@@ -134,7 +134,7 @@ async function getCadenceSocket() {
 }
 
 function applyPlaceholders(text, deal) {
-  const nome = (deal.patient_name && deal.patient_name !== '.') ? deal.patient_name.split(' ')[0] : ''
+  const nome = require('./nameUtils').getFirstName(deal.patient_name)
   const owner = deal.owner_name || ''
   return String(text || '').split('{nome}').join(nome).split('{owner}').join(owner)
 }
