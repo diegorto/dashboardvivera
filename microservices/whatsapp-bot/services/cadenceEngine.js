@@ -374,10 +374,9 @@ async function sendStepContent(step, deal, jid) {
 
 async function sendStepContentResilient(step, deal, jid) {
   try {
-    const flowConnPre = await require('./connectionsStore').getFlowConnection(TRIGGER_KEYWORD)
-    const connIdPre = flowConnPre ? flowConnPre.id : null
-    if (!connIdPre || !wa.isConnectionReallyHealthy(connIdPre)) {
-      console.warn('[cadenceEngine] envio abortado (fail-clean): conexao ' + connIdPre + ' nao esta genuinamente estavel agora - sem retry acumulado, proximo trigger decide de novo')
+    const sockOverridePre = await getCadenceSocket()
+    if (!wa.isSendPathHealthy(sockOverridePre)) {
+      console.warn('[cadenceEngine] envio abortado (fail-clean): conexao nao esta genuinamente estavel agora - sem retry acumulado, proximo trigger decide de novo')
       throw new Error('CADENCE_SKIP_CONEXAO_INSTAVEL')
     }
   } catch (eHealth) {

@@ -969,6 +969,13 @@ function isConnectionReallyHealthy(connectionId, minStableMs) {
     return true
   } catch (e) { return false }
 }
+
+function isSendPathHealthy(sockOverride) {
+  try {
+    const activeSock = sockOverride || sock
+    return !!(activeSock && activeSock.ws && activeSock.ws.readyState === 1 && activeSock.user && activeSock.user.id)
+  } catch (e) { return false }
+}
 function getActiveConnectionId() { return _sessionManager && _sessionManager.getActiveConnectionId ? _sessionManager.getActiveConnectionId() : null }
 
 async function forceReconnectConnection(connectionId) {
@@ -1014,4 +1021,4 @@ function startConnectionWatchdog() {
 startConnectionWatchdog()
 // ===== FIM BAND-AID =====
 
-module.exports = { isConnectionReallyHealthy, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { isSendPathHealthy, isConnectionReallyHealthy, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
