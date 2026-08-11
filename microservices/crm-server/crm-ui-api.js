@@ -2518,7 +2518,15 @@ app.post('/api/crm/ui/conversations/get-or-create', auth, async (req, res) => {
     const digits = String(raw || '').replace(/\D/g, '');
     if (!digits) return res.status(400).json({ success: false, error: 'Telefone invalido' });
     const normalized = '+' + (digits.startsWith('55') ? digits : '55' + digits);
-    const [existing] = await pool.query('SELECT id FROM whatsapp_conversations WHERE phone = ? ORDER BY last_message_at DESC, id DESC LIMIT 1', [normalized]);
+    const digitsNoCountry = digits.startsWith('55') ? digits.slice(2) : digits;
+    const phoneVariantsSet = new Set([normalized]);
+    if (digitsNoCountry.length === 11 && digitsNoCountry[2] === '9') {
+      phoneVariantsSet.add('+55' + digitsNoCountry.slice(0, 2) + digitsNoCountry.slice(3));
+    } else if (digitsNoCountry.length === 10) {
+      phoneVariantsSet.add('+55' + digitsNoCountry.slice(0, 2) + '9' + digitsNoCountry.slice(2));
+    }
+    const phoneVariants = Array.from(phoneVariantsSet);
+    const [existing] = await pool.query('SELECT id FROM whatsapp_conversations WHERE phone IN (?) ORDER BY last_message_at DESC, id DESC LIMIT 1', [phoneVariants]);
     if (existing.length) return res.json({ success: true, id: existing[0].id, created: false });
     const [[conn]] = await pool.query("SELECT id FROM whatsapp_connections WHERE status = 'connected' ORDER BY updated_at DESC LIMIT 1");
     const connectionId = conn ? conn.id : null;
