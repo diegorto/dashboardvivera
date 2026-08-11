@@ -474,3 +474,6 @@
 {"ts":"2026-08-11T10:31:47.944Z","rejected":false,"sql":"SELECT @@bind_address AS bind_address, @@port AS port, @@hostname AS hostname","rowCount":1}
 {"ts":"2026-08-11T12:07:37.834Z","rejected":false,"sql":"SELECT COUNT(*) AS total, SUM(ai_enabled=1) AS ai_on, SUM(cadence_enabled=1) AS cadence_on FROM whatsapp_conversations","rowCount":1}
 {"ts":"2026-08-11T12:07:39.198Z","rejected":false,"sql":"SELECT COUNT(*) AS backup_count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='whatsapp_conversations_preallowlistremoval_backup_20260810'","rowCount":1}
+{"ts":"2026-08-11T12:22:19.484Z","rejected":false,"sql":"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='deals' ORDER BY ORDINAL_POSITION","rowCount":63}
+{"ts":"2026-08-11T12:22:27.894Z","rejected":false,"sql":"SELECT d.id, d.title, d.stage_id, d.stage_tag, p.phone, d.updated_at FROM deals d LEFT JOIN patients p ON p.id=d.patient_id WHERE d.title LIKE '%llowlist%' OR d.title LIKE '%Diego%' OR d.title LIKE '%Teste%' ORDER BY d.id","rowCount":20}
+{"ts":"2026-08-11T12:23:32.537Z","rejected":false,"sql":"SELECT id FROM deals WHERE id IN (5356,5357,5358)","rowCount":3}

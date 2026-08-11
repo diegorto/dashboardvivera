@@ -62,7 +62,7 @@ async function ensureConversation(phone, name, jid, connectionId) {
   }
   try {
     const [r] = await pool.query(
-      'INSERT INTO whatsapp_conversations (phone, wa_jid, contact_name, ai_enabled, status, last_message_at, connection_id) VALUES (?, ?, ?, 1, "open", NOW(), ?)',
+      'INSERT INTO whatsapp_conversations (phone, wa_jid, contact_name, ai_enabled, status, last_message_at, connection_id) VALUES (?, ?, ?, 0, "open", NOW(), ?)',
       [normalized, jid || null, name || null, connectionId || null]
     )
     const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [r.insertId])

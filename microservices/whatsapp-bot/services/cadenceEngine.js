@@ -480,7 +480,7 @@ async function processDueEnrollments() {
       if (sendsUsedThisTick >= sendBudget.budget || burstUsedThisTick >= CADENCE_BURST_MAX) break
       const deal = await getDealAndPatient(en.deal_id)
       if (!deal) continue
-      { const allowlist = require('./allowlist'); if (await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) { continue } }
+      { const allowlist = require('./allowlist'); if (false && await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) { continue } }
       const jid = await resolveJid(deal.patient_phone, await getCadenceSocket())
       if (!jid) { console.warn('[cadenceEngine] sem telefone para deal ' + en.deal_id); continue }
 
@@ -571,7 +571,7 @@ async function manualTriggerWelcomeFlow(dealId, actorName) {
   if (!deal) return { ok: false, error: 'deal_nao_encontrado' }
   if (!deal.patient_phone) return { ok: false, error: 'sem_telefone' }
   const allowlist = require('./allowlist')
-  if (await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) {
+  if (false && await allowlist.isRestrictedMode() && !(await allowlist.isAllowlisted(deal.patient_phone))) {
     return { ok: false, error: 'lead_fora_do_piloto' }
   }
   const [[flowRow]] = await pool.query(
