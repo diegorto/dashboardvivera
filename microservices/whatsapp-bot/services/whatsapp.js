@@ -55,7 +55,9 @@ async function upsertSessionRow(patch) {
 
 async function ensureConversation(phone, name, jid, connectionId) {
   const normalized = crm.normalizePhone(phone)
-  const [rows] = await pool.query('SELECT * FROM whatsapp_conversations WHERE phone = ? AND connection_id <=> ?', [normalized, connectionId || null])
+  const variantDigits = crm.phoneDigitVariants ? crm.phoneDigitVariants(phone) : []
+  const phoneVariants = Array.from(new Set([normalized, ...variantDigits.map(v => '+' + v)]))
+  const [rows] = await pool.query('SELECT * FROM whatsapp_conversations WHERE phone IN (?) AND connection_id <=> ? ORDER BY id DESC', [phoneVariants, connectionId || null])
   if (rows.length) {
     if (jid && rows[0].wa_jid !== jid) await pool.query('UPDATE whatsapp_conversations SET wa_jid = ? WHERE id = ?', [jid, rows[0].id])
     return rows[0]

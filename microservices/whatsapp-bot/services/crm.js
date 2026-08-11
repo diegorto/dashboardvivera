@@ -158,4 +158,4 @@ async function updateQualification(dealId, patientId, qualification, crmSummary)
   )
 }
 
-module.exports = { normalizePhone, findOrCreatePatient, findOpenDealByPatient, findMostRecentDealByPatient, reopenDeal, createDealForWhatsappLead, logActivity, updateQualification, getNextRoundRobinOwner, ROUND_ROBIN_OWNERS, hasTintimOrigin, isCrmSyncGateEnabled, findPatientByPhone }
+module.exports = { normalizePhone, phoneDigitVariants, findOrCreatePatient, findOpenDealByPatient, findMostRecentDealByPatient, reopenDeal, createDealForWhatsappLead, logActivity, updateQualification, getNextRoundRobinOwner, ROUND_ROBIN_OWNERS, hasTintimOrigin, isCrmSyncGateEnabled, findPatientByPhone }
