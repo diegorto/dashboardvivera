@@ -124,13 +124,22 @@ async function resolveJid(phone, sockOverride) {
 }
 
 async function getCadenceSocket() {
+  let sockCandidate
   try {
     const flowConn = await require('./connectionsStore').getFlowConnection(TRIGGER_KEYWORD)
-    return flowConn ? wa.getSocketForConnection(flowConn.id) : undefined
+    sockCandidate = flowConn ? wa.getSocketForConnection(flowConn.id) : undefined
   } catch (e) {
-    console.warn('[cadenceEngine] falha ao resolver conexao do fluxo, usando socket legado:', e.message)
-    return undefined
+    console.warn('[cadenceEngine] falha ao resolver conexao do fluxo, tentando conexao ativa:', e.message)
   }
+  if (!sockCandidate && wa.getActiveConnectionId && wa.getSocketForConnection) {
+    try {
+      const activeId = wa.getActiveConnectionId()
+      if (activeId) sockCandidate = wa.getSocketForConnection(activeId)
+    } catch (e2) {
+      console.warn('[cadenceEngine] falha ao resolver conexao ativa como fallback:', e2.message)
+    }
+  }
+  return sockCandidate
 }
 
 function applyPlaceholders(text, deal) {

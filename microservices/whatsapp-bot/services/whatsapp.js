@@ -1023,4 +1023,4 @@ function startConnectionWatchdog() {
 startConnectionWatchdog()
 // ===== FIM BAND-AID =====
 
-module.exports = { isSendPathHealthy, isConnectionReallyHealthy, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { isSendPathHealthy, isConnectionReallyHealthy, getActiveConnectionId, getSocketForConnection, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
