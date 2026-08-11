@@ -916,7 +916,10 @@ async function startSocket() {
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return
     for (const m of messages) {
-      if (m.key.fromMe) continue
+      if (m.key.fromMe) {
+        try { await handleOutgoingFromDevice(m.key.remoteJid, m, null) } catch (e) { console.error('[whatsapp] erro ao processar mensagem outbound de outro dispositivo:', e.message) }
+        continue
+      }
       try {
         if (m.key.remoteJid && m.key.remoteJid.endsWith('@lid')) {
           let realJid = m.key.remoteJidAlt

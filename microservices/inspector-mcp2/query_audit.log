@@ -506,3 +506,21 @@
 {"ts":"2026-08-11T20:59:49.994Z","rejected":false,"sql":"SELECT column_name FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='whatsapp_sessions'","rowCount":12}
 {"ts":"2026-08-11T20:59:51.171Z","rejected":false,"sql":"SELECT * FROM whatsapp_sessions LIMIT 5","rowCount":1}
 {"ts":"2026-08-11T20:59:52.369Z","rejected":false,"sql":"SELECT NOW() as agora, TIMESTAMPDIFF(MINUTE, '2026-08-07T19:11:44', NOW()) as minutos_desde_last_seen","rowCount":1}
+{"ts":"2026-08-11T23:10:32.361Z","rejected":false,"sql":"SELECT table_name FROM information_schema.tables WHERE table_schema='vivera_crm' AND table_name LIKE '%backup%' ORDER BY table_name","rowCount":20}
+{"ts":"2026-08-11T23:10:34.694Z","rejected":false,"sql":"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name IN ('chatbot_flows','chatbot_flow_nodes','chatbot_flow_edges') ORDER BY table_name, ordinal_position","rowCount":23}
+{"ts":"2026-08-11T23:10:42.012Z","rejected":false,"sql":"SELECT COUNT(*) n FROM chatbot_flow_nodes","rowCount":1}
+{"ts":"2026-08-11T23:10:43.224Z","rejected":false,"sql":"SELECT COUNT(*) n FROM chatbot_flow_edges","rowCount":1}
+{"ts":"2026-08-11T23:10:44.615Z","rejected":false,"sql":"SELECT id, name, description, is_active, trigger_keyword, connection_id, created_at FROM chatbot_flows_backup_20260811_deleteall","rowCount":4}
+{"ts":"2026-08-11T23:10:55.694Z","rejected":false,"sql":"SELECT COLUMN_TYPE FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='chatbot_flow_nodes' AND column_name='node_type'","rowCount":1}
+{"ts":"2026-08-11T23:10:57.005Z","rejected":false,"sql":"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='media_library' ORDER BY ordinal_position","rowCount":11}
+{"ts":"2026-08-11T23:11:03.935Z","rejected":false,"sql":"SELECT id, type, title, category, position, file_name, mimetype FROM media_library WHERE category LIKE '%ABERTURA%' OR category LIKE '%abertura%' ORDER BY position","rowCount":12}
+{"ts":"2026-08-11T23:11:05.176Z","rejected":false,"sql":"SELECT DISTINCT category FROM media_library ORDER BY category","rowCount":4}
+{"ts":"2026-08-11T23:11:08.084Z","rejected":false,"sql":"SELECT id, pipeline_id, skey, label, sort FROM stages WHERE pipeline_id = 1 ORDER BY sort LIMIT 5","rowCount":5}
+{"ts":"2026-08-11T23:11:18.382Z","rejected":false,"sql":"SELECT column_name FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='pipelines'","rowCount":6}
+{"ts":"2026-08-11T23:11:19.934Z","rejected":false,"sql":"SELECT * FROM pipelines","rowCount":7}
+{"ts":"2026-08-11T23:11:21.276Z","rejected":false,"sql":"SELECT column_name FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='chatbot_config_versions'","rowCount":7}
+{"ts":"2026-08-11T23:18:15.958Z","rejected":false,"sql":"SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='scheduled_messages' ORDER BY ordinal_position","rowCount":9}
+{"ts":"2026-08-11T23:18:17.075Z","rejected":false,"sql":"SELECT COUNT(*) n, MAX(created_at) ultimo FROM scheduled_messages","rowCount":1}
+{"ts":"2026-08-11T23:24:11.583Z","rejected":false,"sql":"SELECT sh.deal_id, sh.to_stage_id, sh.changed_at, wc.id AS conv_id\nFROM stage_history sh\nJOIN deals d ON d.id = sh.deal_id\nLEFT JOIN whatsapp_conversations wc ON wc.deal_id = d.id\nWHERE sh.to_stage_id = 8 AND sh.changed_at >= '2026-08-11 00:00:00'\nORDER BY sh.changed_at DESC","rowCount":20}
+{"ts":"2026-08-11T23:24:13.606Z","rejected":false,"sql":"SELECT column_name FROM information_schema.columns WHERE table_schema='vivera_crm' AND table_name='whatsapp_messages'","rowCount":10}
+{"ts":"2026-08-11T23:24:23.430Z","rejected":false,"sql":"SELECT wm.conversation_id, wm.direction, wm.sent_by, LEFT(wm.content,50) content, wm.created_at\nFROM whatsapp_messages wm\nWHERE wm.conversation_id IN (1321,1318,1315,1313,1312,1310)\nORDER BY wm.conversation_id, wm.created_at","rowCount":57}
