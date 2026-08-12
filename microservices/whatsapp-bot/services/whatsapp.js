@@ -819,6 +819,29 @@ async function resolveAndCacheJid(conv, sockOverrideForCheck) {
 }
 
 
+async function sendRecordingPresence(conversationId, totalMs) {
+  try {
+    const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
+    if (!conv) return
+    let sockOverride = getSocketForConnection(conv.connection_id)
+    const jid = await resolveAndCacheJid(conv, sockOverride)
+    if (!jid) return
+    const activeSock = sockOverride || sock
+    if (!activeSock) return
+    let elapsed = 0
+    const chunk = 15000
+    while (elapsed < totalMs) {
+      await activeSock.sendPresenceUpdate('recording', jid)
+      const wait = Math.min(chunk, totalMs - elapsed)
+      await new Promise(r => setTimeout(r, wait))
+      elapsed += wait
+    }
+    await activeSock.sendPresenceUpdate('paused', jid)
+  } catch (e) {
+    console.error('[whatsapp] erro ao enviar presence recording:', e.message)
+  }
+}
+
 async function sendManualMessage(conversationId, text) {
   const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [conversationId])
   if (!conv) throw new Error('conversa nao encontrada')
@@ -1026,4 +1049,4 @@ function startConnectionWatchdog() {
 startConnectionWatchdog()
 // ===== FIM BAND-AID =====
 
-module.exports = { isSendPathHealthy, isConnectionReallyHealthy, getActiveConnectionId, getSocketForConnection, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
+module.exports = { isSendPathHealthy, isConnectionReallyHealthy, getActiveConnectionId, getSocketForConnection, startSocket, getStatus, sendText, sendAudio, sendVideo, sendImage, sendDocument, ensureConversation, triggerWelcomeFlow, saveMessage, sendManualMessage, sendManualMedia, sendRecordingPresence, checkOnWhatsApp, sendAudioWithAck, handleIncomingText, handleOutgoingFromDevice, registerSessionManager, getSocketForConnection, forceReconnectConnection, withConversationLock, handleIncomingAudio, handleIncomingVideo, handleIncomingDocument, handleIncomingImage }
