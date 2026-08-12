@@ -62,7 +62,7 @@ async function checkAndSendFollowup(conversationId, dealId, patientName) {
       'SELECT id FROM whatsapp_messages WHERE conversation_id = ? AND direction = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) LIMIT 1',
       [conversationId, 'in', Math.floor(FOLLOWUP_DELAY_MS / 1000)]
     )
-    if (rows.length > 0) return
+    if (rows.length > 0) { await notifyLeadResponded(conversationId, dealId); return }
     const nome = firstName(patientName)
     const texto1 = nome + '? Ainda estou aqui, mas logo terei que deixar o telefone aqui.'
     const texto2 = 'Se puder responder eu consigo retornar ainda 😉'
@@ -82,7 +82,7 @@ async function checkAndSendSecondFollowup(conversationId, dealId, patientName) {
       'SELECT id FROM whatsapp_messages WHERE conversation_id = ? AND direction = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) LIMIT 1',
       [conversationId, 'in', Math.floor(SECOND_FOLLOWUP_DELAY_MS / 1000)]
     )
-    if (rows.length > 0) return
+    if (rows.length > 0) { await notifyLeadResponded(conversationId, dealId); return }
     const t1 = 'Bom, vou avisar a minha consultora que voce entrou em contato querendo mais informacoes.'
     const t2 = 'Como voce nao respondeu, acredito que esteja meio na correria agora ne? Em breve ela vai te ligar.'
     const t3 = 'tem algum horario melhor pra falar contigo?'
@@ -94,6 +94,19 @@ async function checkAndSendSecondFollowup(conversationId, dealId, patientName) {
     console.log('[fluxoInicial] segundo followup enviado deal=' + dealId + ' conversation=' + conversationId)
   } catch (e) {
     console.error('[fluxoInicial] erro ao enviar segundo followup deal=' + dealId + ':', e.message)
+  }
+}
+
+async function notifyLeadResponded(conversationId, dealId) {
+  try {
+    const [[conv]] = await pool.query('SELECT patient_id, phone, contact_name FROM whatsapp_conversations WHERE id = ?', [conversationId])
+    await pool.query(
+      'INSERT INTO handoff_alerts (conversation_id, deal_id, patient_id, phone, lead_name, created_at) VALUES (?, ?, ?, ?, ?, NOW())',
+      [conversationId, dealId, conv ? conv.patient_id : null, conv ? conv.phone : null, (conv && conv.contact_name) || null]
+    )
+    console.log('[fluxoInicial] lead respondeu durante o fluxo, alerta de atendimento criado conversation=' + conversationId)
+  } catch (e) {
+    console.error('[fluxoInicial] erro ao criar handoff_alert deal=' + dealId + ':', e.message)
   }
 }
 
@@ -114,6 +127,14 @@ async function sendGreetingAndAudio({ dealId, conversationId, patientName }) {
 
   setTimeout(async () => {
     try {
+      const [respRows] = await pool.query(
+        'SELECT id FROM whatsapp_messages WHERE conversation_id = ? AND direction = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) LIMIT 1',
+        [conversationId, 'in', Math.floor(AUDIO_DELAY_AFTER_TEXT_MS / 1000)]
+      )
+      if (respRows.length > 0) {
+        await notifyLeadResponded(conversationId, dealId)
+        return
+      }
       const audio = await getAberturaAudio()
       if (!audio || !audio.content) {
         console.error('[fluxoInicial] audio de abertura nao encontrado (categoria=' + AUDIO_CATEGORY + ' posicao=' + AUDIO_POSITION + '), pulando envio deal=' + dealId)
