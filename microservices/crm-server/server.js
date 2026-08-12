@@ -893,6 +893,12 @@ app.patch('/api/crm/deals/:id', auth, async (req, res) => {
         syncSaleToTintim(dealId).catch(function(e){ console.error('[tintim-sale]', e.message) })
               metaConversionsService.handleDealWon(dealId).catch(function(e){ console.error('[meta-capi]', e.message) })
     
+              // Auto-move: negocio ganho vai direto pro funil Recepcao (pipeline_id=2), estagio Inicio de Tratamento (stage_id=18)
+        try {
+          await conn.query('UPDATE deals SET pipeline_id = 2, stage_id = 18, stage_entered_at = NOW() WHERE id = ?', [dealId]);
+          await conn.query('INSERT INTO stage_history (deal_id, from_stage_id, to_stage_id, changed_by) VALUES (?, ?, 18, NULL)', [dealId, deal.stage_id]);
+        } catch (e3) { console.error('[won-auto-recepcao]', e3.message); }
+
       } else if (wonDate) {
         // negocio ja estava ganho: permite apenas corrigir a data retroativa de fechamento
         await conn.query('UPDATE deals SET won_date = ? WHERE id = ?', [brDateOnlyToUtc(wonDate), dealId])
