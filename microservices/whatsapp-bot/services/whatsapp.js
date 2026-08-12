@@ -25,6 +25,23 @@ const ai = require('./ai')
 const pendingAudioTimers = new Map()
 
 let sock = null
+
+async function resolvePhoneFromJid(jid) {
+  if (!jid) return null
+  if (jid.endsWith('@g.us') || jid.endsWith('@broadcast') || jid.endsWith('@newsletter')) return null
+  if (jid.endsWith('@lid')) {
+    try {
+      if (sock && sock.signalRepository && sock.signalRepository.lidMapping && sock.signalRepository.lidMapping.getPNForLID) {
+        const realJid = await sock.signalRepository.lidMapping.getPNForLID(jid)
+        if (realJid) return realJid.split('@')[0]
+      }
+    } catch (e) {
+      console.log('[whatsapp] falha ao resolver LID ' + jid + ' para telefone real: ' + (e && e.message))
+    }
+    return null
+  }
+  return jid.split('@')[0]
+}
 let latestQrDataUrl = null
 let connectionStatus = 'disconnected'
 let reconnectAttempts = 0
@@ -107,7 +124,7 @@ async function handleOutgoingFromDevice(fromJid, m, connCtx) {
     const [existingRows] = await pool.query('SELECT id FROM whatsapp_messages WHERE wa_message_id = ? LIMIT 1', [waMessageId])
     if (existingRows.length) return
   }
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
@@ -212,7 +229,7 @@ async function triggerWelcomeFlow({ fromJid, convId, dealId, pushName, connCtx, 
   }
 }
 async function handleIncomingText(fromJid, text, pushName, connCtx) {
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
@@ -492,7 +509,7 @@ for (const chunk of chunks) {
 
 async function handleIncomingAudio(m) {
   const fromJid = m.key.remoteJid
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
@@ -527,7 +544,7 @@ async function handleIncomingAudio(m) {
 
 async function handleIncomingVideo(m) {
   const fromJid = m.key.remoteJid
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
@@ -547,7 +564,7 @@ async function handleIncomingVideo(m) {
 
 async function handleIncomingDocument(m) {
   const fromJid = m.key.remoteJid
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
@@ -570,7 +587,7 @@ async function handleIncomingDocument(m) {
 
 async function handleIncomingImage(m) {
   const fromJid = m.key.remoteJid
-  const phone = fromJid.split('@')[0]
+  const phone = await resolvePhoneFromJid(fromJid)
   if (!fromJid || fromJid.endsWith('@broadcast') || fromJid.endsWith('@newsletter') || !/\d/.test(phone)) {
     console.log('[whatsapp] mensagem ignorada - JID nao suportado (status/broadcast/lid invalido): ' + fromJid)
     return
