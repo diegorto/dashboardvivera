@@ -2987,12 +2987,73 @@ const exclusionMap = new Map();
   return header + lines.join('\n');
 }
 
+async function applyPublicoOverrides(rows, listName) {
+  const [overrides] = await pool.query(
+    "SELECT po.patient_id, po.override, po.note, p.name, p.phone, p.email " +
+    "FROM publico_overrides po JOIN patients p ON p.id = po.patient_id"
+  );
+  const overrideMap = new Map(overrides.map(o => [String(o.patient_id), o]));
+  const filtered = rows.filter(r => {
+    const o = overrideMap.get(String(r.patientId));
+    return !o || o.override === listName;
+  });
+  const presentIds = new Set(filtered.map(r => String(r.patientId)));
+  for (const o of overrides) {
+    if (o.override === listName && !presentIds.has(String(o.patient_id))) {
+      filtered.push({
+        patientId: o.patient_id,
+        name: o.name,
+        phone: o.phone,
+        email: o.email,
+        dealCount: 0,
+        reasons: 'Adicionado manualmente' + (o.note ? (': ' + o.note) : ''),
+        criterios: null,
+        manual: true
+      });
+    }
+  }
+  return filtered;
+}
+
+app.post('/api/crm/ui/dashboard/publico/override', auth, requireAdmin, async (req, res) => {
+  try {
+    const patientId = parseInt(req.body.patient_id, 10);
+    const override = req.body.override;
+    const note = req.body.note || null;
+    if (!patientId || !['inclusao', 'exclusao', 'removido'].includes(override)) {
+      return res.status(400).json({ success: false, error: 'patient_id ou override invalido' });
+    }
+    await pool.query(
+      "INSERT INTO publico_overrides (patient_id, override, note) VALUES (?, ?, ?) " +
+      "ON DUPLICATE KEY UPDATE override = VALUES(override), note = VALUES(note), updated_at = CURRENT_TIMESTAMP",
+      [patientId, override, note]
+    );
+    res.json({ success: true });
+  } catch (e) {
+    console.error('publico override error', e);
+    res.status(500).json({ success: false, error: String(e) });
+  }
+});
+
+app.delete('/api/crm/ui/dashboard/publico/override/:patientId', auth, requireAdmin, async (req, res) => {
+  try {
+    const patientId = parseInt(req.params.patientId, 10);
+    if (!patientId) return res.status(400).json({ success: false, error: 'patient_id invalido' });
+    await pool.query('DELETE FROM publico_overrides WHERE patient_id = ?', [patientId]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('publico override delete error', e);
+    res.status(500).json({ success: false, error: String(e) });
+  }
+});
+
 app.get('/api/crm/ui/dashboard/publico/exclusao', auth, requireAdmin, async (req, res) => {
     try {
       const { exclusion, criteriaDefs } = await buildPublicoLists();
       const selected = (req.query.criterios || '').split(',').map(s => s.trim()).filter(Boolean);
       const filtered = selected.length ? exclusion.filter(r => r.criterios && selected.some(k => r.criterios[k])) : exclusion;
-      res.json({ success: true, rows: filtered, total: filtered.length, criteria: criteriaDefs });
+      const withOverrides = await applyPublicoOverrides(filtered, 'exclusao');
+      res.json({ success: true, rows: withOverrides, total: withOverrides.length, criteria: criteriaDefs });
     } catch (e) {
       console.error('publico exclusao error', e);
       res.status(500).json({ success: false, error: 'Erro interno' });
@@ -3004,7 +3065,8 @@ app.get('/api/crm/ui/dashboard/publico/exclusao', auth, requireAdmin, async (req
     const { inclusion, inclusionCriteriaDefs } = await buildPublicoLists();
     const selected = (req.query.criterios ? String(req.query.criterios).split(',').map(s => s.trim()).filter(Boolean) : null);
     const rows = selected && selected.length ? inclusion.filter(r => r.criterios && selected.some(k => r.criterios[k])) : inclusion;
-    res.json({ success: true, total: rows.length, rows, criteria: inclusionCriteriaDefs });
+    const withOverrides = await applyPublicoOverrides(rows, 'inclusao');
+    res.json({ success: true, total: withOverrides.length, rows: withOverrides, criteria: inclusionCriteriaDefs });
   } catch (e) {
     console.error('publico inclusao error', e);
     res.status(500).json({ success: false, error: String(e) });

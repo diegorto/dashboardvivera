@@ -1062,11 +1062,37 @@ function publicoInclusaoCsvUrl() {
   return '/api/crm/ui/dashboard/publico/inclusao.csv' + qs;
 }
 
-function publicoRowsToTable(rows) {
+function publicoRowsToTable(rows, view) {
+  var target = view === 'inclusao' ? 'exclusao' : 'inclusao';
+  var targetLabel = target === 'inclusao' ? 'Mover p/ Inclus\u00e3o' : 'Mover p/ Exclus\u00e3o';
   var tableRows = rows.map(function(r){
-    return [publicoEscapeHtml(r.name), publicoEscapeHtml(r.phone), publicoEscapeHtml(r.email) || '-', publicoEscapeHtml(r.reasons)];
+    var badge = r.manual ? ' <span style="font-size:10px;color:#2563eb;">(manual)</span>' : '';
+    var acoes = '<button class="btn" style="padding:2px 6px;font-size:11px;" onclick="publicoMoveOverride(' + r.patientId + ',\'' + target + '\')">' + targetLabel + '</button> ' +
+      '<button class="btn" style="padding:2px 6px;font-size:11px;" onclick="publicoRemoveOverride(' + r.patientId + ')">Remover</button>';
+    return [publicoEscapeHtml(r.name) + badge, publicoEscapeHtml(r.phone), publicoEscapeHtml(r.email) || '-', publicoEscapeHtml(r.reasons), acoes];
   });
-  return tableHtml(['Nome','Telefone','Email','Motivo'], tableRows);
+  return tableHtml(['Nome','Telefone','Email','Motivo','A\u00e7\u00f5es'], tableRows);
+}
+
+async function publicoMoveOverride(patientId, target) {
+  try {
+    await api('/api/crm/ui/dashboard/publico/override', { method: 'POST', body: JSON.stringify({ patient_id: patientId, override: target }) });
+    if (typeof publicoRefreshExclusao === 'function') await publicoRefreshExclusao();
+    if (typeof publicoRefreshInclusao === 'function') await publicoRefreshInclusao();
+  } catch (e) {
+    alert('Erro ao mover: ' + (e.message || e));
+  }
+}
+
+async function publicoRemoveOverride(patientId) {
+  if (!confirm('Remover esta pessoa dos p\u00fablicos (inclus\u00e3o e exclus\u00e3o)?')) return;
+  try {
+    await api('/api/crm/ui/dashboard/publico/override', { method: 'POST', body: JSON.stringify({ patient_id: patientId, override: 'removido' }) });
+    if (typeof publicoRefreshExclusao === 'function') await publicoRefreshExclusao();
+    if (typeof publicoRefreshInclusao === 'function') await publicoRefreshInclusao();
+  } catch (e) {
+    alert('Erro ao remover: ' + (e.message || e));
+  }
 }
 
 function publicoRefreshExclusao() {
@@ -1079,7 +1105,7 @@ function publicoRefreshExclusao() {
   var countEl = document.getElementById('publicoExclusaoCount');
   if (countEl) countEl.textContent = filtered.length;
   var tableEl = document.getElementById('publicoExclusaoTable');
-  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered);
+  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered, 'exclusao');
 }
 
 function publicoRefreshInclusao() {
@@ -1092,7 +1118,7 @@ function publicoRefreshInclusao() {
   var countEl = document.getElementById('publicoInclusaoCount');
   if (countEl) countEl.textContent = filtered.length;
   var tableEl = document.getElementById('publicoInclusaoTable');
-  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered);
+  if (tableEl) tableEl.innerHTML = publicoRowsToTable(filtered, 'inclusao');
 }
 
 function publicoSetAllCriterios(checked) {
