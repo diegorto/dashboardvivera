@@ -12,6 +12,7 @@ const POLL_INTERVAL_MS = 5 * 1000
 const LOOKBACK_MINUTES = 30
 const PIPELINE_ID = 1 // Inbound
 const STAGE_ID = 1 // Entrada
+const CONTATO_REALIZADO_STAGE_ID = 8 // Contato Realizado
 const TEXT_DELAY_MS = 10 * 1000
 const AUDIO_DELAY_AFTER_TEXT_MS = 45 * 1000
 const FOLLOWUP_DELAY_MS = 5 * 60 * 1000
@@ -129,6 +130,15 @@ async function sendGreetingAndAudio({ dealId, conversationId, patientName }) {
     const texto1 = saudacao + ' ' + nome + ', tudo bem? 😊'
     const texto2 = 'Aqui é o Dr. Diego... peraí que vou te mandar um áudio sobre sua pergunta'
     await wa.sendManualMessage(conversationId, texto1)
+    if (dealId) {
+      try {
+        await pool.query("INSERT INTO activities (deal_id, type, content, created_at) VALUES (?, ?, ?, NOW())", [dealId, ACTIVITY_TYPE, 'envio automatico do fluxo inicial'])
+        await pool.query('UPDATE deals SET stage_id = ?, stage_entered_at = NOW() WHERE id = ?', [CONTATO_REALIZADO_STAGE_ID, dealId])
+        await pool.query("INSERT INTO activities (deal_id, type, content, created_at) VALUES (?, ?, ?, NOW())", [dealId, ACTIVITY_TYPE, 'mudanca automatica para deal stage contato realizado'])
+      } catch (e) {
+        console.error('[fluxoInicial] erro ao mover deal para Contato Realizado deal=' + dealId + ':', e.message)
+      }
+    }
     await new Promise(r => setTimeout(r, 1500))
     await wa.sendManualMessage(conversationId, texto2)
     wa.sendRecordingPresence(conversationId, Math.max(AUDIO_DELAY_AFTER_TEXT_MS - 1500, 1000)).catch(() => {})
@@ -174,6 +184,8 @@ async function processNewLeads() {
       'JOIN whatsapp_conversations wc ON wc.deal_id = d.id ' +
       'WHERE d.pipeline_id = ? AND d.stage_id = ? ' +
       'AND d.stage_entered_at >= (NOW() - INTERVAL ? MINUTE) ' +
+      " AND NOT EXISTS (SELECT 1 FROM deals d2 WHERE d2.patient_id = d.patient_id AND d2.id <> d.id) " +
+      " AND p.created_at >= (d.stage_entered_at - INTERVAL 5 MINUTE) " +
       'ORDER BY d.stage_entered_at ASC LIMIT 20',
       [PIPELINE_ID, STAGE_ID, LOOKBACK_MINUTES]
     )
