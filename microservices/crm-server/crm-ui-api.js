@@ -72,6 +72,26 @@ app.get('/api/crm/ui/deal-situacoes', auth, async (req, res) => {
   }
 });
 
+app.get('/api/crm/ui/deals-lookup', auth, async (req, res) => {
+  try {
+    const search = (req.query.search || '').toString().trim()
+    if (!search) return res.json({ success: true, deals: [] })
+    const [rows] = await pool.query(
+      `SELECT d.id, d.title, p.name AS patient_name, p.phone AS patient_phone
+       FROM deals d
+       JOIN patients p ON p.id = d.patient_id
+       WHERE (p.name LIKE ? OR p.phone LIKE ? OR d.title LIKE ?)
+       ORDER BY d.add_date DESC
+       LIMIT 15`,
+      [`%${search}%`, `%${search}%`, `%${search}%`]
+    )
+    res.json({ success: true, deals: rows })
+  } catch (e) {
+    console.error('deals-lookup error', e.message)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
 app.get('/api/crm/ui/deals', auth, async (req, res) => {
     try {
       const search = (req.query.search || '').toString().trim();

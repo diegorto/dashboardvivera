@@ -1315,7 +1315,7 @@ function runVincularSearch() {
     var resultsEl = document.getElementById('vincularResults');
     if (!resultsEl) return;
     resultsEl.innerHTML = '<div style="color:#999;font-size:12px;">Buscando...</div>';
-    fetch('/api/crm/ui/deals?search=' + encodeURIComponent(q) + '&pageSize=10', { headers: authHeaders() }).then(function(r) { return r.json(); }).then(function(r) {
+    fetch('/api/crm/ui/deals-lookup?search=' + encodeURIComponent(q), { headers: authHeaders() }).then(function(r) { return r.json(); }).then(function(r) {
       var rows = (r && r.deals) || [];
       if (!rows.length) {
         resultsEl.innerHTML = '<div style="color:#999;font-size:12px;">Nenhum negocio encontrado. Use "Criar novo negocio" abaixo.</div>';
