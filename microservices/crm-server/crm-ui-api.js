@@ -9,6 +9,7 @@
 const metaAdsService = require('./metaAdsService');
 const googleAdsCacheReader = require('./googleAdsCacheReader');
 const bcrypt = require('bcryptjs');
+const pushService = require('./pushService');
 const JESSICA_USER_ID = 6; // Dra. Jessica - avaliadora padrao fixa (regra 2026-07-23)
 
 module.exports = function registerCrmUiRoutes(app, pool, auth) {
@@ -71,6 +72,22 @@ app.get('/api/crm/ui/deal-situacoes', auth, async (req, res) => {
     res.status(500).json({ success: false, error: 'Erro interno' });
   }
 });
+
+app.get('/api/crm/ui/push/vapid-public-key', auth, async (req, res) => {
+  res.json({ success: true, publicKey: pushService.publicKey || null })
+})
+
+app.post('/api/crm/ui/push/subscribe', auth, async (req, res) => {
+  try {
+    const sub = req.body
+    if (!sub || !sub.endpoint || !sub.keys) return res.status(400).json({ success: false, error: 'subscription invalida' })
+    await pushService.saveSubscription(req.user.id, sub)
+    res.json({ success: true })
+  } catch (e) {
+    console.error('push/subscribe error', e.message)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
 
 app.get('/api/crm/ui/deals-lookup', auth, async (req, res) => {
   try {

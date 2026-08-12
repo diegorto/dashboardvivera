@@ -6,6 +6,7 @@
 const pool = require('../db')
 const wa = require('./whatsapp')
 const path = require('path')
+const pushService = require('./pushService')
 
 const POLL_INTERVAL_MS = 5 * 1000
 const LOOKBACK_MINUTES = 30
@@ -105,6 +106,17 @@ async function notifyLeadResponded(conversationId, dealId) {
       [conversationId, dealId, conv ? conv.patient_id : null, conv ? conv.phone : null, (conv && conv.contact_name) || null]
     )
     console.log('[fluxoInicial] lead respondeu durante o fluxo, alerta de atendimento criado conversation=' + conversationId)
+    if (dealId) {
+      const [[deal]] = await pool.query('SELECT owner_name FROM deals WHERE id = ?', [dealId])
+      if (deal && deal.owner_name) {
+        const leadName = (conv && conv.contact_name) || 'Lead'
+        pushService.sendPushToUserByName(deal.owner_name, {
+          title: 'Lead respondeu: ' + leadName,
+          body: 'O lead respondeu durante o fluxo automatico e aguarda atendimento.',
+          url: '/whatsapp.html?conv=' + conversationId
+        }).catch(() => {})
+      }
+    }
   } catch (e) {
     console.error('[fluxoInicial] erro ao criar handoff_alert deal=' + dealId + ':', e.message)
   }
