@@ -582,6 +582,7 @@ function escHtml(s) {
 
 function renderConvList(list) {
   const el = document.getElementById('convList');
+  if (!el) { setTimeout(function(){ renderConvList(list); }, 300); return; }
   el.innerHTML = '';
   (list || []).forEach(c => {
     const li = document.createElement('li');
@@ -959,7 +960,7 @@ window.removeTagForCurrentLead = function removeTagForCurrentLead(idx) {
 }
 
 window.__labelsCatalogLS = null;
-window.toggleTagPickerLS = function toggleTagPickerLS() {
+window.toggleTagPickerLS = window.toggleTagPickerLS = function toggleTagPickerLS() {
   var dd = document.getElementById('tagPickerLS');
   if (!dd) return;
   if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
@@ -991,7 +992,7 @@ window.renderTagPickerOptionsLS = function renderTagPickerOptionsLS() {
     return '<div onclick="addTagFromPickerLS(\'' + encodeURIComponent(l.name) + '\')" style="padding:5px 6px;cursor:pointer;font-size:12px;border-radius:4px;display:flex;align-items:center;" onmouseover="this.style.background=\'#f2f2f7\'" onmouseout="this.style.background=\'transparent\'">' + dot + escapeHtmlLS(l.name) + '</div>';
   }).join('');
 }
-window.addTagFromPickerLS = function addTagFromPickerLS(encodedName) {
+window.addTagFromPickerLS = window.addTagFromPickerLS = function addTagFromPickerLS(encodedName) {
   var name = decodeURIComponent(encodedName);
   addTagForCurrentLead(name);
   var dd = document.getElementById('tagPickerLS');
@@ -1048,7 +1049,7 @@ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
 return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
 });
 }
-window.openMediaCentral = function openMediaCentral() {
+window.openMediaCentral = window.openMediaCentral = function openMediaCentral() {
 if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
 mcEnsureModal();
 document.getElementById('mediaCentralOverlay').style.display = 'flex';
@@ -1057,7 +1058,7 @@ window.__mcQueue = [];
 window.__mcEditingId = null;
 loadMediaCentralItems();
 }
-window.closeMediaCentral = function closeMediaCentral() {
+window.closeMediaCentral = window.closeMediaCentral = function closeMediaCentral() {
 var ov = document.getElementById('mediaCentralOverlay');
 if (ov) ov.style.display = 'none';
 document.removeEventListener('keydown', mcHandleKeydown);
@@ -1085,7 +1086,7 @@ ov.innerHTML =
 document.body.appendChild(ov);
 ov.addEventListener('click', function(e){ if (e.target === ov) closeMediaCentral(); });
 }
-window.mcToggleMode = function mcToggleMode() {
+window.mcToggleMode = window.mcToggleMode = function mcToggleMode() {
 window.__mcMode = window.__mcMode === 'direto' ? 'fila' : 'direto';
 window.__mcQueue = [];
 var btn = document.getElementById('mcModeBtn');
@@ -1120,7 +1121,7 @@ var active = t.key === window.__mcActiveTab;
 return '<button type="button" onclick="mcSelectTab(\'' + t.key + '\')" style="flex:1;min-width:0;padding:10px 4px 9px;text-align:center;cursor:pointer;border:0;border-right:1px solid rgba(29,31,32,.16);background:' + (active ? '#5980a6' : 'transparent') + ';color:' + (active ? '#f2f2f3' : '#1d1f20') + ';font-family:Barlow Condensed,Arial,sans-serif;font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;">' + mcEscapeHtml(t.label) + '</button>';
 }).join('');
 }
-window.mcSelectTab = function mcSelectTab(key) {
+window.mcSelectTab = window.mcSelectTab = function mcSelectTab(key) {
 window.__mcActiveTab = key;
 mcRenderTabs();
 mcRenderGrid();
@@ -1138,7 +1139,7 @@ if (it.type === 'empty' || !it.content) return '';
 if (it.type === 'text') return String(it.content).length + ' car.';
 return (it.file_name || it.mimetype || it.type || '').toString().slice(0,18);
 }
-function mcRenderGrid() {
+window.mcRenderGrid = function mcRenderGrid() {
 window.__mcEditingId = null;
 var body = document.getElementById('mcBody');
 var slots = mcItemsForActiveTab();
@@ -1300,7 +1301,7 @@ e.preventDefault();
 mcPadClick(it.id);
 }
 
-function openVincularModal() {
+window.openVincularModal = function openVincularModal() {
   if (!currentConvId) return;
   var existing = document.getElementById('vincularModalOverlay');
   if (existing) existing.remove();
@@ -1321,7 +1322,7 @@ function openVincularModal() {
   runVincularSearch();
 }
 
-function closeVincularModal() {
+window.closeVincularModal = function closeVincularModal() {
   var el = document.getElementById('vincularModalOverlay');
   if (el) el.remove();
 }
@@ -1354,7 +1355,7 @@ function runVincularSearch() {
   }, 300);
 }
 
-function doVincularDeal(dealId) {
+window.doVincularDeal = function doVincularDeal(dealId) {
   if (!currentConvId) return;
   fetch('/api/crm/ui/conversations/' + currentConvId + '/link-deal', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ dealId: dealId }) })
     .then(function(r) { return r.json(); })
@@ -1365,7 +1366,7 @@ function doVincularDeal(dealId) {
     }).catch(function(e) { alert('Erro ao vincular: ' + e.message); });
 }
 
-function doCriarNovoNegocio() {
+window.doCriarNovoNegocio = function doCriarNovoNegocio() {
   if (!currentConvId) return;
   if (!confirm('Criar um novo negocio para esta conversa?')) return;
   fetch('/api/crm/ui/conversations/' + currentConvId + '/create-deal', { method: 'POST', headers: authHeaders() })
@@ -1507,7 +1508,9 @@ let flowViewMode = 'editor';
 async function loadOrientacao() {
   const data = await api('/ai-config');
   const c = data.config;
-  document.getElementById('orAssistantName').value = c.assistant_name || 'Vive';
+  var orName = document.getElementById('orAssistantName');
+  if (!orName) return;
+  orName.value = c.assistant_name || 'Vive';
   document.getElementById('orSystemPrompt').value = c.system_prompt || '';
   document.getElementById('cfgHumanizer').checked = c.humanizer_enabled === 'true';
   document.getElementById('cfgQualifier').checked = c.qualifier_enabled === 'true';
@@ -1652,6 +1655,7 @@ async function loadFlows() {
   if (typeof loadExtraConnections === 'function') { await loadExtraConnections().catch(function(){}); }
   const data = await api('/flows');
   const el = document.getElementById('flowList');
+  if (!el) return;
   el.innerHTML = '';
   (data.flows || []).forEach(f => {
     const div = document.createElement('div');
@@ -1705,7 +1709,9 @@ async function loadCadencia() {
   const data = await api('/monthly-message');
   cadenciaMonthKey = data.month_key;
   cadenciaBlocks = (data.blocks || []).map(b => ({ block_type: b.block_type, text_content: b.text_content || '', media_path: b.media_path || null }));
-  document.getElementById('cadenciaMonthLabel').textContent = cadenciaMonthLabel(cadenciaMonthKey);
+  var cadLabelEl = document.getElementById('cadenciaMonthLabel');
+  if (!cadLabelEl) return;
+  cadLabelEl.textContent = cadenciaMonthLabel(cadenciaMonthKey);
   renderCadenciaBlocks();
 }
 
