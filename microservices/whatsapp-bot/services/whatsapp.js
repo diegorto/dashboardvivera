@@ -33,14 +33,14 @@ async function resolvePhoneFromJid(jid) {
     try {
       if (sock && sock.signalRepository && sock.signalRepository.lidMapping && sock.signalRepository.lidMapping.getPNForLID) {
         const realJid = await sock.signalRepository.lidMapping.getPNForLID(jid)
-        if (realJid) return realJid.split('@')[0]
+        if (realJid) return realJid.split('@')[0].split(':')[0]
       }
     } catch (e) {
       console.log('[whatsapp] falha ao resolver LID ' + jid + ' para telefone real: ' + (e && e.message))
     }
     return null
   }
-  return jid.split('@')[0]
+  return jid.split('@')[0].split(':')[0]
 }
 let latestQrDataUrl = null
 let connectionStatus = 'disconnected'
