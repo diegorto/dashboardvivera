@@ -612,7 +612,7 @@ router.post('/test/send-native-audio-ack', auth, async (req, res) => {
   }
 })
 
-router.post('/test/fluxo-inicial', async (req, res) => {
+router.post('/test/fluxo-inicial', auth, async (req, res) => {
   try {
     const { conversationId, patientName } = req.body
     if (!conversationId) return res.status(400).json({ success: false, error: 'conversationId obrigatorio' })
