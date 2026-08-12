@@ -7,6 +7,7 @@ const apiRoutes = require('./routes/api')
 const scheduler = require('./services/scheduler')
 const monthlyFlow = require('./services/monthlyFlow')
 const cadenceEngine = require('./services/cadenceEngine')
+const fluxoInicial = require('./services/fluxoInicial')
 
 const app = express()
 app.use(express.json({ limit: '2mb' }))
@@ -28,6 +29,7 @@ app.listen(PORT, '172.17.0.1', () => console.log(`[whatsapp-bot] rodando na port
   scheduler.start()
   monthlyFlow.start()
 cadenceEngine.start()
+fluxoInicial.start()
 try { require('./services/connectionWatchdog').startConnectionWatchdog() } catch (e) { console.error('[server] erro ao iniciar watchdog de conexao:', e.message) }
   wa.startSocket().catch(e => console.error('[whatsapp-bot] erro ao iniciar socket WhatsApp:', e.message))
   // DESATIVADO 2026-08-07: sessionManager.startAll() cria um segundo socket Baileys independente (auth_sessions/conn_*) para o MESMO numero que o whatsapp.js legado usa (auth_session/), brigando pela mesma sessao do WhatsApp e causando Connection Closed em loop. So reativar apos sessionManager ser integrado como unico dono da conexao real.
