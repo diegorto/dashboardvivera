@@ -912,6 +912,9 @@ function renderLeadSidebar(info) {
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>' +
     '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>';
+  if (!info.dealId) {
+    sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openVincularModal()" style="width:100%;padding:9px 12px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Vincular a um negocio</button></div>';
+  }
   sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openScheduleForCurrentLead()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Agendar horario</button></div>';
 sidebar.innerHTML += '<div style="margin-top:8px;"><button type="button" onclick="openMediaCentral()" style="width:100%;padding:9px 12px;background:#fff;color:#6c5ce7;border:1px solid #6c5ce7;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Envio Rapido</button></div>';
 }
@@ -1275,6 +1278,83 @@ var it = slots[idx];
 if (!it || it.type === 'empty' || !it.content) return;
 e.preventDefault();
 mcPadClick(it.id);
+}
+
+function openVincularModal() {
+  if (!currentConvId) return;
+  var existing = document.getElementById('vincularModalOverlay');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'vincularModalOverlay';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:10px;padding:20px;width:420px;max-width:92vw;max-height:80vh;overflow-y:auto;">' +
+      '<div style="font-weight:700;font-size:16px;margin-bottom:12px;">Vincular a um negocio</div>' +
+      '<input type="text" id="vincularSearchInput" placeholder="Buscar por nome ou telefone..." style="width:100%;box-sizing:border-box;border:1px solid #ddd;border-radius:6px;padding:8px 10px;font-size:13px;margin-bottom:10px;" oninput="runVincularSearch()">' +
+      '<div id="vincularResults" style="min-height:40px;"></div>' +
+      '<div style="margin-top:14px;border-top:1px solid #eee;padding-top:12px;">' +
+        '<button type="button" onclick="doCriarNovoNegocio()" style="width:100%;padding:9px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">+ Criar novo negocio</button>' +
+      '</div>' +
+      '<div style="text-align:right;margin-top:10px;"><button type="button" onclick="closeVincularModal()" style="background:none;border:none;color:#666;cursor:pointer;font-size:12px;">Cancelar</button></div>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  runVincularSearch();
+}
+
+function closeVincularModal() {
+  var el = document.getElementById('vincularModalOverlay');
+  if (el) el.remove();
+}
+
+var vincularSearchTimer = null;
+function runVincularSearch() {
+  clearTimeout(vincularSearchTimer);
+  vincularSearchTimer = setTimeout(function() {
+    var input = document.getElementById('vincularSearchInput');
+    var q = input ? input.value : '';
+    var resultsEl = document.getElementById('vincularResults');
+    if (!resultsEl) return;
+    resultsEl.innerHTML = '<div style="color:#999;font-size:12px;">Buscando...</div>';
+    fetch('/api/crm/ui/deals?search=' + encodeURIComponent(q) + '&pageSize=10', { headers: authHeaders() }).then(function(r) { return r.json(); }).then(function(r) {
+      var rows = (r && r.deals) || [];
+      if (!rows.length) {
+        resultsEl.innerHTML = '<div style="color:#999;font-size:12px;">Nenhum negocio encontrado. Use "Criar novo negocio" abaixo.</div>';
+        return;
+      }
+      resultsEl.innerHTML = rows.map(function(d) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid #f0f0f0;gap:8px;">' +
+          '<div style="min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtmlLS(d.title || d.patient_name || 'Sem titulo') + '</div>' +
+          '<div style="font-size:11px;color:#999;">' + escapeHtmlLS(d.patient_phone || d.patient_name || '') + '</div></div>' +
+          '<button type="button" onclick="doVincularDeal(' + d.id + ')" style="flex-shrink:0;padding:6px 10px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">Vincular</button>' +
+        '</div>';
+      }).join('');
+    }).catch(function() {
+      resultsEl.innerHTML = '<div style="color:#c0392b;font-size:12px;">Erro ao buscar.</div>';
+    });
+  }, 300);
+}
+
+function doVincularDeal(dealId) {
+  if (!currentConvId) return;
+  fetch('/api/crm/ui/conversations/' + currentConvId + '/link-deal', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ dealId: dealId }) })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r || !r.success) { alert('Erro ao vincular: ' + ((r && r.error) || 'desconhecido')); return; }
+      closeVincularModal();
+      loadConversationSidebar(currentConvId);
+    }).catch(function(e) { alert('Erro ao vincular: ' + e.message); });
+}
+
+function doCriarNovoNegocio() {
+  if (!currentConvId) return;
+  if (!confirm('Criar um novo negocio para esta conversa?')) return;
+  fetch('/api/crm/ui/conversations/' + currentConvId + '/create-deal', { method: 'POST', headers: authHeaders() })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r || !r.success) { alert('Erro ao criar negocio: ' + ((r && r.error) || 'desconhecido')); return; }
+      closeVincularModal();
+      loadConversationSidebar(currentConvId);
+    }).catch(function(e) { alert('Erro ao criar negocio: ' + e.message); });
 }
 
 async function loadConversationSidebar(id) {

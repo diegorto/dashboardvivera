@@ -2497,6 +2497,48 @@ app.get('/api/crm/ui/dashboard/sdrs/whatsapp-hours', auth, async (req, res) => {
   }
 });
 
+app.post('/api/crm/ui/conversations/:id/link-deal', auth, async (req, res) => {
+  try {
+    const { dealId } = req.body || {}
+    if (!dealId) return res.status(400).json({ success: false, error: 'dealId obrigatorio' })
+    const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [req.params.id])
+    if (!conv) return res.status(404).json({ success: false, error: 'Conversa nao encontrada' })
+    const [[deal]] = await pool.query('SELECT * FROM deals WHERE id = ?', [dealId])
+    if (!deal) return res.status(404).json({ success: false, error: 'Negocio nao encontrado' })
+    await pool.query('UPDATE whatsapp_conversations SET deal_id = ?, patient_id = ? WHERE id = ?', [dealId, deal.patient_id, req.params.id])
+    await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)', [dealId, deal.patient_id, 'Conversa de WhatsApp vinculada manualmente por ' + (req.user && req.user.name || 'usuario')])
+    res.json({ success: true, dealId })
+  } catch (e) {
+    console.error('link-deal error', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
+app.post('/api/crm/ui/conversations/:id/create-deal', auth, async (req, res) => {
+  try {
+    const [[conv]] = await pool.query('SELECT * FROM whatsapp_conversations WHERE id = ?', [req.params.id])
+    if (!conv) return res.status(404).json({ success: false, error: 'Conversa nao encontrada' })
+    let patientId = conv.patient_id
+    if (!patientId) {
+      const name = conv.contact_name || 'Lead sem nome (WhatsApp)'
+      const [r0] = await pool.query('INSERT INTO patients (name, phone) VALUES (?, ?)', [name, conv.phone])
+      patientId = r0.insertId
+    }
+    const [[st]] = await pool.query('SELECT id FROM stages WHERE pipeline_id = 1 ORDER BY sort LIMIT 1')
+    const ownerName = (req.user && req.user.name) || null
+    const [r] = await pool.query(
+      'INSERT INTO deals (patient_id, pipeline_id, stage_id, title, origem, owner_name, stage_entered_at) VALUES (?, 1, ?, ?, ?, ?, NOW())',
+      [patientId, st.id, conv.contact_name || 'Lead via WhatsApp (vinculado manualmente)', 'whatsapp_manual', ownerName]
+    )
+    await pool.query('UPDATE whatsapp_conversations SET deal_id = ?, patient_id = ? WHERE id = ?', [r.insertId, patientId, req.params.id])
+    await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)', [r.insertId, patientId, 'Negocio criado manualmente a partir de conversa de WhatsApp sem vinculo, por ' + (ownerName || 'usuario')])
+    res.json({ success: true, dealId: r.insertId })
+  } catch (e) {
+    console.error('create-deal error', e.message)
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 app.post('/api/crm/ui/conversations/:id/resolve', auth, async (req, res) => {
   try {
     const resolved = (req.body || {}).resolved !== false;
