@@ -14,6 +14,7 @@ const STAGE_ID = 1 // Entrada
 const TEXT_DELAY_MS = 10 * 1000
 const AUDIO_DELAY_AFTER_TEXT_MS = 45 * 1000
 const FOLLOWUP_DELAY_MS = 5 * 60 * 1000
+const SECOND_FOLLOWUP_DELAY_MS = 30 * 60 * 1000
 const ACTIVITY_TYPE = 'fluxo_inicial_enviado'
 const AUDIO_CATEGORY = 'Abertura'
 const AUDIO_POSITION = 2
@@ -69,8 +70,30 @@ async function checkAndSendFollowup(conversationId, dealId, patientName) {
     await new Promise(r => setTimeout(r, 1500))
     await wa.sendManualMessage(conversationId, texto2)
     console.log('[fluxoInicial] followup enviado deal=' + dealId + ' conversation=' + conversationId)
+    setTimeout(() => { checkAndSendSecondFollowup(conversationId, dealId, patientName).catch(() => {}) }, SECOND_FOLLOWUP_DELAY_MS)
   } catch (e) {
     console.error('[fluxoInicial] erro ao enviar followup deal=' + dealId + ':', e.message)
+  }
+}
+
+async function checkAndSendSecondFollowup(conversationId, dealId, patientName) {
+  try {
+    const [rows] = await pool.query(
+      'SELECT id FROM whatsapp_messages WHERE conversation_id = ? AND direction = ? AND created_at > DATE_SUB(NOW(), INTERVAL ? SECOND) LIMIT 1',
+      [conversationId, 'in', Math.floor(SECOND_FOLLOWUP_DELAY_MS / 1000)]
+    )
+    if (rows.length > 0) return
+    const t1 = 'Bom, vou avisar a minha consultora que voce entrou em contato querendo mais informacoes.'
+    const t2 = 'Como voce nao respondeu, acredito que esteja meio na correria agora ne? Em breve ela vai te ligar.'
+    const t3 = 'tem algum horario melhor pra falar contigo?'
+    await wa.sendManualMessage(conversationId, t1)
+    await new Promise(r => setTimeout(r, 1500))
+    await wa.sendManualMessage(conversationId, t2)
+    await new Promise(r => setTimeout(r, 1500))
+    await wa.sendManualMessage(conversationId, t3)
+    console.log('[fluxoInicial] segundo followup enviado deal=' + dealId + ' conversation=' + conversationId)
+  } catch (e) {
+    console.error('[fluxoInicial] erro ao enviar segundo followup deal=' + dealId + ':', e.message)
   }
 }
 
