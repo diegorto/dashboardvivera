@@ -58,8 +58,11 @@ async function sendGreetingAndAudio({ dealId, conversationId, patientName }) {
   try {
     const saudacao = saudacaoBrasilia()
     const nome = firstName(patientName)
-    const texto = saudacao + ', ' + nome + ', tudo bem? Aqui é o Dr. Diego. Peraí que vou te mandar um áudio sobre sua pergunta.'
-    await wa.sendManualMessage(conversationId, texto)
+    const texto1 = saudacao + ', ' + nome + ', tudo bem? 😊'
+    const texto2 = 'Aqui é o Dr. Diego... peraí que vou te mandar um áudio sobre sua pergunta'
+    await wa.sendManualMessage(conversationId, texto1)
+    await new Promise(r => setTimeout(r, 1500))
+    await wa.sendManualMessage(conversationId, texto2)
     console.log('[fluxoInicial] texto enviado deal=' + dealId + ' conversation=' + conversationId)
   } catch (e) {
     console.error('[fluxoInicial] erro ao enviar texto deal=' + dealId + ':', e.message)
@@ -73,9 +76,8 @@ async function sendGreetingAndAudio({ dealId, conversationId, patientName }) {
         return
       }
       const fullPath = path.join(__dirname, '..', audio.content)
-      await wa.sendManualMedia(conversationId, fullPath, {
-        fileName: audio.file_name || 'audio.ogg',
-        mimetype: audio.mimetype || undefined
+      await wa.sendManualMedia(conversationId, fullPath, 'audio', {
+        fileName: audio.file_name || 'audio.ogg'
       })
       await pool.query('UPDATE media_library SET usage_count = usage_count + 1 WHERE id = ?', [audio.id])
       console.log('[fluxoInicial] audio enviado deal=' + dealId + ' conversation=' + conversationId)
