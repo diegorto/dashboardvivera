@@ -603,6 +603,18 @@ router.post('/test/send-native-audio-ack', auth, async (req, res) => {
   }
 })
 
+router.post('/test/fluxo-inicial', async (req, res) => {
+  try {
+    const { conversationId, patientName } = req.body
+    if (!conversationId) return res.status(400).json({ success: false, error: 'conversationId obrigatorio' })
+    const fluxoInicial = require('../services/fluxoInicial')
+    await fluxoInicial.testTrigger(conversationId, patientName)
+    res.json({ success: true })
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message })
+  }
+})
+
 router.post('/test/send-native-media', auth, async (req, res) => {
   try {
     const { phone, filePath, type } = req.body
