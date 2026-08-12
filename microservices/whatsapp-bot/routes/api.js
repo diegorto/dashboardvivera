@@ -319,7 +319,7 @@ res.status(500).json({ success: false, error: e.message })
 router.get('/conversations/:id/sidebar', auth, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT c.deal_id AS dealId, d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag, d.notas_manuais
+      `SELECT c.deal_id AS dealId, d.title, d.tags, d.lead_score, d.resumo_crm, d.stage_tag, d.notas_manuais, d.interesse
        FROM whatsapp_conversations c
        LEFT JOIN deals d ON d.id = c.deal_id
        WHERE c.id = ?`,
@@ -337,6 +337,7 @@ router.get('/conversations/:id/sidebar', auth, async (req, res) => {
       leadScore: row.lead_score,
       resumo: row.resumo_crm || null,
       notasManuais: row.notas_manuais || null,
+      interesse: row.interesse || null,
       stageTag: row.stage_tag || null
     })
   } catch (e) {
@@ -382,6 +383,14 @@ router.patch('/conversations/:id/deal-meta', auth, async (req, res) => {
     }
     if (!updates.length) return res.status(400).json({ success: false, error: 'nada para atualizar' })
 
+    if (req.body.interesse !== undefined) {
+      const interesse = req.body.interesse
+      if (interesse !== null && typeof interesse !== 'string') {
+        return res.status(400).json({ success: false, error: 'interesse deve ser texto (ou null)' })
+      }
+      updates.push('interesse = ?')
+      params.push(interesse)
+    }
     params.push(dealId)
     await pool.query('UPDATE deals SET ' + updates.join(', ') + ' WHERE id = ?', params)
     res.json({ success: true })

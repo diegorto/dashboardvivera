@@ -905,13 +905,22 @@ function renderLeadSidebar(info) {
   } else {
     notesHtml = '<span style="color:#999;">sem notas</span>';
   }
+  var interesseHtml;
+  if (info.dealId) {
+    interesseHtml = '<textarea id="interesseLS" placeholder="Interesse do lead (captado pela IA ou preenchido manualmente)..." style="width:100%;box-sizing:border-box;min-height:50px;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;">' + escapeHtmlLS(info.interesse || '') + '</textarea>' +
+      '<button type="button" onclick="saveInteresseForCurrentLead()" style="margin-top:6px;padding:6px 12px;background:#6c5ce7;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Salvar interesse</button>' +
+      '<span id="interesseSavedLS" style="margin-left:8px;font-size:11px;color:#2e7d32;display:none;">Salvo!</span>';
+  } else {
+    interesseHtml = '<span style="color:#999;">sem negocio vinculado</span>';
+  }
   sidebar.innerHTML =
     '<div style="font-weight:700;margin-bottom:10px;">' + (info.dealTitle ? escapeHtmlLS(info.dealTitle) : 'Lead') + '</div>' +
     linkNoteHtml +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Lead score</div>' + scoreHtml + '</div>' +
     '<div style="margin-bottom:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Tags</div>' + tagsHtml + '</div>' +
     '<div><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Resumo da conversa</div><div style="line-height:1.4;">' + resumoHtml + '</div></div>' +
-    '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>';
+    '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Notas manuais (equipe)</div>' + notesHtml + '</div>' +
+    '<div style="margin-top:14px;"><div style="color:#666;font-size:11px;text-transform:uppercase;margin-bottom:4px;">Interesse</div>' + interesseHtml + '</div>';
   if (!info.dealId) {
     sidebar.innerHTML += '<div style="margin-top:16px;"><button type="button" onclick="openVincularModal()" style="width:100%;padding:9px 12px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">Vincular a um negocio</button></div>';
   }
@@ -998,6 +1007,17 @@ window.saveNotasManuaisForCurrentLead = function saveNotasManuaisForCurrentLead(
     var saved = document.getElementById('notasManuaisSavedLS');
     if (saved) { saved.style.display = 'inline'; setTimeout(function(){ saved.style.display = 'none'; }, 2000); }
   }).catch(function(e){ alert('Erro ao salvar nota: ' + e.message); });
+}
+window.saveInteresseForCurrentLead = function saveInteresseForCurrentLead() {
+  var el = document.getElementById('interesseLS');
+  if (!el || !currentConvId) return;
+  var val = el.value;
+  api('/conversations/' + currentConvId + '/deal-meta', { method: 'PATCH', body: JSON.stringify({ interesse: val }) }).then(function(r){
+    if (!r || !r.success) { alert('Erro ao salvar interesse: ' + ((r && r.error) || 'desconhecido')); return; }
+    if (window.__lastSidebarInfo) window.__lastSidebarInfo.interesse = val;
+    var saved = document.getElementById('interesseSavedLS');
+    if (saved) { saved.style.display = 'inline'; setTimeout(function(){ saved.style.display = 'none'; }, 2000); }
+  }).catch(function(e){ alert('Erro ao salvar interesse: ' + e.message); });
 }
 window.openScheduleForCurrentLead = function openScheduleForCurrentLead() {
   if (!currentConvId) { alert('Selecione uma conversa primeiro.'); return; }
