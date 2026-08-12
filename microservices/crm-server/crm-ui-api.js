@@ -770,7 +770,7 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
     for (const f of funnel) { f.top5 = top5For(f.label); }
 
     const [[wonRow]] = await pool.query(
-      'SELECT COUNT(*) AS c FROM deals WHERE pipeline_id = 1 AND status = "won" AND won_date BETWEEN ? AND ?',
+      'SELECT COUNT(*) AS c FROM deals WHERE COALESCE(pre_win_pipeline_id, pipeline_id) = 1 AND status = "won" AND won_date BETWEEN ? AND ?',
       [fromDt, toDt]
     );
     const [[lostRow]] = await pool.query(
@@ -817,7 +817,7 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
     const refDate = new Date(to + 'T00:00:00');
     const start6 = new Date(refDate.getFullYear(), refDate.getMonth() - 5, 1);
     const [monthlyRevenue] = await pool.query(
-      'SELECT DATE_FORMAT(won_date, "%Y-%m") AS ym, COALESCE(SUM(CASE WHEN pipeline_id = 1 THEN value ELSE 0 END),0) AS receita_pago, COALESCE(SUM(CASE WHEN pipeline_id <> 1 THEN value ELSE 0 END),0) AS receita_organico ' +
+      'SELECT DATE_FORMAT(won_date, "%Y-%m") AS ym, COALESCE(SUM(CASE WHEN COALESCE(pre_win_pipeline_id, pipeline_id) = 1 THEN value ELSE 0 END),0) AS receita_pago, COALESCE(SUM(CASE WHEN COALESCE(pre_win_pipeline_id, pipeline_id) <> 1 THEN value ELSE 0 END),0) AS receita_organico ' +
       'FROM deals WHERE status = "won" AND won_date >= ? ' +
       'GROUP BY ym ORDER BY ym',
       [start6.toISOString().slice(0,10) + ' 00:00:00']
@@ -885,7 +885,7 @@ app.get('/api/crm/ui/dashboard/sdrs', auth, requireAdmin, async (req, res) => {
       'LEFT JOIN ( ' +
       '  SELECT d3.owner_name AS ownerName, COUNT(d3.id) AS vendas, COALESCE(SUM(d3.value),0) AS receita ' +
       '  FROM deals d3 ' +
-      "  WHERE d3.stage_id IN (SELECT id FROM stages WHERE pipeline_id = 1) AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +
+      "  WHERE COALESCE(d3.pre_win_pipeline_id, d3.pipeline_id) = 1 AND d3.status = 'won' AND d3.won_date BETWEEN ? AND ? AND (d3.tags IS NULL OR d3.tags NOT LIKE '%teste_allowlist%') AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = d3.patient_id AND l.name = 'Vendedor') " +
       '  GROUP BY d3.owner_name ' +
       ') vm ON vm.ownerName = u.name ' +
       "WHERE u.role = 'sdr' AND u.active = 1 " +
@@ -971,7 +971,7 @@ app.get('/api/crm/ui/dashboard/sdrs/drilldown', auth, requireAdmin, async (req, 
     } else if (metric === 'qualificados') {
       ;[rows] = await pool.query('SELECT d.id AS dealId, p.name AS patientName, p.phone, d.add_date AS date, d.value FROM deals d JOIN patients p ON p.id = d.patient_id LEFT JOIN stages s ON s.id = d.stage_id WHERE d.owner_name = ? AND d.pipeline_id = 1 AND d.add_date BETWEEN ? AND ? AND s.sort >= 9 ORDER BY d.add_date DESC', [ownerName, fromDt, toDt])
     } else if (metric === 'vendas' || metric === 'fechados') {
-      ;[rows] = await pool.query("SELECT d.id AS dealId, p.name AS patientName, p.phone, d.won_date AS date, d.value FROM deals d JOIN patients p ON p.id = d.patient_id WHERE d.owner_name = ? AND d.pipeline_id = 1 AND d.won_date BETWEEN ? AND ? AND d.status = 'won' ORDER BY d.won_date DESC", [ownerName, fromDt, toDt])
+      ;[rows] = await pool.query("SELECT d.id AS dealId, p.name AS patientName, p.phone, d.won_date AS date, d.value FROM deals d JOIN patients p ON p.id = d.patient_id WHERE d.owner_name = ? AND COALESCE(d.pre_win_pipeline_id, d.pipeline_id) = 1 AND d.won_date BETWEEN ? AND ? AND d.status = 'won' ORDER BY d.won_date DESC", [ownerName, fromDt, toDt])
     } else if (metric === 'orcamentos_gerados') {
       ;[rows] = await pool.query('SELECT d.id AS dealId, p.name AS patientName, p.phone, d.add_date AS date, d.value FROM deals d JOIN patients p ON p.id = d.patient_id WHERE d.owner_name = ? AND d.pipeline_id = 1 AND d.add_date BETWEEN ? AND ? AND d.value > 0 ORDER BY d.add_date DESC', [ownerName, fromDt, toDt])
     } else if (['ligacoes_efetuadas','ligacoes_atendidas','agendamentos','comparecimentos'].includes(metric)) {
@@ -1245,7 +1245,7 @@ async function ddSdrDayMetrics(pool, ownerName, fromDate, toDate) {
   const comp = await ddCountDedupedActivity(pool, ownerName, 'Compareceu', fromDt, toDt)
   const dup = await ddCountDuplicates(pool, ownerName, fromDt, toDt)
   const oppSum = await ddSumDedupedBudget(pool, 'd.owner_name = ? AND a.created_at BETWEEN ? AND ?', [ownerName, fromDt, toDt])
-  const [[fech]] = await pool.query("SELECT COALESCE(SUM(value),0) v FROM deals WHERE pipeline_id = 1 AND owner_name = ? AND status = 'won' AND won_date BETWEEN ? AND ?", [ownerName, fromDt, toDt])
+  const [[fech]] = await pool.query("SELECT COALESCE(SUM(value),0) v FROM deals WHERE COALESCE(pre_win_pipeline_id, pipeline_id) = 1 AND owner_name = ? AND status = 'won' AND won_date BETWEEN ? AND ?", [ownerName, fromDt, toDt])
   return {
     leads_recebidos_dia: leads,
     ligacoes_efetuadas_dia: ligEfet,
@@ -1340,7 +1340,7 @@ app.get('/api/crm/ui/dashboard/sdr-daily/drilldown', auth, requireAdmin, async (
     } else if (metric === 'oportunidades_dia') {
       rows = await ddDedupedBudgetItems(pool, ownerName, fromDt, toDt);
     } else if (metric === 'fechamentos_dia') {
-      [rows] = await pool.query("SELECT d.id AS dealId, COALESCE(p.name, d.title) AS title, d.value AS value, d.won_date AS date FROM deals d LEFT JOIN patients p ON p.id = d.patient_id WHERE d.pipeline_id = 1 AND d.owner_name = ? AND d.status = 'won' AND d.won_date BETWEEN ? AND ? ORDER BY d.won_date DESC", [ownerName, fromDt, toDt]);
+      [rows] = await pool.query("SELECT d.id AS dealId, COALESCE(p.name, d.title) AS title, d.value AS value, d.won_date AS date FROM deals d LEFT JOIN patients p ON p.id = d.patient_id WHERE COALESCE(d.pre_win_pipeline_id, d.pipeline_id) = 1 AND d.owner_name = ? AND d.status = 'won' AND d.won_date BETWEEN ? AND ? ORDER BY d.won_date DESC", [ownerName, fromDt, toDt]);
     } else {
       return res.status(400).json({ success: false, error: 'metric invalido' });
     }
@@ -1520,7 +1520,7 @@ app.get('/api/crm/ui/dashboard/campaigns', auth, requireAdmin, async (req, res) 
         'SUM(CASE WHEN add_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS leads, ' +
         'SUM(CASE WHEN status="won" AND won_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS vendas, ' +
         'COALESCE(SUM(CASE WHEN status="won" AND won_date BETWEEN ? AND ? THEN value ELSE 0 END),0) AS receita ' +
-        'FROM deals WHERE pipeline_id = 1 AND (campanha IS NULL OR LOWER(TRIM(campanha)) <> "ja e paciente") AND (add_date BETWEEN ? AND ? OR (status="won" AND won_date BETWEEN ? AND ?)) ' +
+        'FROM deals WHERE COALESCE(pre_win_pipeline_id, pipeline_id) = 1 AND (campanha IS NULL OR LOWER(TRIM(campanha)) <> "ja e paciente") AND (add_date BETWEEN ? AND ? OR (status="won" AND won_date BETWEEN ? AND ?)) ' +
         'GROUP BY COALESCE(NULLIF(campanha,""), "(sem campanha)") ORDER BY leads DESC LIMIT 30',
       [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
     )
@@ -1541,7 +1541,7 @@ app.get('/api/crm/ui/dashboard/creatives', auth, requireAdmin, async (req, res) 
         'SUM(CASE WHEN add_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS leads, ' +
         'SUM(CASE WHEN status="won" AND won_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS vendas, ' +
         'COALESCE(SUM(CASE WHEN status="won" AND won_date BETWEEN ? AND ? THEN value ELSE 0 END),0) AS receita ' +
-        'FROM deals WHERE pipeline_id = 1 AND (campanha IS NULL OR LOWER(TRIM(campanha)) <> "ja e paciente") AND (add_date BETWEEN ? AND ? OR (status="won" AND won_date BETWEEN ? AND ?)) ' +
+        'FROM deals WHERE COALESCE(pre_win_pipeline_id, pipeline_id) = 1 AND (campanha IS NULL OR LOWER(TRIM(campanha)) <> "ja e paciente") AND (add_date BETWEEN ? AND ? OR (status="won" AND won_date BETWEEN ? AND ?)) ' +
         'GROUP BY COALESCE(NULLIF(ad_name,""), NULLIF(criativo,""), NULLIF(palavra_chave,""), "(sem criativo)") ORDER BY leads DESC LIMIT 30',
       [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
     )
