@@ -89,25 +89,60 @@ app.post('/api/crm/ui/push/subscribe', auth, async (req, res) => {
   }
 })
 
-app.get('/api/crm/ui/deals-lookup', auth, async (req, res) => {
-  try {
-    const search = (req.query.search || '').toString().trim()
-    if (!search) return res.json({ success: true, deals: [] })
-    const [rows] = await pool.query(
-      `SELECT d.id, d.title, p.name AS patient_name, p.phone AS patient_phone
-       FROM deals d
-       JOIN patients p ON p.id = d.patient_id
-       WHERE (p.name LIKE ? OR p.phone LIKE ? OR d.title LIKE ?)
-       ORDER BY d.add_date DESC
-       LIMIT 15`,
-      [`%${search}%`, `%${search}%`, `%${search}%`]
-    )
-    res.json({ success: true, deals: rows })
-  } catch (e) {
-    console.error('deals-lookup error', e.message)
-    res.status(500).json({ success: false, error: 'Erro interno' })
-  }
-})
+  app.get('/api/crm/ui/deals-lookup', auth, async (req, res) => {
+    try {
+      const search = (req.query.search || '').toString().trim()
+      if (!search) return res.json({ success: true, deals: [] })
+
+      // Normaliza telefone: remove formatacao (espacos, parenteses, traco) e gera
+      // variantes com/sem o 9o digito, mesma logica de
+      // microservices/whatsapp-bot/services/crm.js -> phoneDigitVariants()
+      // Corrige bug: busca manual do modal "Vincular a um negocio" nao encontrava
+      // leads existentes quando o telefone era digitado formatado ou sem o 9o digito.
+      function phoneDigitVariants(raw) {
+        const digits = String(raw || '').replace(/\D/g, '')
+        if (!digits) return []
+        const variants = new Set([digits])
+        if (digits.startsWith('55') && digits.length >= 12) {
+          const prefix = digits.slice(0, 4)
+          const rest = digits.slice(4)
+          if (rest.length === 9 && rest[0] === '9') variants.add(prefix + rest.slice(1))
+          else if (rest.length === 8) variants.add(prefix + '9' + rest)
+        }
+        return Array.from(variants)
+      }
+
+      const searchDigits = search.replace(/\D/g, '')
+      const phoneVariants = searchDigits.length >= 8 ? phoneDigitVariants(search) : []
+
+      const conditions = ['p.name LIKE ?', 'd.title LIKE ?']
+      const params = [`%${search}%`, `%${search}%`]
+
+      if (phoneVariants.length) {
+        for (const v of phoneVariants) {
+          conditions.push('p.phone LIKE ?')
+          params.push(`%${v}%`)
+        }
+      } else {
+        conditions.push('p.phone LIKE ?')
+        params.push(`%${search}%`)
+      }
+
+      const [rows] = await pool.query(
+        `SELECT d.id, d.title, p.name AS patient_name, p.phone AS patient_phone
+         FROM deals d
+         JOIN patients p ON p.id = d.patient_id
+         WHERE (${conditions.join(' OR ')})
+         ORDER BY d.add_date DESC
+         LIMIT 15`,
+        params
+      )
+      res.json({ success: true, deals: rows })
+    } catch (e) {
+      console.error('deals-lookup error', e.message)
+      res.status(500).json({ success: false, error: 'Erro interno' })
+    }
+  })
 
 app.get('/api/crm/ui/deals', auth, async (req, res) => {
     try {
