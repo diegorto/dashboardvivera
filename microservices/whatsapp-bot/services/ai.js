@@ -95,6 +95,7 @@ function mostSimilarAiMessage(candidate, recentAiMessages, threshold) {
     humanizer_enabled: 'true',
     qualifier_enabled: 'true',
     ai_globally_enabled: 'true',
+    agenda_enabled: 'false', // Vivi so pode checar/criar agendamento quando isso for 'true' - Diego ativa depois de escrever as instrucoes de oferta da consulta
     redis_ttl_seconds: '86400',
     // Mensagens e FAQ abaixo tambem sao so fallback de emergencia (mesmo motivo do
     // comentario acima). O conteudo real e editado na tela do painel.
@@ -234,22 +235,51 @@ function qualifyForHandoff(userText) {
 // Ponto de integracao com um LLM externo (OpenAI/Anthropic). Se nenhuma API key estiver
 // configurada em .env (OPENAI_API_KEY), o agente cai em modo "somente FAQ + qualificacao",
 // que ja e suficiente para o teste de QR/fluxo, mas nao gera respostas livres.
-async function callLLM(systemPrompt, memory, userText) {
+async function callLLM(systemPrompt, memory, userText, agendaCtx) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
   const fetch = require('node-fetch')
+  const agenda = require('./agenda')
+  const agendaEnabled = !!(agendaCtx && agendaCtx.cfg && agendaCtx.cfg.agenda_enabled === 'true')
   const messages = [
     { role: 'system', content: systemPrompt + INJECTION_GUARD_INSTRUCTION },
     ...memory.map(m => ({ role: m.role, content: m.content })),
     { role: 'user', content: '<mensagem_do_lead>\n' + (userText || '') + '\n</mensagem_do_lead>' }
   ]
+  const baseBody = { model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.6) }
+  if (agendaEnabled) { baseBody.tools = agenda.AGENDA_TOOLS; baseBody.tool_choice = 'auto' }
   const resp = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.6) })
+    body: JSON.stringify(baseBody)
   })
   const data = await resp.json()
-  return data?.choices?.[0]?.message?.content || null
+  let msg = data?.choices?.[0]?.message
+  let rounds = 0
+  // Loop de tool-calling: so executa quando agenda_enabled === 'true'. Limitado a 2 rodadas
+  // para nunca travar a resposta ao paciente caso o modelo insista em chamar tools.
+  while (agendaEnabled && msg && Array.isArray(msg.tool_calls) && msg.tool_calls.length && rounds < 2) {
+    messages.push({ role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls })
+    for (const tc of msg.tool_calls) {
+      let result
+      try {
+        const args = JSON.parse(tc.function.arguments || '{}')
+        result = await agenda.executeAgendaTool(tc.function.name, args, { conversationId: agendaCtx.conversationId })
+      } catch (e) {
+        result = { error: String((e && e.message) || e) }
+      }
+      messages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) })
+    }
+    const resp2 = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, temperature: llmTemp(0.6), tools: agenda.AGENDA_TOOLS, tool_choice: 'auto' })
+    })
+    const data2 = await resp2.json()
+    msg = data2?.choices?.[0]?.message
+    rounds++
+  }
+  return msg?.content || null
 }
 
 
@@ -356,7 +386,7 @@ const memory = await getMemory(conversationId)
 const isFirstContact = memory.length === 0
 let replyText = null
 const [llm, qualification] = await Promise.all([
-  callLLM(groundedSystemPrompt, memory, userText).catch(e => { console.error('[ai] callLLM erro', e.message); return null }),
+  callLLM(groundedSystemPrompt, memory, userText, { cfg, conversationId }).catch(e => { console.error('[ai] callLLM erro', e.message); return null }),
   cfg.qualifier_enabled === 'true'
     ? callStructuredLLM(cfg.qualificador_prompt, memory, userText)
     : Promise.resolve(null)
