@@ -1526,7 +1526,7 @@ app.post('/api/crm/webhooks/tintim', async (req, res) => {
     return res.json({ success: true, patientId, created, dealsUpdated: 0, reentry: true, existingDealIds: openByPhone.map(x => x.id) })
     }
     const [closedHistForNote] = await pool.query(
-      `SELECT d.id, d.status, d.add_date
+      `SELECT d.id, d.status, d.add_date, d.won_date, d.lost_date
        FROM deals d JOIN patients p ON p.id = d.patient_id
        WHERE d.status IN ('won','lost') AND RIGHT(REGEXP_REPLACE(COALESCE(p.phone,''), '[^0-9]', ''), 8) = ?
        ORDER BY d.add_date DESC LIMIT 5`,
@@ -1547,7 +1547,7 @@ app.post('/api/crm/webhooks/tintim', async (req, res) => {
         [r.insertId, patientId])
         autoResolveDealAdName(r.insertId, criativo)
       if (closedHistForNote.length > 0) {
-        const histList = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date(h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
+        const histList = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date((h.status === 'won' ? h.won_date : h.lost_date) || h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
         await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
           [r.insertId, patientId, `Reengajamento — telefone possui historico anterior de negocio(s): ${histList}`])
       }
@@ -1606,7 +1606,7 @@ await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VA
 }
 }
 if (closedHistForNote.length > 0) {
-const histList2 = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date(h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
+const histList2 = closedHistForNote.map(h => `#${h.id} (${h.status === 'won' ? 'ganho' : 'perdido'}, ${new Date((h.status === 'won' ? h.won_date : h.lost_date) || h.add_date).toLocaleDateString('pt-BR')})`).join(', ')
 await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)',
 [r2.insertId, patientId, `Reengajamento — telefone possui historico anterior de negocio(s): ${histList2}`])
 }

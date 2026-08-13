@@ -582,7 +582,7 @@ app.get('/api/crm/ui/dashboard/executive/drilldown', auth, requireAdmin, async (
     let rows = []
     if (indicador === 'Ganho') {
       ;[rows] = await pool.query(
-        "SELECT d.id AS dealId, COALESCE(p.name, d.title) AS title, d.value AS value, d.won_date AS date FROM deals d LEFT JOIN patients p ON p.id = d.patient_id WHERE d.pipeline_id = 1 AND d.status = 'won' AND d.add_date BETWEEN ? AND ? ORDER BY d.won_date DESC",
+        "SELECT d.id AS dealId, COALESCE(p.name, d.title) AS title, d.value AS value, d.won_date AS date FROM deals d LEFT JOIN patients p ON p.id = d.patient_id WHERE d.pipeline_id = 1 AND d.status = 'won' AND d.won_date BETWEEN ? AND ? ORDER BY d.won_date DESC",
         [fromDt, toDt])
     } else if (indicador === 'Perdido') {
       ;[rows] = await pool.query(
