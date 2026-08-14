@@ -718,6 +718,7 @@ openConversation(data.id, (conv2 && (conv2.contact_name || conv2.phone)) || qPho
 async function toggleAi(id, enabled) { await api('/conversations/' + id + '/toggle-ai', { method: 'POST', body: JSON.stringify({ ai_enabled: enabled }) }); }
   async function toggleCadence(id, enabled) { await fetch('/api/crm/ui/conversations/' + id + '/toggle-cadence', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ enabled: enabled }) }); }
 let currentConvId = null;
+  let vincularAutoPhone = null;
 async function handleAttachmentSelected(inputEl) {
   var file = inputEl.files && inputEl.files[0];
   inputEl.value = '';
@@ -869,6 +870,7 @@ const box = document.getElementById('convThreadBox');
 const msgsEl = document.getElementById('convThreadMsgs');
 const titleEl0 = document.getElementById('convThreadTitle');
   titleEl0.textContent = title;
+  (function(){ var conv1 = (window.__allConversations||[]).find(function(c){ return String(c.id) === String(id); }); if (conv1 && conv1.phone && titleEl0.textContent && titleEl0.textContent.indexOf(conv1.phone) === -1) { titleEl0.textContent = titleEl0.textContent + ' - ' + conv1.phone; } })();
   (function(){ var conv0 = (__allConversations||[]).find(function(c){ return String(c.id) === String(id); }); if (conv0 && conv0.deal_id) { titleEl0.href = 'detail.html?id=' + conv0.deal_id; titleEl0.target = '_blank'; titleEl0.style.textDecoration = 'underline'; titleEl0.style.cursor = 'pointer'; titleEl0.title = 'Abrir negocio no CRM'; } else { titleEl0.removeAttribute('href'); titleEl0.removeAttribute('target'); titleEl0.style.textDecoration = 'none'; titleEl0.style.cursor = 'default'; titleEl0.title = ''; } })();
     (function(){ var b = document.getElementById('convThreadBadge'); if (b) { var conv = (__allConversations||[]).find(function(c){ return String(c.id) === String(id); }); if (conv) { var bd = convBadgeInfo(conv); var waitHtml = ''; if (conv.last_sent_by === 'lead') { var t = new Date(String(conv.last_msg_created_at || conv.last_message_at || '').replace(' ', 'T')).getTime(); if (!isNaN(t)) waitHtml = ' (' + fmtWaitTime(Date.now() - t) + ')'; } b.textContent = bd.label + waitHtml; b.style.background = bd.color; b.style.display = 'inline-block'; } else { b.style.display = 'none'; } } })();
   const emptyEl = document.getElementById('convThreadEmpty');
@@ -1385,6 +1387,7 @@ window.openVincularModal = function openVincularModal() {
       '<div style="text-align:right;margin-top:10px;"><button type="button" onclick="closeVincularModal()" style="background:none;border:none;color:#666;cursor:pointer;font-size:12px;">Cancelar</button></div>' +
     '</div>';
   document.body.appendChild(overlay);
+  (function(){ var conv2 = (window.__allConversations||[]).find(function(c){ return String(c.id) === String(currentConvId); }); vincularAutoPhone = (conv2 && conv2.phone) ? String(conv2.phone) : null; if (vincularAutoPhone) { var inp0 = document.getElementById('vincularSearchInput'); if (inp0) inp0.value = vincularAutoPhone; } })();
   runVincularSearch();
 }
 
@@ -1408,7 +1411,8 @@ function runVincularSearch() {
         resultsEl.innerHTML = '<div style="color:#999;font-size:12px;">Nenhum negocio encontrado. Use "Criar novo negocio" abaixo.</div>';
         return;
       }
-      resultsEl.innerHTML = rows.map(function(d) {
+        var __banner = (q && vincularAutoPhone && q === vincularAutoPhone && rows.length) ? '<div style="background:#e8f8ee;border:1px solid #27ae60;color:#1e7e45;font-size:11px;padding:6px 8px;border-radius:6px;margin-bottom:8px;">Sugestão automática pelo telefone da conversa</div>' : '';
+      resultsEl.innerHTML = __banner + rows.map(function(d) {
         return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 6px;border-bottom:1px solid #f0f0f0;gap:8px;">' +
           '<div style="min-width:0;"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtmlLS(d.title || d.patient_name || 'Sem titulo') + '</div>' +
           '<div style="font-size:11px;color:#999;">' + escapeHtmlLS(d.patient_phone || d.patient_name || '') + '</div></div>' +

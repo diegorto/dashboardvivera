@@ -62,11 +62,12 @@ router.get('/status', auth, async (req, res) => {
 router.get('/conversations', auth, async (req, res) => {
   const [rows] = await pool.query(
       "SELECT wc.*, d.owner_name AS deal_owner_name, " +
+      "COALESCE(p.name, d.title, wc.contact_name) AS contact_name, " +
       "(SELECT sent_by FROM whatsapp_messages wm WHERE wm.conversation_id = wc.id ORDER BY wm.id DESC LIMIT 1) AS last_sent_by, " +
       "(SELECT created_at FROM whatsapp_messages wm WHERE wm.conversation_id = wc.id ORDER BY wm.id DESC LIMIT 1) AS last_msg_created_at, " +
       "(SELECT content FROM whatsapp_messages wm WHERE wm.conversation_id = wc.id ORDER BY wm.id DESC LIMIT 1) AS last_msg_content, " +
       "(SELECT message_type FROM whatsapp_messages wm WHERE wm.conversation_id = wc.id ORDER BY wm.id DESC LIMIT 1) AS last_msg_type " +
-      "FROM whatsapp_conversations wc LEFT JOIN deals d ON d.id = wc.deal_id " +
+      "FROM whatsapp_conversations wc LEFT JOIN deals d ON d.id = wc.deal_id LEFT JOIN patients p ON p.id = wc.patient_id " +
       "ORDER BY wc.last_message_at DESC LIMIT 300"
     )
   res.json({ success: true, conversations: rows })
