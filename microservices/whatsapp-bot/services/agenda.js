@@ -14,6 +14,14 @@ const WORK_PERIODS = [
   { startH: 13, endH: 18 }
 ]
 
+// Chave Pix estatica da clinica (copia-e-cola, informada pelo Diego em 2026-08-13).
+// Nao e QR code dinamico nem gateway de pagamento - e so a chave CNPJ da clinica.
+const CLINIC_PIX_KEY = '05945573000101'
+const CLINIC_PIX_KEY_TYPE = 'CNPJ'
+const CLINIC_PIX_TITULAR = 'Vivera Odontologia Premium'
+const CONSULTATION_PRICE_BRL = 200
+const PAYMENT_WINDOW_MINUTES = 30
+
 // Brasilia = UTC-3 o ano inteiro (Brasil nao tem mais horario de verao desde 2019).
 const BRAZIL_UTC_OFFSET_MS = 3 * 60 * 60 * 1000
 
@@ -86,7 +94,7 @@ async function checkAvailability({ dentistUserId, days, slotMinutes } = {}) {
   const busy = rows.map(function (r) { return { start: new Date(r.start_at), end: new Date(r.end_at) } })
 
   const slots = []
-  const MAX_SLOTS = 40
+  const MAX_SLOTS = 500 // alto o suficiente pra pickOfferSlots enxergar ate 21 dias a frente mesmo com agenda vazia; a lista bruta nunca chega ao paciente, so os no maximo 2 escolhidos
 
   for (let d = 0; d < windowDays && slots.length < MAX_SLOTS; d++) {
     const day = new Date(now)
@@ -114,6 +122,39 @@ async function checkAvailability({ dentistUserId, days, slotMinutes } = {}) {
   return { dentist_user_id: professionalId, window_days: windowDays, slot_minutes: step, slots }
 }
 
+// ---- Selecao curada de horarios para oferecer (nunca a lista inteira) ----
+// Usada por checar_disponibilidade: filtra por periodo (manha/tarde) e devolve
+// no maximo 2 opcoes (uma proxima, ate 48h, e uma daqui a ~3 semanas), nunca
+// o array bruto de dezenas de slots. Defesa em profundidade: mesmo que o
+// modelo nao siga a instrucao do system_prompt de nunca listar tudo, a
+// ferramenta em si ja nao devolve mais que 2 opcoes pra vazar.
+const lastOfferByConversation = new Map()
+
+async function pickOfferSlots({ periodo, dentistUserId, conversationId } = {}) {
+  const p = periodo === 'tarde' ? 'tarde' : 'manha'
+  const avail = await checkAvailability({ dentistUserId, days: 21, slotMinutes: 30 })
+  const matches = avail.slots.filter(function (s) {
+    const h = new Date(s.start_at).getUTCHours()
+    return p === 'manha' ? h < 12 : h >= 12
+  })
+  if (!matches.length) return { periodo: p, opcoes: [] }
+
+  const now = nowInClinicWallClock()
+  const in48h = new Date(now.getTime() + 48 * 60 * 60 * 1000)
+  const in18d = new Date(now.getTime() + 18 * 24 * 60 * 60 * 1000)
+
+  const soon = matches.find(function (s) { return new Date(s.start_at) <= in48h }) || matches[0]
+  const later = matches.slice().reverse().find(function (s) { return new Date(s.start_at) >= in18d }) || matches[matches.length - 1]
+
+  const opcoes = [Object.assign({ oferta: 'proxima' }, soon)]
+  if (later && later.start_at !== soon.start_at) {
+    opcoes.push(Object.assign({ oferta: 'daqui_a_semanas' }, later))
+  }
+  const out = { periodo: p, opcoes: opcoes, dentist_user_id: avail.dentist_user_id }
+  if (conversationId) lastOfferByConversation.set(conversationId, out)
+  return out
+}
+
 // ---- Criar agendamento ----
 // Insere um novo evento em calendar_events. Sempre revalida conflito antes de inserir
 // (protege contra corrida entre checar_disponibilidade e criar_agendamento).
@@ -122,6 +163,7 @@ async function createAppointment({ conversationId, dentistUserId, startAt, endAt
   const professionalId = Number(dentistUserId) || DEFAULT_DENTIST_USER_ID
   const start = parseWallClock(startAt)
   if (isNaN(start.getTime())) throw new Error('startAt invalido')
+  if (start.getTime() <= nowInClinicWallClock().getTime()) throw new Error('start_at esta no passado - use exatamente o start_at devolvido por checar_disponibilidade, sem recalcular a data')
   const end = endAt ? parseWallClock(endAt) : new Date(start.getTime() + (Number(durationMinutes) || 30) * 60 * 1000)
   if (isNaN(end.getTime()) || end <= start) throw new Error('endAt/durationMinutes invalido')
 
@@ -139,10 +181,11 @@ async function createAppointment({ conversationId, dentistUserId, startAt, endAt
 
   const finalTitle = title || ('Consulta - ' + patientName)
   const description = 'Agendado automaticamente pela Vivi (bot)' + (conversationId ? (' - conversationId ' + conversationId) : '') + (notes ? ('. Obs: ' + notes) : '.')
+  const paymentDueAt = new Date(Date.now() + PAYMENT_WINDOW_MINUTES * 60 * 1000)
 
   const [result] = await pool.query(
-    'INSERT INTO calendar_events (deal_id, dentist_user_id, title, description, start_at, end_at, status, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [dealId, professionalId, finalTitle, description, start, end, 'confirmed', null]
+    'INSERT INTO calendar_events (deal_id, dentist_user_id, title, description, start_at, end_at, status, payment_due_at, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [dealId, professionalId, finalTitle, description, start, end, 'pending_payment', paymentDueAt, null]
   )
 
   return {
@@ -153,7 +196,15 @@ async function createAppointment({ conversationId, dentistUserId, startAt, endAt
     title: finalTitle,
     start_at: start.toISOString(),
     end_at: end.toISOString(),
-    status: 'confirmed'
+    status: 'pending_payment',
+    payment_due_at: paymentDueAt.toISOString(),
+    payment_window_minutes: PAYMENT_WINDOW_MINUTES,
+    pix: {
+      chave: CLINIC_PIX_KEY,
+      tipo_chave: CLINIC_PIX_KEY_TYPE,
+      titular: CLINIC_PIX_TITULAR,
+      valor: CONSULTATION_PRICE_BRL
+    }
   }
 }
 
@@ -166,13 +217,13 @@ const AGENDA_TOOLS = [
     type: 'function',
     function: {
       name: 'checar_disponibilidade',
-      description: 'Consulta a agenda real da clinica e retorna horarios livres para consulta nos proximos dias. Use antes de propor um horario ao paciente.',
+      description: 'Consulta a agenda real da clinica e retorna no maximo 2 opcoes de horario ja curadas para o periodo pedido (nunca a lista completa). So chame depois de perguntar se o paciente prefere manha ou tarde.',
       parameters: {
         type: 'object',
         properties: {
-          dias: { type: 'integer', description: 'Quantos dias a partir de hoje verificar (padrao 7, maximo 21).' }
+          periodo: { type: 'string', enum: ['manha', 'tarde'], description: 'Periodo escolhido pelo paciente: manha ou tarde. Obrigatorio - so chame depois de perguntar isso ao paciente.' }
         },
-        required: []
+        required: ['periodo']
       }
     }
   },
@@ -180,15 +231,16 @@ const AGENDA_TOOLS = [
     type: 'function',
     function: {
       name: 'criar_agendamento',
-      description: 'Cria um agendamento real na agenda da clinica para o paciente desta conversa, em um horario ja confirmado explicitamente pelo paciente. So use depois que o paciente confirmar o horario.',
+      description: 'Cria um agendamento real na agenda da clinica para o paciente desta conversa, em um horario ja confirmado explicitamente pelo paciente. So use depois que o paciente confirmar o horario. Prefira sempre o parametro escolha (proxima ou daqui_a_semanas), referenciando a opcao que checar_disponibilidade acabou de oferecer, em vez de reescrever a data manualmente.',
       parameters: {
         type: 'object',
         properties: {
-          start_at: { type: 'string', description: 'Data/hora de inicio no formato AAAA-MM-DDTHH:MM:SS, sempre no horario local da clinica (o mesmo horario que aparece em checar_disponibilidade). Qualquer sufixo de fuso (Z ou -03:00) e ignorado, so os numeros de data/hora contam.' },
+          escolha: { type: 'string', enum: ['proxima', 'daqui_a_semanas'], description: 'PREFERIDO: qual das duas opcoes que checar_disponibilidade ofereceu o paciente escolheu - proxima (a de amanha/em breve) ou daqui_a_semanas (a mais distante). Use isso sempre que possivel, em vez de start_at.' },
+        start_at: { type: 'string', description: 'Alternativa a escolha, use so se por algum motivo escolha nao se aplicar. Data/hora no formato AAAA-MM-DDTHH:MM:SS, copiada exatamente do valor start_at de uma das opcoes - nunca recalculada de cabeca.' },
           duration_minutes: { type: 'integer', description: 'Duracao em minutos (padrao 30).' },
           observacao: { type: 'string', description: 'Observacao opcional sobre o agendamento.' }
         },
-        required: ['start_at']
+        required: []
       }
     }
   }
@@ -197,13 +249,22 @@ const AGENDA_TOOLS = [
 async function executeAgendaTool(name, args, context) {
   const conversationId = context && context.conversationId
   if (name === 'checar_disponibilidade') {
-    return await checkAvailability({ days: args && args.dias })
+    return await pickOfferSlots({ periodo: args && args.periodo, conversationId: conversationId })
   }
   if (name === 'criar_agendamento') {
+    let startAt = args && args.start_at
+    let durationMinutes = args && args.duration_minutes
+    const escolha = args && args.escolha
+    if (escolha) {
+      const offer = conversationId ? lastOfferByConversation.get(conversationId) : null
+      const opcao = offer.opcoes.find(function (o) { return o.oferta === escolha })
+      startAt = opcao.start_at
+      durationMinutes = 30
+    }
     return await createAppointment({
       conversationId,
-      startAt: args && args.start_at,
-      durationMinutes: args && args.duration_minutes,
+      startAt: startAt,
+      durationMinutes: durationMinutes,
       notes: args && args.observacao
     })
   }
@@ -216,5 +277,6 @@ module.exports = {
   createAppointment,
   getConversationContext,
   AGENDA_TOOLS,
-  executeAgendaTool
+  executeAgendaTool,
+  pickOfferSlots
 }
