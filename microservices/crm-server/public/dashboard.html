@@ -304,6 +304,7 @@ async function loadExecutive(){
     <div class="kpi-grid">
       <div class="kpi-card" style="cursor:pointer" onclick="openLeadsDrilldown('${from}','${to}')"><div class="lbl">Leads</div><div class="val">${d.leads}</div><div class="sub">${d.duplicados||0} duplicado(s)${kpiSrcBreakdown(exSource,'leads',false)}</div></div>
       <div class="kpi-card" style="cursor:pointer" onclick="openQualificadosDrilldown('${from}','${to}')"><div class="lbl">Qualificados</div><div class="val">${d.qualificados}</div><div class="sub">${fmtPct(d.taxaQualif)} taxa de qualif.${kpiSrcBreakdown(exSource,'qualificados',false)}</div></div>
+      <div class="kpi-card"><div class="lbl">Desqualificados</div><div class="val">${d.desqualificados}</div><div class="sub">${fmtPct(d.taxaDesqualif)} taxa de desqualif.${kpiSrcBreakdown(exSource,'desqualificados',false)}</div></div>
       <div class="kpi-card" style="cursor:pointer" onclick="openAgendadasDrilldown('${from}','${to}')"><div class="lbl">Consultas Agendadas</div><div class="val">${d.agendadas}${kpiSrcBreakdown(exSource,'agendadas',false)}</div></div>
       <div class="kpi-card" style="cursor:pointer" onclick="openComparecidasDrilldown('${from}','${to}')"><div class="lbl">Consultas Comparecidas</div><div class="val">${d.comparecidas}</div></div>
       <div class="kpi-card" style="cursor:pointer" onclick="openOrcamentoDrilldown('${from}','${to}')"><div class="lbl">Orcamento</div><div class="val">${fmtMoney(d.orcamento)}${kpiSrcBreakdown(exSource,'orcamento',true)}</div></div>

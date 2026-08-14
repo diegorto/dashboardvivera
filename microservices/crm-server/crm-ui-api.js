@@ -543,6 +543,7 @@ app.get('/api/crm/ui/agenda', auth, async (req, res) => {
     const { fromDt, toDt } = brRangeToUtc(from, to)
     const [[leadsRow]] = await pool.query('SELECT COUNT(*) AS c FROM deals WHERE pipeline_id = 1 AND add_date BETWEEN ? AND ? AND (campanha IS NULL OR LOWER(TRIM(campanha)) <> "ja e paciente") AND count_as_lead_entry = 1', [fromDt, toDt]);
     const [[qualRow]] = await pool.query('SELECT COUNT(*) AS c FROM deals d JOIN stages s ON s.id = d.stage_id WHERE d.pipeline_id = 1 AND s.sort >= 9 AND d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") AND d.count_as_lead_entry = 1', [fromDt, toDt]);
+    const [[desqRow]] = await pool.query('SELECT COUNT(*) AS c FROM deals d WHERE d.pipeline_id = 1 AND d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") AND d.count_as_lead_entry = 1 AND EXISTS (SELECT 1 FROM JSON_TABLE(d.tags, "$[*]" COLUMNS(tag VARCHAR(100) PATH "$")) jt WHERE LOWER(TRIM(jt.tag)) = "desqualificada")', [fromDt, toDt]);
     const [[vendasRow]] = await pool.query('SELECT COUNT(*) AS c, COALESCE(SUM(value),0) AS receita FROM deals WHERE status = "won" AND won_date BETWEEN ? AND ? AND (tags IS NULL OR tags NOT LIKE "%teste_allowlist%") AND NOT EXISTS (SELECT 1 FROM patient_labels pl JOIN labels l ON l.id = pl.label_id WHERE pl.patient_id = deals.patient_id AND l.name = "Vendedor")', [fromDt, toDt]);
     const [[orcRow]] = await pool.query('SELECT COUNT(*) AS c, COALESCE(SUM(amount),0) AS total FROM activities WHERE type = "Orcamento Gerado" AND created_at BETWEEN ? AND ?', [fromDt, toDt]);
     const [[agendRow]] = await pool.query('SELECT COUNT(*) AS c FROM activities WHERE type = "Agendou" AND created_at BETWEEN ? AND ?', [fromDt, toDt]);
@@ -552,6 +553,7 @@ app.get('/api/crm/ui/agenda', auth, async (req, res) => {
     const [dailyQual] = await pool.query('SELECT DATE(d.add_date) AS dia, COUNT(*) AS c FROM deals d JOIN stages s ON s.id = d.stage_id WHERE d.pipeline_id = 1 AND s.sort >= 9 AND d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") AND d.count_as_lead_entry = 1 GROUP BY DATE(d.add_date) ORDER BY dia', [fromDt, toDt]);
     const leads = leadsRow.c;
     const qualificados = qualRow.c;
+    const desqualificados = desqRow.c;
     const vendas = vendasRow.c;
     const receita = Number(vendasRow.receita);
     const agendadas = agendRow.c;
@@ -576,7 +578,9 @@ app.get('/api/crm/ui/agenda', auth, async (req, res) => {
     res.json({
       success: true, from, to,
       leads, qualificados, vendas, receita, orcamento, duplicados,
+      desqualificados,
       taxaQualif: leads ? (qualificados / leads * 100) : 0,
+      taxaDesqualif: leads ? (desqualificados / leads * 100) : 0,
       ticketMedio: vendas ? (receita / vendas) : 0,
       agendadas, comparecidas, faltaram,
       faltaramPct: agendadas ? (faltaram / agendadas * 100) : 0,
@@ -702,9 +706,10 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
       'SUM(CASE WHEN d.pipeline_id IN (1,4) AND d.add_date BETWEEN ? AND ? AND s.sort >= 9 AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") THEN 1 ELSE 0 END) AS qualificados, ' +
       'SUM(CASE WHEN d.status = "won" AND d.won_date BETWEEN ? AND ? THEN 1 ELSE 0 END) AS vendas, ' +
       'COALESCE(SUM(CASE WHEN d.status = "won" AND d.won_date BETWEEN ? AND ? THEN d.value ELSE 0 END),0) AS receita ' +
+        ', SUM(CASE WHEN d.pipeline_id IN (1,4) AND d.add_date BETWEEN ? AND ? AND (d.campanha IS NULL OR LOWER(TRIM(d.campanha)) <> "ja e paciente") AND EXISTS (SELECT 1 FROM JSON_TABLE(d.tags, "$[*]" COLUMNS(tag VARCHAR(100) PATH "$")) jt WHERE LOWER(TRIM(jt.tag)) = "desqualificada") THEN 1 ELSE 0 END) AS desqualificados ' +
       'FROM deals d LEFT JOIN stages s ON s.id = d.stage_id ' +
       'GROUP BY fonte ORDER BY leads DESC',
-      [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
+      [fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt, fromDt, toDt]
     );
 
     const fonteExprLocal = 'COALESCE(NULLIF(CASE WHEN d.origem IN ("Instagram Orgânico","Organico","Orgânico") OR (d.origem = "Instagram" AND COALESCE(d.tintim_source_raw,"") NOT IN ("Meta Ads","Google Ads") AND COALESCE(d.plataforma,"") NOT IN ("Meta Ads","Meta") AND COALESCE(d.utm_source,"") <> "meta-ads" AND d.ad_campaign_name IS NULL AND d.ad_adset_name IS NULL AND d.ad_name IS NULL AND COALESCE(d.campanha,"") = "") THEN "Instagram Organico" WHEN d.origem IN ("Facebook","Facebook Ads","Meta","Meta Ads","Organico","Orgânico","Instagram Orgânico","Instagram Orgânico") THEN "Instagram" WHEN d.origem IN ("Google","Google Ads","Google ads") THEN "Google" WHEN d.origem IN ("Origem nao Identificada","Origem não Identificada","Não rastreada","Nao rastreada") THEN "Sem rastreio" ELSE d.origem END,""),"Sem rastreio")';
@@ -719,14 +724,14 @@ app.get('/api/crm/ui/dashboard/executive-extra', auth, requireAdmin, async (req,
     );
     const bySourceMap = {};
     (bySource || []).forEach(function(r){
-      bySourceMap[r.fonte] = { fonte: r.fonte, leads: Number(r.leads||0), qualificados: Number(r.qualificados||0), vendas: Number(r.vendas||0), receita: Number(r.receita||0), agendadas: 0, orcamento: 0 };
+      bySourceMap[r.fonte] = { fonte: r.fonte, leads: Number(r.leads||0), qualificados: Number(r.qualificados||0), desqualificados: Number(r.desqualificados||0), vendas: Number(r.vendas||0), receita: Number(r.receita||0), agendadas: 0, orcamento: 0 };
     });
     (bySourceAgendadas || []).forEach(function(r){
-      if (!bySourceMap[r.fonte]) bySourceMap[r.fonte] = { fonte: r.fonte, leads: 0, qualificados: 0, vendas: 0, receita: 0, agendadas: 0, orcamento: 0 };
+      if (!bySourceMap[r.fonte]) bySourceMap[r.fonte] = { fonte: r.fonte, leads: 0, qualificados: 0, vendas: 0, receita: 0, agendadas: 0, orcamento: 0, desqualificados: 0 };
       bySourceMap[r.fonte].agendadas = Number(r.c||0);
     });
     (bySourceOrcamento || []).forEach(function(r){
-      if (!bySourceMap[r.fonte]) bySourceMap[r.fonte] = { fonte: r.fonte, leads: 0, qualificados: 0, vendas: 0, receita: 0, agendadas: 0, orcamento: 0 };
+      if (!bySourceMap[r.fonte]) bySourceMap[r.fonte] = { fonte: r.fonte, leads: 0, qualificados: 0, vendas: 0, receita: 0, agendadas: 0, orcamento: 0, desqualificados: 0 };
       bySourceMap[r.fonte].orcamento = Number(r.total||0);
     });
     const bySourceEnriched = Object.keys(bySourceMap).map(function(k){ return bySourceMap[k]; });
@@ -2578,6 +2583,10 @@ app.post('/api/crm/ui/conversations/:id/link-deal', auth, async (req, res) => {
     const [[deal]] = await pool.query('SELECT * FROM deals WHERE id = ?', [dealId])
     if (!deal) return res.status(404).json({ success: false, error: 'Negocio nao encontrado' })
     await pool.query('UPDATE whatsapp_conversations SET deal_id = ?, patient_id = ? WHERE id = ?', [dealId, deal.patient_id, req.params.id])
+    if (deal.patient_id) {
+      const [[__cnLink]] = await pool.query('SELECT name FROM patients WHERE id = ?', [deal.patient_id])
+      if (__cnLink && __cnLink.name) await pool.query('UPDATE whatsapp_conversations SET contact_name = ? WHERE id = ?', [__cnLink.name, req.params.id])
+    }
     await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)', [dealId, deal.patient_id, 'Conversa de WhatsApp vinculada manualmente por ' + (req.user && req.user.name || 'usuario')])
     res.json({ success: true, dealId })
   } catch (e) {
@@ -2603,6 +2612,10 @@ app.post('/api/crm/ui/conversations/:id/create-deal', auth, async (req, res) => 
       [patientId, st.id, conv.contact_name || 'Lead via WhatsApp (vinculado manualmente)', 'whatsapp_manual', ownerName]
     )
     await pool.query('UPDATE whatsapp_conversations SET deal_id = ?, patient_id = ? WHERE id = ?', [r.insertId, patientId, req.params.id])
+    if (patientId) {
+      const [[__cnCreate]] = await pool.query('SELECT name FROM patients WHERE id = ?', [patientId])
+      if (__cnCreate && __cnCreate.name) await pool.query('UPDATE whatsapp_conversations SET contact_name = ? WHERE id = ?', [__cnCreate.name, req.params.id])
+    }
     await pool.query('INSERT INTO activities (deal_id, patient_id, type, content) VALUES (?, ?, "system", ?)', [r.insertId, patientId, 'Negocio criado manualmente a partir de conversa de WhatsApp sem vinculo, por ' + (ownerName || 'usuario')])
     res.json({ success: true, dealId: r.insertId })
   } catch (e) {
