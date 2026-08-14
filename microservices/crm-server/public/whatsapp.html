@@ -226,6 +226,25 @@
       <div class="wa-card" id="handoffAlertsCard" style="border:2px solid #c0392b;background:#fff5f5;margin-bottom:16px;display:none;">
         <div style="font-size:16px;font-weight:700;color:#c0392b;margin-bottom:12px;">Transferencias pendentes (aguardando atendimento humano)</div>
         <div id="handoffAlertsList" style="font-size:13px;"></div>
+<!-- Lead Creation Prompt modal (Diego, 2026-08-13) -->
+<div id="leadPromptModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:24px;max-width:380px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.25);">
+    <p id="leadPromptText" style="margin:0 0 18px;font-size:15px;color:#222;line-height:1.4;"></p>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button id="leadPromptNoBtn" style="padding:8px 18px;border:1px solid #ccc;background:#fff;border-radius:4px;cursor:pointer;font-size:14px;">Não</button>
+      <button id="leadPromptYesBtn" style="padding:8px 18px;border:none;background:#c0392b;color:#fff;border-radius:4px;cursor:pointer;font-size:14px;">Sim</button>
+    </div>
+  </div>
+</div>
+<div id="leadPromptReminderModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:24px;max-width:380px;width:90%;box-shadow:0 4px 24px rgba(0,0,0,.25);">
+    <p id="leadPromptReminderText" style="margin:0 0 18px;font-size:15px;color:#222;line-height:1.4;"></p>
+    <div style="display:flex;justify-content:flex-end;">
+      <button id="leadPromptReminderOkBtn" style="padding:8px 18px;border:none;background:#c0392b;color:#fff;border-radius:4px;cursor:pointer;font-size:14px;">OK</button>
+    </div>
+  </div>
+</div>
+
       </div>
 
     <div class="wa-card" style="border:2px solid #25D366; background:#f4fff8; margin-bottom:16px;">
@@ -497,6 +516,52 @@ async function refreshHandoffAlerts() {
     setInterval(refreshStatus, 5000);
       refreshHandoffAlerts();
       setInterval(refreshHandoffAlerts, 15000);
+      // ---- Lead Creation Prompt: polling + modal (Diego, 2026-08-13) ----
+      var leadPromptQueue = [];
+      var leadPromptShowing = null;
+      async function refreshLeadPrompts() {
+        try {
+          const data = await fetch('/api/crm/ui/lead-prompts', { headers: authHeaders() }).then(r => r.json());
+          if (!data || !data.success || !data.prompts) return;
+          data.prompts.forEach(function(p) {
+            if (leadPromptShowing && leadPromptShowing.id === p.id) return;
+            if (leadPromptQueue.some(function(q){ return q.id === p.id; })) return;
+            leadPromptQueue.push(p);
+          });
+          if (!leadPromptShowing && leadPromptQueue.length) showNextLeadPrompt();
+        } catch (e) { console.error('refreshLeadPrompts erro', e); }
+      }
+      function showNextLeadPrompt() {
+        leadPromptShowing = leadPromptQueue.shift();
+        if (!leadPromptShowing) return;
+        document.getElementById('leadPromptText').textContent = 'Novo lead detectado sem origem no Tintim. Posso criar um novo negócio no CRM?';
+        document.getElementById('leadPromptModal').style.display = 'flex';
+      }
+      async function respondLeadPrompt(response) {
+        const p = leadPromptShowing;
+        if (!p) return;
+        document.getElementById('leadPromptModal').style.display = 'none';
+        try {
+          const data = await fetch('/api/crm/ui/lead-prompts/' + p.id + '/respond', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify({ response: response })
+          }).then(r => r.json());
+          if (response === 'yes' && data && data.success && data.created) {
+            document.getElementById('leadPromptReminderText').textContent = 'Deal criado para o número ' + p.phone + '. Não esqueça de registrar a origem desse lead.';
+            document.getElementById('leadPromptReminderModal').style.display = 'flex';
+          }
+        } catch (e) { console.error('respondLeadPrompt erro', e); }
+        leadPromptShowing = null;
+        showNextLeadPrompt();
+      }
+      document.getElementById('leadPromptYesBtn').addEventListener('click', function(){ respondLeadPrompt('yes'); });
+      document.getElementById('leadPromptNoBtn').addEventListener('click', function(){ respondLeadPrompt('no'); });
+      document.getElementById('leadPromptReminderOkBtn').addEventListener('click', function(){
+        document.getElementById('leadPromptReminderModal').style.display = 'none';
+      });
+      setInterval(refreshLeadPrompts, 5000);
+      refreshLeadPrompts();
   }
 })();
 

@@ -158,4 +158,31 @@ async function updateQualification(dealId, patientId, qualification, crmSummary)
   )
 }
 
-module.exports = { normalizePhone, phoneDigitVariants, findOrCreatePatient, findOpenDealByPatient, findMostRecentDealByPatient, reopenDeal, createDealForWhatsappLead, logActivity, updateQualification, getNextRoundRobinOwner, ROUND_ROBIN_OWNERS, hasTintimOrigin, isCrmSyncGateEnabled, findPatientByPhone }
+// ---- Lead Creation Prompt (Diego, 2026-08-13) ----
+// Cria um pedido de confirmacao de lead pro SDR responsavel quando o bot detecta
+// numero novo sem patient existente E sem origem confirmada via Tintim.
+// Idempotente: nao duplica se ja existe um pedido 'pending' pro mesmo telefone.
+async function createLeadPromptIfNotExists(rawPhone, leadName) {
+  const phone = normalizePhone(rawPhone)
+  if (!phone) return null
+  const [existing] = await pool.query(
+    "SELECT id FROM lead_creation_prompts WHERE phone = ? AND status = 'pending' LIMIT 1",
+    [phone]
+  )
+  if (existing.length) return existing[0].id
+  const [[assignee]] = await pool.query(
+    "SELECT id FROM users WHERE email = 'heelenice@gmail.com' AND active = 1 LIMIT 1"
+  )
+  if (!assignee) {
+    console.error('[crm] createLeadPromptIfNotExists: usuaria Helenice nao encontrada/ativa')
+    return null
+  }
+  const [r] = await pool.query(
+    "INSERT INTO lead_creation_prompts (phone, lead_name, assigned_user_id, status) VALUES (?, ?, ?, 'pending')",
+    [phone, leadName || null, assignee.id]
+  )
+  console.log('[crm] lead_creation_prompt criado id=' + r.insertId + ' phone=' + phone)
+  return r.insertId
+}
+
+module.exports = { normalizePhone, phoneDigitVariants, findOrCreatePatient, findOpenDealByPatient, findMostRecentDealByPatient, reopenDeal, createDealForWhatsappLead, logActivity, updateQualification, getNextRoundRobinOwner, ROUND_ROBIN_OWNERS, hasTintimOrigin, isCrmSyncGateEnabled, findPatientByPhone, createLeadPromptIfNotExists }

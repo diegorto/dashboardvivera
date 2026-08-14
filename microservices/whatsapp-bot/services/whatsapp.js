@@ -306,6 +306,15 @@ try {
         console.log('[whatsapp] CRM sync bloqueado para ' + phone + ': jid anonimo/grupo (' + fromJid + '), nao cria patient/deal')
       } else {
         console.log('[whatsapp] CRM sync bloqueado: telefone ' + phone + ' sem patient existente - bot NUNCA cria patient novo (regra permanente: so via webhook Tintim lead.create confirmado ou cadastro manual por SDR)')
+        // ---- Lead Creation Prompt hook (Diego, 2026-08-13) ----
+        try {
+          const tintimOrigin = await crm.hasTintimOrigin(phone)
+          if (!tintimOrigin) {
+            await crm.createLeadPromptIfNotExists(phone, null)
+          }
+        } catch (eLeadPrompt) {
+          console.error('[whatsapp] lead-prompt hook error', eLeadPrompt.message)
+        }
       }
     }
     if (patient) {

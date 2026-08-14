@@ -459,6 +459,61 @@ app.post('/api/crm/deals', auth, async (req, res) => {
   }
 })
 
+// ---- Lead Creation Prompts: notificacao SDR numero novo sem Tintim (Diego, 2026-08-13) ----
+app.get('/api/crm/ui/lead-prompts', auth, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, phone, lead_name, created_at FROM lead_creation_prompts
+       WHERE assigned_user_id = ? AND status = 'pending'
+       ORDER BY created_at ASC`,
+      [req.user.id]
+    )
+    res.json({ success: true, prompts: rows })
+  } catch (e) {
+    console.error('lead-prompts list error', e.message)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
+app.post('/api/crm/ui/lead-prompts/:id/respond', auth, async (req, res) => {
+  const conn = await pool.getConnection()
+  try {
+    const id = req.params.id
+    const response = (req.body || {}).response
+    if (!['yes', 'no'].includes(response)) {
+      conn.release()
+      return res.status(400).json({ success: false, error: 'response invalido' })
+    }
+    const [[prompt]] = await conn.query(
+      "SELECT * FROM lead_creation_prompts WHERE id = ? AND assigned_user_id = ? AND status = 'pending'",
+      [id, req.user.id]
+    )
+    if (!prompt) {
+      conn.release()
+      return res.status(404).json({ success: false, error: 'Prompt nao encontrado ou ja respondido' })
+    }
+    if (response === 'no') {
+      await conn.query("UPDATE lead_creation_prompts SET status='declined', resolved_at=NOW() WHERE id=?", [id])
+      conn.release()
+      return res.json({ success: true, created: false })
+    }
+    const patientId = await findOrCreatePatient(conn, { name: prompt.lead_name, phone: prompt.phone, email: null })
+    const title = prompt.lead_name ? ('Lead WhatsApp - ' + prompt.lead_name) : 'Lead WhatsApp'
+    const [r] = await conn.query(
+      `INSERT INTO deals (patient_id, pipeline_id, stage_id, title, origem, plataforma, owner_name, sdr_user_id, count_as_lead_entry, stage_entered_at, add_date)
+       VALUES (?, 1, 1, ?, 'Manual SDR (sem Tintim)', 'whatsapp', ?, ?, 0, NOW(), NOW())`,
+      [patientId, title, req.user.name, req.user.id]
+    )
+    await conn.query("UPDATE lead_creation_prompts SET status='accepted', deal_id=?, resolved_at=NOW() WHERE id=?", [r.insertId, id])
+    conn.release()
+    res.json({ success: true, created: true, dealId: r.insertId, phone: prompt.phone })
+  } catch (e) {
+    conn.release()
+    console.error('lead-prompts respond error', e.message)
+    res.status(500).json({ success: false, error: 'Erro interno' })
+  }
+})
+
 app.post('/api/crm/ui/dashboard/tintim/importar', auth, async (req, res) => {
   const conn = await pool.getConnection();
   try {
