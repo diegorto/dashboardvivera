@@ -14,6 +14,16 @@ const WORK_PERIODS = [
   { startH: 13, endH: 18 }
 ]
 
+// Brasilia = UTC-3 o ano inteiro (Brasil nao tem mais horario de verao desde 2019).
+const BRAZIL_UTC_OFFSET_MS = 3 * 60 * 60 * 1000
+
+// 'Agora' nos mesmos digitos crus (sem fuso) usados em calendar_events.start_at/end_at -
+// os digitos de HH:MM que um relogio em Brasilia mostraria neste instante, nao os
+// digitos UTC do servidor (o servidor roda em UTC, 3h adiantado de Brasilia).
+function nowInClinicWallClock() {
+  return new Date(Date.now() - BRAZIL_UTC_OFFSET_MS)
+}
+
 function isWeekday(date) {
   const dow = date.getDay()
   return dow !== 0 && dow !== 6
@@ -66,7 +76,7 @@ async function checkAvailability({ dentistUserId, days, slotMinutes } = {}) {
   const windowDays = Math.min(Math.max(Number(days) || 7, 1), 21)
   const step = Math.min(Math.max(Number(slotMinutes) || 30, 15), 120)
 
-  const now = new Date()
+  const now = nowInClinicWallClock() // horario de parede de Brasilia, nao UTC do servidor
   const until = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000)
 
   const [rows] = await pool.query(
